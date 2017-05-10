@@ -26,6 +26,7 @@
 # include <TProfile2D.h>
 # include <TDatabasePDG.h>
 # include <THStack.h>
+# include <cstdarg>
 #else
 class TList;
 class TH1;
@@ -672,10 +673,14 @@ public:
    * - 1: Only propagate errors from @a ipz (no scale) 
    * - 2: Do not propagate errors or scale by @a ipz 
    *
+   * If mode is less than 2, and @a ipEff is non-zero, then we scale
+   * the histogram @a ipz by the inverse vertex efficiency.
+   * 
    * @param h     Histogram 
    * @param name  Name of projection 
    * @param mode  Mode of operation. 
    * @param ipz   Vertex distribution
+   * @param ipEff IP efficiency @f$ \varepsilon_{V}@f$ 
    * @param mask  Optional mask - if a bin is zero here, do not count
    *              it in average.
    * @param verb  Whether to be verbose 
@@ -686,8 +691,9 @@ public:
 			     const char* name,
 			     UShort_t    mode,
 			     TH1*        ipz,
+			     Double_t    ipEff=0,
 			     TH2*        mask=0,
-			     Bool_t      verb=true);
+			     Bool_t      verb=false);
   /** 
    * Clone an object and add to container 
    * 
@@ -830,6 +836,54 @@ public:
    * @return Opened file handle or null 
    */
   static TFile* OpenFile(const char* filename);
+
+  //__________________________________________________________________
+  /**
+   * A guard idom for producing debug output 
+   * 
+   */
+  struct DebugGuard 
+  {
+    /** 
+     * Constructor 
+     * 
+     * @param lvl       Current level
+     * @param msgLvl    Target level 
+     * @param format    @c printf -like format
+     * 
+     * @return 
+     */
+    DebugGuard(Int_t lvl, Int_t msgLvl, const char* format, ...);
+    /** 
+     * Destructor
+     */
+    ~DebugGuard();
+    /** 
+     * Make a message 
+     * 
+     * @param lvl    Current level
+     * @param msgLvl Target level 
+     * @param format @c printf -like format
+     */
+    static void Message(Int_t lvl, Int_t msgLvl, const char* format, ...);
+  private:
+    /** 
+     * Output the message 
+     * 
+     * @param in    Direction
+     * @param msg   Message 
+     */
+    static void Output(int in, TString& msg);
+    /** 
+     * Format a message 
+     * 
+     * @param out     Output is stored here
+     * @param format  @c printf -like format
+     * @param ap      List of arguments
+     */
+    static void Format(TString& out, const char* format, va_list ap);
+    TString fMsg;
+  };
 protected:
   ClassDef(AliTrackletAODUtils,1); // Utilities
 };
@@ -1141,10 +1195,14 @@ AliTrackletAODUtils::GetC(TDirectory* parent, const char* name, Bool_t v)
 TDirectory*
 AliTrackletAODUtils::GetT(TDirectory* parent, const char* name, Bool_t v)
 {
+  if (!parent) {
+    if (v) ::Warning("GetT", "No parent directory passed");
+    return 0;
+  }
   TDirectory* d = parent->GetDirectory(name);
   if (!d) {
-    if (v) ::Warning("GetO", "Directory \"%s\" not found in \"%s\"",
-			name, parent->GetName());
+    if (v) ::Warning("GetT", "Directory \"%s\" not found in \"%s\"",
+		     name, parent->GetName());
     return 0;
   }
   return d;
@@ -1802,6 +1860,7 @@ TH1* AliTrackletAODUtils::AverageOverIPz(TH2*        h,
 					 const char* name,
 					 UShort_t    mode,
 					 TH1*        ipz,
+					 Double_t    ipEff, 
 					 TH2*        other,
 					 Bool_t      verb)
 {
@@ -1816,6 +1875,8 @@ TH1* AliTrackletAODUtils::AverageOverIPz(TH2*        h,
   p->SetFillStyle(0);
   p->SetYTitle(Form("#LT%s#GT", h->GetYaxis()->GetTitle()));
   p->Reset();
+  if (ipz && mode < 2 && ipEff > 1e-6) ipz->Scale(1./ipEff);
+  
   for (Int_t etaBin = 1; etaBin <= nEta; etaBin++) {
     TArrayD hv(nIPz);
     TArrayD he(nIPz);
@@ -2189,9 +2250,11 @@ TFile* AliTrackletAODUtils::OpenFile(const char* filename)
 const char* AliTrackletAODUtils::CentName(Double_t c1, Double_t c2)
 {
   static TString tmp;
-  tmp.Form("cent%03dd%02d_%03dd%02d",
-	   Int_t(c1), Int_t(c1*100)%100,
-	   Int_t(c2), Int_t(c2*100)%100);
+  tmp = "all";
+  if (c1 < c2) 
+    tmp.Form("cent%03dd%02d_%03dd%02d",
+	     Int_t(c1), Int_t(c1*100)%100,
+	     Int_t(c2), Int_t(c2*100)%100);
   return tmp.Data();
 }
 //____________________________________________________________________
@@ -2221,6 +2284,60 @@ Color_t AliTrackletAODUtils::CentColor(const TAxis& axis,
   return CentColor(binC);
 }
 
+//====================================================================
+AliTrackletAODUtils::DebugGuard::DebugGuard(Int_t lvl, Int_t msgLvl, 
+					    const char* format, ...)
+  : fMsg("")
+{
+  if (lvl < msgLvl) return; 
+  va_list ap;
+  va_start(ap, format);
+  Format(fMsg, format, ap);
+  va_end(ap);
+  Output(+1, fMsg);
+}
+//____________________________________________________________________
+AliTrackletAODUtils::DebugGuard::~DebugGuard()
+{
+  if (fMsg.IsNull()) return;
+  Output(-1, fMsg);
+}
+//____________________________________________________________________
+void
+AliTrackletAODUtils::DebugGuard::Message(Int_t lvl, Int_t msgLvl, 
+				    const char* format, ...)
+{
+  if (lvl < msgLvl) return; 
+  TString msg;
+  va_list ap;
+  va_start(ap, format);
+  Format(msg, format, ap);
+  va_end(ap);
+  Output(0, msg);
+}
+
+//____________________________________________________________________
+void
+AliTrackletAODUtils::DebugGuard::Format(TString& out, const char* format,
+					va_list ap)
+{
+  static char buf[512];
+  Int_t n = gROOT->GetDirLevel() + 2;
+  for (Int_t i = 0; i < n; i++) buf[i] = ' ';
+  vsnprintf(&(buf[n]), 511-n, format, ap);
+  buf[511] = '\0';
+  out = buf;  
+}
+//____________________________________________________________________
+void
+AliTrackletAODUtils::DebugGuard::Output(int in, TString& msg)
+{
+  msg[0] = (in > 0 ? '>' :  in < 0 ? '<' : '=');
+  if (in < 0) gROOT->DecreaseDirLevel();
+  // gROOT->IndentLevel();
+  Printf(msg);
+  if (in > 0) gROOT->IncreaseDirLevel();
+}
   
   
 #endif

@@ -82,12 +82,13 @@ fUseEtaWeights(kFALSE),
 fUseTrackWeights(kFALSE),
 fUsePhiEtaWeights(kFALSE),
 fUsePhiEtaWeightsChDep(kFALSE),
+fUsePhiEtaWeightsVtxDep(kFALSE),
 fUsePhiEtaCuts(kFALSE),
 fUseZDCESEMulWeights(kFALSE),
 fUseZDCESESpecWeights(kFALSE),
 fWeightsList(NULL),
 fWeightsListChDep(NULL),
-fPhiEtaCutsList(NULL),
+fWeightsListVtxDep(NULL),
 fMultiplicityWeight(NULL),
 fMultiplicityIs(AliFlowCommonConstants::kRP),
 fnBinsForCorrelations(10000),
@@ -101,6 +102,7 @@ fCalculateCRC2(kFALSE),
 fCalculateCRCVZ(kFALSE),
 fCalculateCRCZDC(kFALSE),
 fCalculateEbEFlow(kFALSE),
+fStoreZDCQVecVtxPos(kFALSE),
 fCRC2nEtaBins(6),
 fCalculateFlowQC(kFALSE),
 fCalculateFlowZDC(kFALSE),
@@ -125,11 +127,13 @@ fSelectCharge(""),
 fCorrWeight("TPCuVZuZDCu"),
 fQVecList(NULL),
 fCRCZDCCalibList(NULL),
+fCRCZDCResList(NULL),
 fZDCESEList(NULL),
 fCenWeightsHist(NULL),
 fQAZDCCuts(kFALSE),
 fMinMulZN(1),
-fMaxDevZN(5.)
+fMaxDevZN(5.),
+fZDCGainAlpha(0.395)
 {
   // constructor
   AliDebug(2,"AliAnalysisTaskCRC::AliAnalysisTaskCRC(const char *name, Bool_t useParticleWeights)");
@@ -230,12 +234,13 @@ fUseEtaWeights(kFALSE),
 fUseTrackWeights(kFALSE),
 fUsePhiEtaWeights(kFALSE),
 fUsePhiEtaWeightsChDep(kFALSE),
+fUsePhiEtaWeightsVtxDep(kFALSE),
 fUsePhiEtaCuts(kFALSE),
 fUseZDCESEMulWeights(kFALSE),
 fUseZDCESESpecWeights(kFALSE),
 fWeightsList(NULL),
 fWeightsListChDep(NULL),
-fPhiEtaCutsList(NULL),
+fWeightsListVtxDep(NULL),
 fMultiplicityWeight(NULL),
 fMultiplicityIs(AliFlowCommonConstants::kRP),
 fnBinsForCorrelations(0),
@@ -249,6 +254,7 @@ fCalculateCRC2(kFALSE),
 fCalculateCRCVZ(kFALSE),
 fCalculateCRCZDC(kFALSE),
 fCalculateEbEFlow(kFALSE),
+fStoreZDCQVecVtxPos(kFALSE),
 fCRC2nEtaBins(6),
 fCalculateFlowQC(kFALSE),
 fCalculateFlowZDC(kFALSE),
@@ -273,11 +279,13 @@ fSelectCharge(""),
 fCorrWeight("TPCuVZuZDCu"),
 fQVecList(NULL),
 fCRCZDCCalibList(NULL),
+fCRCZDCResList(NULL),
 fZDCESEList(NULL),
 fCenWeightsHist(NULL),
 fQAZDCCuts(kFALSE),
 fMinMulZN(1),
-fMaxDevZN(5.)
+fMaxDevZN(5.),
+fZDCGainAlpha(0.395)
 {
   // Dummy constructor
   AliDebug(2,"AliAnalysisTaskCRC::AliAnalysisTaskCRC()");
@@ -360,6 +368,7 @@ void AliAnalysisTaskCRC::UserCreateOutputObjects()
   if(fDataSet.EqualTo("2010")) fQC->SetDataSet(AliFlowAnalysisCRC::k2010);
   if(fDataSet.EqualTo("2011")) fQC->SetDataSet(AliFlowAnalysisCRC::k2011);
   if(fDataSet.EqualTo("2015")) fQC->SetDataSet(AliFlowAnalysisCRC::k2015);
+  if(fDataSet.EqualTo("2015v6")) fQC->SetDataSet(AliFlowAnalysisCRC::k2015v6);
   if(fInteractionRate.EqualTo("high")) fQC->SetInteractionRate(AliFlowAnalysisCRC::kHigh);
   if(fInteractionRate.EqualTo("low"))  fQC->SetInteractionRate(AliFlowAnalysisCRC::kLow);
   if(fInteractionRate.EqualTo("pos"))  fQC->SetInteractionRate(AliFlowAnalysisCRC::kPos);
@@ -373,6 +382,7 @@ void AliAnalysisTaskCRC::UserCreateOutputObjects()
   fQC->SetCalculateCRCVZ(fCalculateCRCVZ);
   fQC->SetCalculateCRCZDC(fCalculateCRCZDC);
   fQC->SetCalculateEbEFlow(fCalculateEbEFlow);
+  fQC->SetStoreZDCQVecVtxPos(fStoreZDCQVecVtxPos);
   fQC->SetCRC2nEtaBins(fCRC2nEtaBins);
   fQC->SetCalculateFlowQC(fCalculateFlowQC);
   fQC->SetFlowQCCenBin(fFlowQCCenBin);
@@ -412,12 +422,13 @@ void AliAnalysisTaskCRC::UserCreateOutputObjects()
     if(fUseTrackWeights){fQC->SetUseTrackWeights(fUseTrackWeights);}
     if(fUsePhiEtaWeights){fQC->SetUsePhiEtaWeights(fUsePhiEtaWeights);}
     if(fUsePhiEtaWeightsChDep){fQC->SetUsePhiEtaWeightsChDep(fUsePhiEtaWeightsChDep);}
+    if(fUsePhiEtaWeightsVtxDep){fQC->SetUsePhiEtaWeightsVtxDep(fUsePhiEtaWeightsVtxDep);}
     // Pass the list with weights to class:
     if(fWeightsList) fQC->SetWeightsList(fWeightsList);
     if(fWeightsListChDep) fQC->SetWeightsListChDep(fWeightsListChDep);
+    if(fWeightsListVtxDep) fQC->SetWeightsListVtxDep(fWeightsListVtxDep);
   }
   if(fUsePhiEtaCuts) fQC->SetUsePhiEtaCuts(fUsePhiEtaCuts);
-  if(fPhiEtaCutsList) fQC->SetPhiEtaCutsList(fPhiEtaCutsList);
   // Event weights:
   if(!fMultiplicityWeight->Contains("combinations")) {
     fQC->SetMultiplicityWeight(fMultiplicityWeight->Data());
@@ -428,6 +439,7 @@ void AliAnalysisTaskCRC::UserCreateOutputObjects()
   }
   if (fRecenterZDC) {
     if(fCRCZDCCalibList) fQC->SetCRCZDCCalibList(fCRCZDCCalibList);
+    if(fCRCZDCResList) fQC->SetCRCZDCResList(fCRCZDCResList);
   }
   if (fQAZDCCuts) {
     if(fZDCESEList) fQC->SetZDCESEList(fZDCESEList);
@@ -466,7 +478,7 @@ void AliAnalysisTaskCRC::UserCreateOutputObjects()
       if(fZDCESESpecWeightsHist[k]) fQC->SetZDCESESpecWeightsHist(fZDCESESpecWeightsHist[k],k);
     }
   }
-  
+  fQC->SetZDCGainAlpha(fZDCGainAlpha);
   fQC->SetMultiplicityIs(fMultiplicityIs);
   fQC->SetnBinsForCorrelations(fnBinsForCorrelations);
   fQC->SetUse2DHistograms(fUse2DHistograms);
@@ -541,6 +553,7 @@ void AliAnalysisTaskCRC::Terminate(Option_t *)
   if(fDataSet.EqualTo("2010")) fQC->SetDataSet(AliFlowAnalysisCRC::k2010);
   if(fDataSet.EqualTo("2011")) fQC->SetDataSet(AliFlowAnalysisCRC::k2011);
   if(fDataSet.EqualTo("2015")) fQC->SetDataSet(AliFlowAnalysisCRC::k2015);
+  if(fDataSet.EqualTo("2015v6")) fQC->SetDataSet(AliFlowAnalysisCRC::k2015v6);
   if(fInteractionRate.EqualTo("high")) fQC->SetInteractionRate(AliFlowAnalysisCRC::kHigh);
   if(fInteractionRate.EqualTo("low"))  fQC->SetInteractionRate(AliFlowAnalysisCRC::kLow);
   if(fInteractionRate.EqualTo("pos"))  fQC->SetInteractionRate(AliFlowAnalysisCRC::kPos);

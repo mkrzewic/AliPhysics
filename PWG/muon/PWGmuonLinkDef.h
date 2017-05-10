@@ -60,6 +60,7 @@
 #pragma link C++ class AliAnalysisMuMuCutCombination+;
 #pragma link C++ class AliAnalysisMuMuEventCutter+;
 #pragma link C++ class AliAnalysisMuMuSingle+;
+#pragma link C++ class AliAnalysisMuMuTriggerResponse+;
 #pragma link C++ class AliAnalysisMuMuMinv+;
 #pragma link C++ class AliAnalysisMuMuNch+;
 #pragma link C++ class AliAnalysisTaskNorm+;
@@ -77,5 +78,8 @@
 #pragma link C++ class AliAnalysisTaskLMREventFilter+;
 #pragma link C++ class AliLMREvent+;
 #pragma link C++ class AliLMRMuon+;
+
+#pragma link C++ class AliMuonTrackSmearing+;
+#pragma link C++ class AliTaskMuonTrackSmearing+;
 #endif
 

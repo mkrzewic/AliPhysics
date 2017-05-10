@@ -318,6 +318,9 @@ Bool_t AliHFMultiTrials::DoMultiTrials(TH1D* hInvMassHisto, TPad* thePad){
 		if(out && fDrawIndividualFits && thePad){
 		  thePad->Clear();
 		  fitter->DrawHere(thePad);
+		  for (auto format : fInvMassFitSaveAsFormats) {
+		    thePad->SaveAs(Form("FitOutput_%s_Trial%d.%s",hInvMassHisto->GetName(),globBin, format.c_str()));
+		  }
 		}
 	      }
 	      // else{
@@ -452,6 +455,7 @@ void AliHFMultiTrials::SaveToRoot(TString fileName, TString option) const{
     fHistoRawYieldTrialBinC[ic]->Write();
     fHistoRawYieldDistBinC[ic]->Write();
   }
+  fNtupleMultiTrials->SetDirectory(outHistos);
   fNtupleMultiTrials->Write();
   outHistos->Close();
   delete outHistos;

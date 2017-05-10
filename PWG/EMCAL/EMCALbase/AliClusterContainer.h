@@ -11,6 +11,9 @@ class AliVEvent;
 #include <AliVCluster.h>
 
 #include "AliEmcalContainer.h"
+#if !(defined(__CINT__) || defined(__MAKECINT__))
+#include "AliEmcalContainerIndexMap.h"
+#endif
 
 #if !(defined(__CINT__) || defined(__MAKECINT__))
 typedef EMCALIterableContainer::AliEmcalIterableContainerT<AliVCluster, EMCALIterableContainer::operator_star_object<AliVCluster> > AliClusterIterableContainer;
@@ -65,6 +68,9 @@ class AliClusterContainer : public AliEmcalContainer {
   void                        SetMCLabelRange(Int_t min, Int_t max)        { SetMinMCLabel(min)     ; SetMaxMCLabel(max)    ; }
   void                        SetExoticCut(Bool_t e)                       { fExoticCut       = e   ; }
   void                        SetIncludePHOS(Bool_t b)                     { fIncludePHOS = b       ; }
+  void                        SetPhosMinNcells(Int_t n)                    { fPhosMinNcells = n; }
+  void                        SetPhosMinM02(Double_t m)                    { fPhosMinM02 = m; }
+  void                        SetArray(const AliVEvent * event);
   void                        SetClusUserDefEnergyCut(Int_t t, Double_t cut);
   Double_t                    GetClusUserDefEnergyCut(Int_t t) const;
 
@@ -77,29 +83,47 @@ class AliClusterContainer : public AliEmcalContainer {
   const char*                 GetTitle() const;
 
 #if !(defined(__CINT__) || defined(__MAKECINT__))
+  /// Get the EMCal container utils associated with particle containers
+  static const AliEmcalContainerIndexMap <TClonesArray, AliVCluster>& GetEmcalContainerIndexMap() { return fgEmcalContainerIndexMap; }
+
   const AliClusterIterableContainer      all() const;
   const AliClusterIterableContainer      accepted() const;
 
   const AliClusterIterableMomentumContainer      all_momentum() const;
   const AliClusterIterableMomentumContainer      accepted_momentum() const;
-
 #endif
 
  protected:
+  /**
+   * Create default array name for the cluster container. The
+   * default array name will be
+   * - *caloClusters* in case of AOD event
+   * - *CaloClusters* in case of ESD event
+   * @param[in] ev Input event, used for data type selection
+   * @return Appropriate default array name
+   */
+  virtual TString             GetDefaultArrayName(const AliVEvent * const ev) const;
+
   
+#if !(defined(__CINT__) || defined(__MAKECINT__))
+  static AliEmcalContainerIndexMap <TClonesArray, AliVCluster> fgEmcalContainerIndexMap; //!<! Mapping from containers to indices
+#endif
+
   Double_t         fClusTimeCutLow;             ///< low time cut for clusters
   Double_t         fClusTimeCutUp;              ///< up time cut for clusters
   Bool_t           fExoticCut;                  ///< reject clusters marked as "exotic"
   Double_t         fUserDefEnergyCut[AliVCluster::kLastUserDefEnergy+1]; ///< cut on the energy of the cluster after higher level corrections (see AliVCluster.h)
   Int_t            fDefaultClusterEnergy;       ///< default cluster energy: -1 for clus->E(); otherwise clus->GetUserDefEnergy(fDefaultClusterEnergy)
   Bool_t           fIncludePHOS;                ///< whether or not to include PHOS clusters in addition to EMCal clusters
+  Int_t            fPhosMinNcells;              ///< min number of phos cells per cluster
+  Double_t         fPhosMinM02;                 ///< min value of M02 for phos clusters
 
  private:
   AliClusterContainer(const AliClusterContainer& obj); // copy constructor
   AliClusterContainer& operator=(const AliClusterContainer& other); // assignment
 
   /// \cond CLASSIMP
-  ClassDef(AliClusterContainer,6);
+  ClassDef(AliClusterContainer,8);
   /// \endcond
 };
 

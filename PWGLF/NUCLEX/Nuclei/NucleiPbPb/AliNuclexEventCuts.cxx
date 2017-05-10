@@ -1,17 +1,24 @@
 #include "AliNuclexEventCuts.h"
 
+#include <algorithm>
+#include <array>
+using std::array;
 #include <memory>
 #include <vector>
 using std::vector;
 
+#include <TClonesArray.h>
 #include <TH1D.h>
 #include <TH1I.h>
 #include <TH2D.h>
+#include <TH2F.h>
 
 #include <AliAnalysisManager.h>
+#include <AliAODMCParticle.h>
 #include <AliCentrality.h>
 #include <AliESDtrackCuts.h>
 #include <AliInputEventHandler.h>
+#include <AliMCEventHandler.h>
 #include <AliMultSelection.h>
 #include <AliVEventHandler.h>
 #include <AliVMultiplicity.h>
@@ -19,11 +26,16 @@ using std::vector;
 #include <AliAODEvent.h>
 #include <AliESDEvent.h>
 
+ClassImp(AliNuclexEventCutsContainer);
 ClassImp(AliNuclexEventCuts);
+
+
 
 /// Standard constructor with null selection
 ///
 AliNuclexEventCuts::AliNuclexEventCuts(bool saveplots) : TList(),
+  fUtils{},
+  fMC{false},
   fRequireTrackVertex{false},
   fMinVtz{-1000.f},
   fMaxVtz{1000.f},
@@ -33,20 +45,29 @@ AliNuclexEventCuts::AliNuclexEventCuts(bool saveplots) : TList(),
   fMaxResolutionSPDvertex{1000.f},
   fRejectDAQincomplete{false},
   fRequiredSolenoidPolarity{0},
+  fUseMultiplicityDependentPileUpCuts{false},
   fSPDpileupMinContributors{1000},
   fSPDpileupMinZdist{-1.f},
   fSPDpileupNsigmaZdist{-1.f},
   fSPDpileupNsigmaDiamXY{-1.f},
   fSPDpileupNsigmaDiamZ{-1.f},
   fTrackletBGcut{false},
+  fPileUpCutMV{false},
   fCentralityFramework{0},
   fMinCentrality{-1000.f},
   fMaxCentrality{1000.f},
+  fMultSelectionEvCuts{false},
   fUseVariablesCorrelationCuts{false},
   fUseEstimatorsCorrelationCut{false},
   fEstimatorsCorrelationCoef{0.,1.},
   fEstimatorsSigmaPars{10000.,0.,0.,0.},
   fDeltaEstimatorNsigma{1.,1.},
+  fTOFvsFB32correlationPars{0.},
+  fTOFvsFB32sigmaPars{1.e8,0.,0.,0.,0.,0.},
+  fTOFvsFB32nSigmaCut{1.,1.},
+  fESDvsTPConlyLinearCut{1.e8,0.},
+  fMultiplicityV0McorrCut{nullptr},
+  fFB128vsTrklLinearCut{1.e8,0.},
   fRequireExactTriggerMask{false},
   fTriggerMask{AliVEvent::kAny},
   fContainer{},
@@ -58,12 +79,19 @@ AliNuclexEventCuts::AliNuclexEventCuts(bool saveplots) : TList(),
   fCentEstimators{"V0M","CL0"},
   fCentPercentiles{-1.f},
   fPrimaryVertex{nullptr},
+  fNewEvent{true},
+  fOverrideAutoTriggerMask{false},
+  fOverrideAutoPileUpCuts{false},
   fCutStats{nullptr},
   fVtz{nullptr},
   fDeltaTrackSPDvtz{nullptr},
   fCentrality{nullptr},
   fEstimCorrelation{nullptr},
-  fMultCentCorrelation{nullptr}
+  fMultCentCorrelation{nullptr},
+  fTOFvsFB32{nullptr},
+  fTPCvsAll{nullptr},
+  fMultvsV0M{nullptr},
+  fTPCvsTrkl{nullptr}
 {
   SetName("AliNuclexEventCuts");
   SetOwner(true);
@@ -75,7 +103,7 @@ bool AliNuclexEventCuts::AcceptEvent(AliVEvent *ev) {
   if (!fManualMode && current_run != fCurrentRun) {
     ::Info("AliNuclexEventCuts::AcceptEvent","Current run (%i) is different from the previous (%i): setting automatically the corresponding event cuts.",current_run,fCurrentRun);
     fCurrentRun = current_run;
-    AutomaticSetup();
+    AutomaticSetup(ev);
   }
 
   if (fSavePlots && !this->Last()) {
@@ -122,16 +150,23 @@ bool AliNuclexEventCuts::AcceptEvent(AliVEvent *ev) {
     fFlag |= BIT(kVertexQuality);
   fPrimaryVertex = const_cast<AliVVertex*>(vtx);
 
-  /// SPD pile-up rejection
+  /// Pile-up rejection
+  AliVMultiplicity* mult = ev->GetMultiplicity();
+  const int ntrkl = mult->GetNumberOfTracklets();
+  if (fUseMultiplicityDependentPileUpCuts) {
+    if (ntrkl < 20) fSPDpileupMinContributors = 3;
+    else if (ntrkl < 50) fSPDpileupMinContributors = 4;
+    else fSPDpileupMinContributors = 5;
+  }
+  fUtils.SetMinPlpContribMV(fSPDpileupMinContributors);
   if (!ev->IsPileupFromSPD(fSPDpileupMinContributors,fSPDpileupMinZdist,fSPDpileupNsigmaZdist,fSPDpileupNsigmaDiamXY,fSPDpileupNsigmaDiamZ) &&
-      (!fTrackletBGcut || !fUtils.IsSPDClusterVsTrackletBG(ev)))
+      (!fTrackletBGcut || !fUtils.IsSPDClusterVsTrackletBG(ev)) &&
+      (!fPileUpCutMV || !fUtils.IsPileUpMV(ev)))
     fFlag |= BIT(kPileUp);
 
   /// Centrality cuts:
   /// * Check for min and max centrality
   /// * Cross check correlation between two centrality estimators
-  AliVMultiplicity* mult = ev->GetMultiplicity();
-  const int ntrkl = mult->GetNumberOfTracklets();
   if (fCentralityFramework) {
     if (fCentralityFramework == 2) {
       AliCentrality* cent = ev->GetCentrality();
@@ -139,26 +174,38 @@ bool AliNuclexEventCuts::AcceptEvent(AliVEvent *ev) {
       fCentPercentiles[1] = cent->GetCentralityPercentile(fCentEstimators[1].data());
     } else {
       AliMultSelection* cent = (AliMultSelection*)ev->FindListObject("MultSelection");
-      fCentPercentiles[0] = cent->GetMultiplicityPercentile(fCentEstimators[0].data(), true);
-      fCentPercentiles[1] = cent->GetMultiplicityPercentile(fCentEstimators[1].data(), true);
+      fCentPercentiles[0] = cent->GetMultiplicityPercentile(fCentEstimators[0].data(), fMultSelectionEvCuts);
+      fCentPercentiles[1] = cent->GetMultiplicityPercentile(fCentEstimators[1].data(), fMultSelectionEvCuts);
     }
     const auto& x = fCentPercentiles[1];
     const double center = x * fEstimatorsCorrelationCoef[1] + fEstimatorsCorrelationCoef[0];
     const double sigma = fEstimatorsSigmaPars[0] + fEstimatorsSigmaPars[1] * x + fEstimatorsSigmaPars[2] * x * x + fEstimatorsSigmaPars[3] * x * x * x;
-    if ((!fUseEstimatorsCorrelationCut ||
+    if ((!fUseEstimatorsCorrelationCut || fMC ||
           (fCentPercentiles[0] >= center - fDeltaEstimatorNsigma[0] * sigma && fCentPercentiles[0] <= center + fDeltaEstimatorNsigma[1] * sigma))
         && fCentPercentiles[0] >= fMinCentrality
         && fCentPercentiles[0] <= fMaxCentrality) fFlag |= BIT(kMultiplicity);
   } else fFlag |= BIT(kMultiplicity);
 
-  if (fUseVariablesCorrelationCuts) {
+  if (fUseVariablesCorrelationCuts && !fMC) {
     ComputeTrackMultiplicity(ev);
-    ///TODO: fill with Alexandru's cuts
-  }
+    const double fb32 = fContainer.fMultTrkFB32;
+    const double fb32acc = fContainer.fMultTrkFB32Acc;
+    const double fb32tof = fContainer.fMultTrkFB32TOF;
+    const double fb128 = fContainer.fMultTrkTPC;
+    const double esd = fContainer.fMultESD;
+    const double mu32tof = PolN(fb32,fTOFvsFB32correlationPars,3);
+    const double sigma32tof = PolN(fb32,fTOFvsFB32sigmaPars, 5);
+    const bool multV0Mcut = (fMultiplicityV0McorrCut) ? fb32acc > fMultiplicityV0McorrCut->Eval(fCentPercentiles[0]) : true;
+    if ((fb32tof <= mu32tof + fTOFvsFB32nSigmaCut[0] * sigma32tof && fb32tof >= mu32tof - fTOFvsFB32nSigmaCut[1] * sigma32tof) &&
+        (esd < fESDvsTPConlyLinearCut[0] + fESDvsTPConlyLinearCut[1] * fb128) &&
+        multV0Mcut &&
+        (fb128 < fFB128vsTrklLinearCut[0] + fFB128vsTrklLinearCut[1] * ntrkl))
+      fFlag |= BIT(kCorrelations);
+  } else fFlag |= BIT(kCorrelations);
 
   bool allcuts = (fFlag == (BIT(kAllCuts) - 1));
   if (allcuts) fFlag |= BIT(kAllCuts);
-  if (fCutStats != nullptr) {
+  if (fCutStats) {
     for (int iCut = kNoCuts; iCut <= kAllCuts; ++iCut) {
       if (TESTBIT(fFlag,iCut))
         fCutStats->Fill(iCut);
@@ -168,18 +215,22 @@ bool AliNuclexEventCuts::AcceptEvent(AliVEvent *ev) {
 
   /// Filling the monitoring histograms (first iteration always filled, second iteration only for selected events.
   for (int befaft = 0; befaft < 2; ++befaft) {
-    if (fCentrality[befaft] != nullptr) fCentrality[befaft]->Fill(fCentPercentiles[0]);
-    if (fEstimCorrelation[befaft] != nullptr) fEstimCorrelation[befaft]->Fill(fCentPercentiles[1],fCentPercentiles[0]);
-    if (fMultCentCorrelation[befaft] != nullptr) fMultCentCorrelation[befaft]->Fill(fCentPercentiles[0],ntrkl);
-    if (fVtz[befaft] != nullptr) fVtz[befaft]->Fill(vtx->GetZ());
-    if (fDeltaTrackSPDvtz[befaft] != nullptr) fDeltaTrackSPDvtz[befaft]->Fill(dz);
+    if (fCentrality[befaft]) fCentrality[befaft]->Fill(fCentPercentiles[0]);
+    if (fEstimCorrelation[befaft]) fEstimCorrelation[befaft]->Fill(fCentPercentiles[1],fCentPercentiles[0]);
+    if (fMultCentCorrelation[befaft]) fMultCentCorrelation[befaft]->Fill(fCentPercentiles[0],ntrkl);
+    if (fVtz[befaft]) fVtz[befaft]->Fill(vtx->GetZ());
+    if (fDeltaTrackSPDvtz[befaft]) fDeltaTrackSPDvtz[befaft]->Fill(dz);
+    if (fTOFvsFB32[befaft]) fTOFvsFB32[befaft]->Fill(fContainer.fMultTrkFB32,fContainer.fMultTrkFB32TOF);
+    if (fTPCvsAll[befaft])  fTPCvsAll[befaft]->Fill(fContainer.fMultTrkTPC,float(fContainer.fMultESD) - fESDvsTPConlyLinearCut[1] * fContainer.fMultTrkTPC);
+    if (fMultvsV0M[befaft]) fMultvsV0M[befaft]->Fill(GetCentrality(),fContainer.fMultTrkFB32Acc);
+    if (fTPCvsTrkl[befaft]) fTPCvsTrkl[befaft]->Fill(ntrkl,fContainer.fMultTrkTPC);
     if (!allcuts) return false; /// Do not fill the "after" histograms if the event does not pass the cuts.
   }
 
   return true;
 }
 
-void AliNuclexEventCuts::AddQAplotsToList(TList *qaList) {
+void AliNuclexEventCuts::AddQAplotsToList(TList *qaList, bool addCorrelationPlots) {
   if (!qaList) {
     if (fSavePlots)
       qaList = static_cast<TList*>(this);
@@ -188,7 +239,7 @@ void AliNuclexEventCuts::AddQAplotsToList(TList *qaList) {
   }
   static_cast<TList*>(this)->Delete();
 
-  vector<string> bin_labels = {"No cuts","DAQ Incomplete","Magnetic field choice","Trigger selection","Vertex position","Vertex quality","Pile-up","Centrality selection","All cuts"};
+  vector<string> bin_labels = {"No cuts","DAQ Incomplete","Magnetic field choice","Trigger selection","Vertex position","Vertex quality","Pile-up","Centrality selection","Correlations","All cuts"};
   fCutStats = new TH1I("fCutStats",";;Number of selected events",bin_labels.size(),-.5,bin_labels.size() - 0.5);
   for (int iB = 1; iB <= bin_labels.size(); ++iB) fCutStats->GetXaxis()->SetBinLabel(iB,bin_labels[iB-1].data());
   qaList->Add(fCutStats);
@@ -206,11 +257,32 @@ void AliNuclexEventCuts::AddQAplotsToList(TList *qaList) {
     qaList->Add(fCentrality[iS]);
     qaList->Add(fEstimCorrelation[iS]);
     qaList->Add(fMultCentCorrelation[iS]);
+
+    if (addCorrelationPlots) {
+      fTOFvsFB32[iS] = new TH2F(Form("fTOFvsFB32_%s",fkLabels[iS].data()),Form("%s;Multiplicity FB32;Multiplicity FB32+TOF",titles[iS].data()),500,0.,3000.,500,0.,2000.);
+      fTPCvsAll[iS] = new TH2F(Form("fTPCvsAll_%s",fkLabels[iS].data()),Form("%s;Multiplicity TPC;Multiplicity ESD - a_{0} #times Multiplicity TPC",titles[iS].data()),300,0.,3000.,3000,-200.,28800.);
+      fMultvsV0M[iS] = new TH2F(Form("fMultvsV0M_%s",fkLabels[iS].data()),Form("%s;Centrality (V0M);FB32",titles[iS].data()),100,0.,100.,500,0.,3000.);
+      fTPCvsTrkl[iS] = new TH2F(Form("fTPCvsTrkl_%s",fkLabels[iS].data()),Form("%s;SPD tracklets;FB128",titles[iS].data()),2500,0.,5000.,2500,0.,5000.);
+      qaList->Add(fTOFvsFB32[iS]);
+      qaList->Add(fTPCvsAll[iS]);
+      qaList->Add(fMultvsV0M[iS]);
+      qaList->Add(fTPCvsTrkl[iS]);
+    }
   }
 
 }
 
-void AliNuclexEventCuts::AutomaticSetup() {
+void AliNuclexEventCuts::AutomaticSetup(AliVEvent *ev) {
+  if (dynamic_cast<AliAODEvent*>(ev)) {
+    TClonesArray *stack = (TClonesArray*)ev->GetList()->FindObject(AliAODMCParticle::StdBranchName());
+    fMC = (stack) ? true : false;
+  } else if (!dynamic_cast<AliESDEvent*>(ev))
+    AliFatal("I don't find the AOD event nor the ESD one, aborting.");
+  else {
+    AliMCEventHandler* eventHandler = dynamic_cast<AliMCEventHandler*> (AliAnalysisManager::GetAnalysisManager()->GetMCtruthEventHandler());
+    fMC = (eventHandler) ? true : false;
+  }
+
   if (fCurrentRun >= 166423 && fCurrentRun <= 170593) {
     SetupLHC11h();
     return;
@@ -228,7 +300,19 @@ void AliNuclexEventCuts::AutomaticSetup() {
     return;
   }
 
-  ::Fatal("AliNuclexEventCuts::AutomaticSetup","Automatic period detection failed, please use the manual mode.");
+  /// Run 2 p-Pb
+  if ((fCurrentRun >= 265309 && fCurrentRun <= 265525) || /// LHC16q: p-Pb 5 TeV
+      (fCurrentRun >= 265594 && fCurrentRun <= 266318) || /// LHC16r: p-Pb 8 TeV
+      (fCurrentRun >= 267163 && fCurrentRun <= 267166)) { /// LHC16t: p-Pb 5 TeV
+    SetupRun2pA(0);
+    return;
+  }
+  if (fCurrentRun >= 266437 && fCurrentRun <= 267110) {   /// LHC16s: Pb-p 5 TeV
+    SetupRun2pA(1);
+    return;
+  }
+
+  ::Fatal("AliNuclexEventCuts::AutomaticSetup","Automatic period detection failed, please use the manual mode. If you need this period in AliNuclexEventCuts send an email to the DPG event selection mailing list.");
 }
 
 float AliNuclexEventCuts::GetCentrality (unsigned int estimator) const {
@@ -249,13 +333,21 @@ string AliNuclexEventCuts::GetCentralityEstimator (unsigned int estimator) const
     return fCentEstimators[estimator];
 }
 
+
 void AliNuclexEventCuts::ComputeTrackMultiplicity(AliVEvent *ev) {
   AliNuclexEventCutsContainer* tmp_cont = static_cast<AliNuclexEventCutsContainer*>(ev->FindListObject("AliNuclexEventCutsContainer"));
   if (tmp_cont) {
-    fContainer = *tmp_cont;
-    return;
-  }
-  tmp_cont = new AliNuclexEventCutsContainer;
+    unsigned long evid = ((unsigned long)(ev->GetBunchCrossNumber()) << 32) + ev->GetTimeStamp();
+    fNewEvent = (tmp_cont->fEventId != evid);
+    tmp_cont->fEventId = evid;
+    //if (fNewEvent) ::Info("AliNuclexEventCuts::AcceptEvent","New event. %Lu", evid);
+    //else ::Info("AliNuclexEventCuts::AcceptEvent","Old event. %Lu", evid);
+
+    if (!fNewEvent) {
+      fContainer = *tmp_cont;
+      return;
+    }
+  } else tmp_cont = new AliNuclexEventCutsContainer;
 
   bool isAOD = false;
   if (dynamic_cast<AliAODEvent*>(ev))
@@ -333,22 +425,32 @@ void AliNuclexEventCuts::SetupRun2pp() {
 
   fRequiredSolenoidPolarity = 0;
 
-  fSPDpileupMinContributors = 3;
-  fSPDpileupMinZdist = 0.8;
-  fSPDpileupNsigmaZdist = 3.;
-  fSPDpileupNsigmaDiamXY = 2.;
-  fSPDpileupNsigmaDiamZ = 5.;
-  fTrackletBGcut = true;
+  if (!fOverrideAutoPileUpCuts) {
+    fUseMultiplicityDependentPileUpCuts = true; // If user specify a value it is not overwritten
+    fSPDpileupMinZdist = 0.8;
+    fSPDpileupNsigmaZdist = 3.;
+    fSPDpileupNsigmaDiamXY = 2.;
+    fSPDpileupNsigmaDiamZ = 5.;
+    fTrackletBGcut = true;
+  }
 
   if (fCentralityFramework > 1)
     ::Fatal("AliNuclexEventCutsSetupRun2pp","You cannot use the legacy centrality framework in pp. Please set the fCentralityFramework to 0 to disable the multiplicity selection or to 1 to use AliMultSelection.");
-  fCentEstimators[0] = "V0M";
-  fCentEstimators[1] = "CL0";
-  fMinCentrality = 0.f;
-  fMaxCentrality = 100.f;
+  else if (fCentralityFramework == 1) {
+    fCentEstimators[0] = "V0M";
+    fCentEstimators[1] = "CL0";
+    fMinCentrality = 0.f;
+    fMaxCentrality = 100.f;
+  }
 
-  fTriggerMask = AliVEvent::kINT7;
+  fFB128vsTrklLinearCut[0] = 32.077;
+  fFB128vsTrklLinearCut[1] = 0.932;
 
+  if (!fOverrideAutoTriggerMask) fTriggerMask = AliVEvent::kINT7;
+
+  fUtils.SetMaxPlpChi2MV(5);
+  fUtils.SetMinWDistMV(15);
+  fUtils.SetCheckPlpFromDifferentBCMV(kFALSE);
 }
 
 void AliNuclexEventCuts::SetupLHC15o() {
@@ -367,12 +469,14 @@ void AliNuclexEventCuts::SetupLHC15o() {
 
   fRequiredSolenoidPolarity = 0;
 
-  fSPDpileupMinContributors = 5;
-  fSPDpileupMinZdist = 0.8;
-  fSPDpileupNsigmaZdist = 3.;
-  fSPDpileupNsigmaDiamXY = 2.;
-  fSPDpileupNsigmaDiamZ = 5.;
-  fTrackletBGcut = false;
+  if (!fOverrideAutoPileUpCuts) {
+    fUseMultiplicityDependentPileUpCuts = true; // If user specify a value it is not overwritten
+    fSPDpileupMinZdist = 0.8;
+    fSPDpileupNsigmaZdist = 3.;
+    fSPDpileupNsigmaDiamXY = 2.;
+    fSPDpileupNsigmaDiamZ = 5.;
+    fTrackletBGcut = false;
+  }
 
   fCentralityFramework = 1;
   fCentEstimators[0] = "V0M";
@@ -390,7 +494,20 @@ void AliNuclexEventCuts::SetupLHC15o() {
   fDeltaEstimatorNsigma[0] = 5.;
   fDeltaEstimatorNsigma[1] = 5.5;
 
-  fTriggerMask = AliVEvent::kINT7;
+  array<double,4> tof_fb32_corr = {-1.0178, 0.333132, 9.10282e-05, -1.61861e-08};
+  std::copy(tof_fb32_corr.begin(),tof_fb32_corr.end(),fTOFvsFB32correlationPars);
+  array<double,6> tof_fb32_sigma = {1.47848, 0.0385923, -5.06153e-05, 4.37641e-08, -1.69082e-11, 2.35085e-15};
+  std::copy(tof_fb32_sigma.begin(),tof_fb32_sigma.end(),fTOFvsFB32sigmaPars);
+  fTOFvsFB32nSigmaCut[0] = 4.;
+  fTOFvsFB32nSigmaCut[1] = 4.;
+
+  fESDvsTPConlyLinearCut[0] = 15000.;
+  fESDvsTPConlyLinearCut[1] = 3.38;
+
+  if(!fMultiplicityV0McorrCut) fMultiplicityV0McorrCut = new TF1("fMultiplicityV0McorrCut","[0]+[1]*x+[2]*exp([3]-[4]*x) - 5.*([5]+[6]*exp([7]-[8]*x))",0,100);
+  fMultiplicityV0McorrCut->SetParameters(-6.15980e+02, 4.89828e+00, 4.84776e+03, -5.22988e-01, 3.04363e-02, -1.21144e+01, 2.95321e+02, -9.20062e-01, 2.17372e-02);
+
+  if (!fOverrideAutoTriggerMask) fTriggerMask = AliVEvent::kINT7;
 
 }
 
@@ -407,5 +524,29 @@ void AliNuclexEventCuts::SetupLHC11h() {
 
   fUseEstimatorsCorrelationCut = false;
 
-  fTriggerMask = AliVEvent::kMB | AliVEvent::kCentral | AliVEvent::kSemiCentral;
+  if (!fOverrideAutoTriggerMask) fTriggerMask = AliVEvent::kMB | AliVEvent::kCentral | AliVEvent::kSemiCentral;
+}
+
+void AliNuclexEventCuts::SetupRun2pA(int iPeriod) {
+  /// iPeriod: 0 p-Pb 5&8 TeV, 1 Pb-p 8 TeV
+  SetupRun2pp();
+  /// p--Pb requires nsigma cuts on primary vertex
+  fMaxDeltaSpdTrackNsigmaSPD = 20.f;
+  fMaxDeltaSpdTrackNsigmaTrack = 40.f;
+
+  /// No centrality cuts by default
+  fCentralityFramework = 1;
+  fUseEstimatorsCorrelationCut = false;
+
+  fCentEstimators[0] = iPeriod ? "ZNC" : "ZNA";
+  fCentEstimators[1] = iPeriod ? "V0C" : "V0A";
+}
+
+void  AliNuclexEventCuts::OverridePileUpCuts(int minContrib, float minZdist, float nSigmaZdist, float nSigmaDiamXY, float nSigmaDiamZ, bool ov) {
+  fSPDpileupMinContributors = minContrib;
+  fSPDpileupMinZdist = minZdist;
+  fSPDpileupNsigmaZdist = nSigmaZdist;
+  fSPDpileupNsigmaDiamXY = nSigmaDiamXY;
+  fSPDpileupNsigmaDiamZ = nSigmaDiamZ;
+  fOverrideAutoPileUpCuts = ov;
 }

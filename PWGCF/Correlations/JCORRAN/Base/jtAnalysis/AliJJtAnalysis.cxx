@@ -71,6 +71,7 @@ AliJJtAnalysis::AliJJtAnalysis() :
   fbLPCorrel(0),
   fMinimumPt(0),
   fbLPSystematics(false),
+  fMCTruthRun(false),
   fEventBC(0),
   fEfficiency(0),
   fRunTable(0),
@@ -108,6 +109,7 @@ AliJJtAnalysis::AliJJtAnalysis(Bool_t execLocal) :
   fbLPCorrel(0),
   fMinimumPt(0),
   fbLPSystematics(false),
+  fMCTruthRun(false),
   fEventBC(0),
   fEfficiency(0),
   fRunTable(0),
@@ -164,6 +166,7 @@ AliJJtAnalysis::AliJJtAnalysis(const AliJJtAnalysis& obj) :
   fbLPCorrel(obj.fbLPCorrel),
   fMinimumPt(obj.fMinimumPt),
   fbLPSystematics(obj.fbLPSystematics),
+  fMCTruthRun(obj.fMCTruthRun),
   fEventBC(obj.fEventBC),
   fEfficiency(obj.fEfficiency),
   fRunTable(obj.fRunTable),
@@ -193,6 +196,10 @@ void AliJJtAnalysis::UserCreateOutputObjects(){
   
   fHadronSelectionCut =int ( fcard->Get("HadronSelectionCut"));
   
+  // Switch between regular analysis and MC truth analysis
+  fMCTruthRun = false;
+  if(fcard->Get("AnalyseMCTruth") == 1) fMCTruthRun = true;
+  
   // Initialize the histograms needed to store the output
   fhistos = new AliJJtHistograms( fcard );
   if(fcard->Get("QualityControlLevel")>1) fhistos->Set2DHistoCreate(true);
@@ -210,9 +217,8 @@ void AliJJtAnalysis::UserCreateOutputObjects(){
   // Set the number of hits per bin required in the acceptance correction histograms
   int hitsPerBin = fcard->Get("HitsPerBinAcceptance");
   fAcceptanceCorrection->SetMinCountsPerBinInclusive(hitsPerBin);
-  if(fcard->Get("AcceptanceTestMode") == 1){
-    fAcceptanceCorrection->SetTestMode(true);
-  }
+  if(fcard->Get("AcceptanceTestMode") == 1) fAcceptanceCorrection->SetTestMode(true);
+  if(fcard->Get("OnlyMixedEventInSafeRadius") == 1) fAcceptanceCorrection->SetSafeRadius(true);
   
   // Create the class doing correlation analysis
   fcorrelations = new AliJJtCorrelations( fcard, fhistos);
@@ -243,6 +249,7 @@ void AliJJtAnalysis::UserCreateOutputObjects(){
     const int numCentBins  = fcard->GetNoOfBins(kCentrType);
     const int numPttBins   = fcard->GetNoOfBins(kTriggType);
     const int numZvertex   = fcard->GetNoOfBins(kZVertType);
+    const int numXlongBins = fcard->GetNoOfBins(kXeType);
     
     fhistos->fhAcceptanceTraditional2D[0][0][1]->Fill(0.0,0.0);
     int nBinsEta = fhistos->fhAcceptanceTraditional2D[0][0][1]->GetNbinsX();
@@ -331,6 +338,39 @@ void AliJJtAnalysis::UserCreateOutputObjects(){
       } // trigger loop
     } // centrality loop
     
+    
+    if(fcard->Get("TrackMergeSystematics") == 1){
+      
+      // Construct the track merge correction histogram from the obtained track merge correction values
+      for(int iCent = 0; iCent < numCentBins; iCent++){
+        for(int iPtt = 0; iPtt < numPttBins; iPtt++){
+          for(int iXlong = 0; iXlong < numXlongBins; iXlong++){
+            for(int iEta = 0; iEta < nBinsEta; iEta++){
+              for(int iPhi = 0; iPhi < nBinsPhi; iPhi++){
+                etaValue = binWidthEta/2.0 + iEta*binWidthEta - minValueEta;
+                phiValue = binWidthPhi/2.0 + iPhi*binWidthPhi - minValuePhi;
+                for(int iZ = 0; iZ < numZvertex; iZ++){
+                  correction = fAcceptanceCorrection->GetTrackMergeCorrection(etaValue,phiValue,iCent,iZ,iPtt,iXlong);
+                  if(correction < 1e-6){
+                    fhistos->fhDphiDetaTrackMergeCorrection[iCent][iZ][iPtt][iXlong]->Fill(etaValue,phiValue,0);
+                  } else {
+                    fhistos->fhDphiDetaTrackMergeCorrection[iCent][iZ][iPtt][iXlong]->Fill(etaValue,phiValue,1.0/correction);
+                  }
+                }
+              } // phi loop
+            } // eta loop
+          } // xLong loop
+          
+          // In case the histogram is rebinned in acceptance correction class, we need to
+          // normalize the distribution to one here
+          //double maxValue = fhistos->fhAcceptance3DNearSide[iCent][iPtt][0]->GetMaximum();
+          //if(maxValue > 0) fhistos->fhAcceptance3DNearSide[iCent][iPtt][0]->Scale(1.0/maxValue);
+          
+        } // trigger loop
+      } // centrality loop
+      
+    } // Track merge systematics
+    
   } // End of quality control check
   
   //==================================
@@ -339,7 +379,7 @@ void AliJJtAnalysis::UserCreateOutputObjects(){
   fassocPool   = new AliJEventPool( fcard, fhistos, fcorrelations, fjassoc);
   
   fphotonList = new TClonesArray(kParticleProtoType[kJPhoton],1500);
-  fchargedHadronList  = new TClonesArray(kParticleProtoType[kJHadron],1500);
+  fchargedHadronList  = new TClonesArray(kParticleProtoType[fMCTruthRun ? kJHadronMC : kJHadron],1500);
   fpizeroList = new TClonesArray(kParticleProtoType[kJPizero],1500);
   ftriggList  = new TClonesArray(kParticleProtoType[fjtrigg],1500);
   fassocList  = new TClonesArray(kParticleProtoType[fjassoc],1500);
@@ -414,6 +454,10 @@ void AliJJtAnalysis::UserExec(){
 		cout << "sqrts = "<< sqrtS << ",runnumber = "<< frunHeader->GetRunNumber() << endl;
 		fEfficiency->SetRunNumber( frunHeader->GetRunNumber() );
 		fEfficiency->Load();
+    double magneticFieldPolarity = 1;
+    if(frunHeader->GetL3MagnetFieldIntensity() < 0) magneticFieldPolarity = -1;
+    fcorrelations->SetMagneticFieldPolarity(magneticFieldPolarity);
+    cout << "Magnetic field polarity is: " << magneticFieldPolarity << endl;
 		fFirstEvent = kFALSE;
 	}
 
@@ -468,9 +512,10 @@ void AliJJtAnalysis::UserExec(){
 	// Triggers and associated
 	//----------------------ooooo---------------------------------------
 
-	if(fjtrigg==kJHadron || fjassoc==kJHadron){
+	if(fjtrigg==kJHadron || fjassoc==kJHadron || fjtrigg==kJHadronMC || fjassoc==kJHadronMC){
 		fchargedHadronList->Clear();
-		fdmg->RegisterList(fchargedHadronList, NULL, cBin, zBin, kJHadron);
+    
+		fdmg->RegisterList(fchargedHadronList, NULL, cBin, zBin, fMCTruthRun ? kJHadronMC : kJHadron);
 		// apply efficiencies
 
 		for( int i = 0; i < fchargedHadronList->GetEntries(); i++ ){
@@ -478,15 +523,20 @@ void AliJJtAnalysis::UserExec(){
 			triggerTrack = (AliJBaseTrack*)fchargedHadronList->At(i);
 			ptt = triggerTrack->Pt();
 
-			effCorr = 1./fEfficiency->GetCorrection(ptt, fHadronSelectionCut, fcent);  // here you generate warning if ptt>30
-			fhistos->fhTrackingEfficiency[cBin]->Fill( ptt, 1./effCorr );
-			triggerTrack->SetTrackEff( 1./effCorr );
+      if(fMCTruthRun){
+        fhistos->fhTrackingEfficiency[cBin]->Fill( ptt, 1.0 );
+        triggerTrack->SetTrackEff(1.0);
+      } else {
+			  effCorr = 1./fEfficiency->GetCorrection(ptt, fHadronSelectionCut, fcent);  // here you generate warning if ptt>30
+			  fhistos->fhTrackingEfficiency[cBin]->Fill( ptt, 1./effCorr );
+			  triggerTrack->SetTrackEff( 1./effCorr );
+      }
 		}
 	}
 
 	//---- assign input list ---- 
 	if(fjtrigg==kJPizero)      finputList = fpizeroList;  
-	else if(fjtrigg==kJHadron) finputList = fchargedHadronList;
+	else if(fjtrigg==kJHadron || fjtrigg==kJHadronMC) finputList = fchargedHadronList;
 	else if(fjtrigg==kJPhoton) finputList = fphotonList;
 	int noAllTriggTracks = finputList->GetEntries();
 	int noAllChargedTracks = fchargedHadronList->GetEntries();
@@ -561,7 +611,7 @@ void AliJJtAnalysis::UserExec(){
 	fassocList->Clear();
 	int noAssocs=0;
 	if(fjassoc==kJPizero) finputList = fpizeroList;  
-	else if(fjassoc==kJHadron) finputList = fchargedHadronList;
+	else if(fjassoc==kJHadron || fjassoc==kJHadronMC) finputList = fchargedHadronList;
 	else if(fjassoc==kJPhoton) finputList = fphotonList;
 
 	int noAllAssocTracks = finputList->GetEntries();
@@ -589,7 +639,11 @@ void AliJJtAnalysis::UserExec(){
 	// Leading particle pT and eta
 	//-----------------------------------------------
 	if( lpTrackCounter->Exists() ){
-		effCorr = 1./fEfficiency->GetCorrection(lpTrackCounter->Pt(), fHadronSelectionCut, fcent );
+    if(fMCTruthRun){
+      effCorr = 1.0;
+    } else {
+		  effCorr = 1./fEfficiency->GetCorrection(lpTrackCounter->Pt(), fHadronSelectionCut, fcent );
+    }
 		fhistos->fhLPpt->Fill(lpTrackCounter->Pt(), effCorr);
 		fhistos->fhLPeta->Fill(lPTr->Eta(), effCorr);
 	}
@@ -601,7 +655,12 @@ void AliJJtAnalysis::UserExec(){
 	//----------------------ooooo---------------------------------------
 	int nTriggerTracks=-1;
 	nTriggerTracks = fbTriggCorrel ? noTriggs : 1;
-	if(fbLPCorrel && !lpTrackCounter->Exists()) return;
+  if(fbLPCorrel && !lpTrackCounter->Exists()){
+    delete lpTrackCounter;
+    delete subLeadingTrackCounter;
+    return;
+  }
+  
 	triggerTrack = NULL;
 
 	for(int ii=0;ii<nTriggerTracks;ii++){ // trigger loop 
@@ -625,7 +684,7 @@ void AliJJtAnalysis::UserExec(){
 			//-------------------------------------------------------------
 		} // end assoc loop
 	} // end trigg loop
-  
+
 	// ===== Event mixing =====
   fassocPool->Mix(ftriggList, kAzimuthFill, fcent, zVert, noAllChargedTracks, fevt, fbLPCorrel);
 

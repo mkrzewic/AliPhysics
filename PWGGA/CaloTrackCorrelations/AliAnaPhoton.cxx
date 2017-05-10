@@ -114,9 +114,15 @@ fhPtPhotonNPileUpSPDVtxTimeCut2(0),   fhPtPhotonNPileUpTrkVtxTimeCut2(0),
 fhEClusterSM(0),                      fhEPhotonSM(0),
 fhPtClusterSM(0),                     fhPtPhotonSM(0),
 fhMCConversionVertex(0),              fhMCConversionVertexTRD(0),
-fhDistanceAddedPhotonAddedPrimarySignal  (0), fhDistanceHijingPhotonAddedPrimarySignal  (0),
-fhDistanceAddedPhotonAddedSecondarySignal(0), fhDistanceHijingPhotonAddedSecondarySignal(0),
-fhDistanceAddedPhotonHijingSecondary(0)
+//fhDistanceAddedPhotonAddedPrimarySignal  (0), fhDistanceHijingPhotonAddedPrimarySignal  (0),
+//fhDistanceAddedPhotonAddedSecondarySignal(0), fhDistanceHijingPhotonAddedSecondarySignal(0),
+//fhDistanceAddedPhotonHijingSecondary(0)
+fhLocalRegionClusterEnergySumHijing2(0), 
+fhLocalRegionClusterMultiplicityHijing2(0),
+fhLocalRegionClusterEnergySumPerCentralityHijing2(0),
+fhLocalRegionClusterMultiplicityPerCentralityHijing2(0), 
+fhDistance2AddedSignals(0),           fhDistanceAddedSignalsHijing(0),
+fhDistance2Hijing(0)
 {
   for(Int_t i = 0; i < fgkNmcTypes; i++)
   {
@@ -389,13 +395,19 @@ void AliAnaPhoton::ActivityNearCluster(Int_t icalo, Float_t en,
   // CAREFUL if used for Run2 with DCal.
   if(phi < 3.15 - radius && phi > 1.4 + radius && TMath::Abs(eta) < 0.7-radius)
   {
-    TString genName, genNameBkg;
+    TString genName , genNameBkg ;
+    Int_t   genIndex, genIndexBkg;
     Int_t genBkgTag = -1;
+    
+    TString genName2 , genNameBkg2 ;
+    Int_t   genIndex2, genIndexBkg2;
+    Int_t genBkgTag2 = -1;
+
     if( IsDataMC() && IsStudyClusterOverlapsPerGeneratorOn() )
     {
       AliVCluster * calo = (AliVCluster*) (clusterList->At(icalo));
       
-      genBkgTag = GetCocktailGeneratorBackgroundTag(calo, mctag, genName, genNameBkg);
+      genBkgTag = GetCocktailGeneratorBackgroundTag(calo, mctag, genName, genIndex, genNameBkg, genIndexBkg);
       
      }
     
@@ -411,6 +423,9 @@ void AliAnaPhoton::ActivityNearCluster(Int_t icalo, Float_t en,
     Int_t   sumM   = 0;
     Float_t sumEHi = 0;
     Int_t   sumMHi = 0;
+    Float_t sumEHi2 = 0;
+    Int_t   sumMHi2 = 0;
+
     for(Int_t icalo2 = 0; icalo2 < clusterList->GetEntriesFast(); icalo2++)
     {
       if ( icalo2 == icalo ) continue;
@@ -425,22 +440,42 @@ void AliAnaPhoton::ActivityNearCluster(Int_t icalo, Float_t en,
       
       if(TMath::Abs(dPhi) >= TMath::Pi())
         dPhi = TMath::TwoPi()-TMath::Abs(dPhi);
+            
+      Float_t distance = TMath::Sqrt( dEta*dEta + dPhi*dPhi );
       
-      if (TMath::Sqrt( dEta*dEta + dPhi*dPhi ) > radius) continue;
+      genNameBkg2  = "";
+      genName2     = "";
+      genIndexBkg2 = -1;
+      genIndex2    = -1;
+      genBkgTag2   = -1;
+      if( IsDataMC() && IsStudyClusterOverlapsPerGeneratorOn() && calo2->GetNLabels() > 0 && distance < 0.4)
+      {
+        genBkgTag2 = GetCocktailGeneratorBackgroundTag(calo2, -1, genName2, genIndex2, genNameBkg2, genIndexBkg2);
+
+        if( !genName.Contains("ijing") && !genName2.Contains("ijing")) fhDistance2AddedSignals     ->Fill(en,distance,GetEventWeight());
+        if( !genName.Contains("ijing") &&  genName2.Contains("ijing")) fhDistanceAddedSignalsHijing->Fill(en,distance,GetEventWeight());
+        if(  genName.Contains("ijing") &&  genName2.Contains("ijing")) fhDistance2Hijing           ->Fill(en,distance,GetEventWeight());
+      }
+      
+      if ( distance > radius) continue;
       
       sumM++;
       sumE += calo2->E();
       
       if( IsDataMC() && IsStudyClusterOverlapsPerGeneratorOn() && calo2->GetNLabels() > 0)
-      {
-        TString genName2;
-        (GetReader()->GetMC())->GetCocktailGenerator(calo2->GetLabel(),genName2);
-        
+      {        
         if(genName2.Contains("ijing"))
         {
           sumMHi++;
           sumEHi += calo2->E();
         }
+      
+        if(genName2.Contains("ijing") || genBkgTag2 == 1 || genBkgTag2 == 3)
+        {
+          sumMHi2++;
+          sumEHi2 += calo2->E();
+        }
+
       }
     }
     
@@ -472,6 +507,9 @@ void AliAnaPhoton::ActivityNearCluster(Int_t icalo, Float_t en,
     {
       fhLocalRegionClusterEnergySumHijing   [0]->Fill(en,sumEHi ,GetEventWeight());
       fhLocalRegionClusterMultiplicityHijing[0]->Fill(en,sumMHi ,GetEventWeight());
+
+      fhLocalRegionClusterEnergySumHijing2   ->Fill(en,sumEHi2 ,GetEventWeight());
+      fhLocalRegionClusterMultiplicityHijing2->Fill(en,sumMHi2 ,GetEventWeight());
       
       fhLocalRegionClusterEnergySumAdded    [0]->Fill(en,sumEAdd,GetEventWeight());
       fhLocalRegionClusterMultiplicityAdded [0]->Fill(en,sumMAdd,GetEventWeight());
@@ -480,6 +518,9 @@ void AliAnaPhoton::ActivityNearCluster(Int_t icalo, Float_t en,
       {
         fhLocalRegionClusterEnergySumPerCentralityHijing   [0]->Fill(GetEventCentrality(),sumEHi ,GetEventWeight());
         fhLocalRegionClusterMultiplicityPerCentralityHijing[0]->Fill(GetEventCentrality(),sumMHi ,GetEventWeight());        
+
+        fhLocalRegionClusterEnergySumPerCentralityHijing2   ->Fill(GetEventCentrality(),sumEHi2 ,GetEventWeight());
+        fhLocalRegionClusterMultiplicityPerCentralityHijing2->Fill(GetEventCentrality(),sumMHi2 ,GetEventWeight());    
         
         fhLocalRegionClusterEnergySumPerCentralityAdded    [0]->Fill(GetEventCentrality(),sumEAdd,GetEventWeight());
         fhLocalRegionClusterMultiplicityPerCentralityAdded [0]->Fill(GetEventCentrality(),sumMAdd,GetEventWeight());
@@ -619,8 +660,9 @@ void AliAnaPhoton::CocktailGeneratorsClusterOverlaps(AliVCluster* calo, Int_t mc
 {
   //
   // Check the generators inside the cluster
-  TString genName = "", genNameBkg = "";
-  Int_t genBkgTag = GetCocktailGeneratorBackgroundTag(calo, mctag, genName, genNameBkg);
+  TString genName  = "", genNameBkg  = "";
+  Int_t   genIndex = -1, genIndexBkg = -1;
+  Int_t genBkgTag = GetCocktailGeneratorBackgroundTag(calo, mctag, genName, genIndex, genNameBkg, genIndexBkg);
   if     (genBkgTag == -1) return;
   else if(genBkgTag  >  3) printf("Bkg generator tag larger than 3\n");
   
@@ -657,7 +699,8 @@ void AliAnaPhoton::CocktailGeneratorsClusterOverlaps(AliVCluster* calo, Int_t mc
   Int_t genType = GetNCocktailGenNamesToCheck()-1;
   for(Int_t igen = 1; igen < GetNCocktailGenNamesToCheck(); igen++)
   {
-    if ( genName.Contains(GetCocktailGenNameToCheck(igen)) )
+    if ( GetCocktailGenNameToCheck(igen).Contains(genName) && 
+        ( GetCocktailGenIndexToCheck(igen) < 0 || genIndex == GetCocktailGenIndexToCheck(igen)) )
     {
       genType = igen;
       break;
@@ -1036,9 +1079,8 @@ void AliAnaPhoton::FillAcceptanceHistograms()
       continue;
     }
   
-    if(fStudyActivityNearCluster  && photonE > 5) // cut at 5 GeV to avoid too many iterations
-      DistanceToAddedSignal(i,nprim, stack, mcparticles,
-                            photonE,photonEta,photonPhi);
+    //if(fStudyActivityNearCluster  && photonE > 5) // cut at 5 GeV to avoid too many iterations
+     // DistanceToAddedSignalAtGeneratorLevel(i,nprim, stack, mcparticles, photonE,photonEta,photonPhi);
     
     // Consider only final state particles, but this depends on generator,
     // status 1 is the usual one, in case of not being ok, leave the possibility
@@ -1134,170 +1176,170 @@ void AliAnaPhoton::FillAcceptanceHistograms()
 ///
 ///
 //________________________________________________________________________________
-void AliAnaPhoton::DistanceToAddedSignal(Int_t label, Int_t nprim, 
-                                         AliStack * stack, TClonesArray*  mcparticles,
-                                         Float_t photonE, Float_t photonEta, Float_t photonPhi)
-{
-  //Double_t addedY   = -100 ;
-  //Double_t addedE   = -1 ;
-  Double_t addedPt  = -1 ;
-  Double_t addedPhi =  100 ;
-  Double_t addedEta = -1 ;
-  
-  //Int_t    pdg       =  0 ;
-  Int_t    status    =  0 ;
-  Bool_t   inacceptance = kFALSE ;
-    
-  Int_t pdgMomOrg = 0, statusMomOrg = -1, momLabelOrg = -1;
-  Bool_t okMomOrg = kFALSE;
-  GetMCAnalysisUtils()->GetMother(label,GetReader(), pdgMomOrg, statusMomOrg, okMomOrg, momLabelOrg);     
-  
-  TParticle        * primStack = 0;
-  AliAODMCParticle * primAOD   = 0;
-
-  TParticle        * primStackMom = 0;
-  AliAODMCParticle * primAODMom   = 0;
-
-  TString genName;
-  (GetReader()->GetMC())->GetCocktailGenerator(label,genName);
-  
-  for(Int_t i=0 ; i < nprim; i++)
-  {
-    if( i == label ) continue ;
-    
-    if ( !GetReader()->AcceptParticleMCLabel( i ) ) continue ;
-    
-    //printf("particle %d\n",i);
-    
-    Int_t pdgMom = 0, statusMom = -1, momLabel = -1;
-    Bool_t okMom = kFALSE;
-    GetMCAnalysisUtils()->GetMother(i,GetReader(), pdgMom, statusMom, okMom, momLabel);    
-    //printf("\t mom label %d\n",momLabel);
-
-    if(momLabel < 0) continue;
-    
-    Int_t grandMomLabel = -1;
-    if(GetReader()->ReadStack())
-    {
-      primStack = stack->Particle(i) ;
-      if(!primStack)
-      {
-        AliWarning("ESD primaries pointer not available!!");
-        continue;
-      }
-      
-      //pdg    = primStack->GetPdgCode();
-      status = primStack->GetStatusCode();
-      
-      // Protection against floating point exception
-      if ( primStack->Energy() == TMath::Abs(primStack->Pz()) || 
-          (primStack->Energy() - primStack->Pz()) < 1e-3      ||
-          (primStack->Energy() + primStack->Pz()) < 0           )  continue ; 
-      
-      //printf("i %d, %s %d  %s %d \n",i, stack->Particle(i)->GetName(), stack->Particle(i)->GetPdgCode(),
-      //       prim->GetName(), prim->GetPdgCode());
-      
-      // Photon kinematics
-      primStack->Momentum(fMomentum);
-      
-      //addedY = 0.5*TMath::Log((primStack->Energy()+primStack->Pz())/(primStack->Energy()-primStack->Pz())) ;
-      
-      if(momLabel >= 0)
-      {
-        primStackMom = stack->Particle(momLabel) ;
-        grandMomLabel = primStackMom->GetFirstMother();      
-      }
-    }
-    else
-    {
-      primAOD = (AliAODMCParticle *) mcparticles->At(i);
-      if(!primAOD)
-      {
-        AliWarning("AOD primaries pointer not available!!");
-        continue;
-      }
-      //pdg    = primAOD->GetPdgCode();
-      status = primAOD->GetStatus();
-      
-      //printf("\t pdg %d, status %d, E %f, pz %f\n",pdg,status,primAOD->E(),primAOD->Pz());
-
-      // Protection against floating point exception
-      if ( primAOD->E() == TMath::Abs(primAOD->Pz()) || 
-          (primAOD->E() - primAOD->Pz()) < 1e-3      || 
-          (primAOD->E() + primAOD->Pz()) < 0           )  continue ; 
-      
-      // Photon kinematics
-      fMomentum.SetPxPyPzE(primAOD->Px(),primAOD->Py(),primAOD->Pz(),primAOD->E());
-
-      //addedY = 0.5*TMath::Log((primAOD->E()+primAOD->Pz())/(primAOD->E()-primAOD->Pz())) ;
-      
-      if(momLabel >= 0)
-      {
-        primAODMom = (AliAODMCParticle *) mcparticles->At(momLabel);
-        grandMomLabel = primAODMom->GetMother();
-      }
-    }
-    //printf("\t grandmom %d\n",grandMomLabel);
-   
-    // Select only photons in the final state
-    //if(pdg != 22 ) continue ;
-    
-    // If too small or too large pt, skip, same cut as for data analysis
-    addedPt  = fMomentum.Pt () ;
-    
-    if(addedPt < GetMinPt() || addedPt > GetMaxPt() ) continue ;
-    
-    //addedE   = fMomentum.E  () ;
-    addedEta = fMomentum.Eta() ;
-    addedPhi = fMomentum.Phi() ;
-    
-    if(addedPhi < 0) addedPhi+=TMath::TwoPi();
-    
-    // Check if photons hit desired acceptance
-    inacceptance = kTRUE;
-    
-    // Check same fidutial borders as in data analysis on top of real acceptance if real was requested.
-    if( IsFiducialCutOn() && !GetFiducialCut()->IsInFiducialCut(fMomentum.Eta(),fMomentum.Phi(),GetCalorimeter())) inacceptance = kFALSE ;
-    
-    // Check if photons hit the Calorimeter acceptance
-    if(IsRealCaloAcceptanceOn()) // defined on base class
-    {
-      if(GetReader()->ReadStack()          &&
-         !GetCaloUtils()->IsMCParticleInCalorimeterAcceptance(GetCalorimeter(), primStack)) inacceptance = kFALSE ;
-      if(GetReader()->ReadAODMCParticles() &&
-         !GetCaloUtils()->IsMCParticleInCalorimeterAcceptance(GetCalorimeter(), primAOD  )) inacceptance = kFALSE ;
-    }
-    //printf("\t in acceptance %d", inacceptance);
-    if(!inacceptance) continue;
-    
-    TString genName2;
-    (GetReader()->GetMC())->GetCocktailGenerator(i,genName2);
-    
-    Float_t dEta = photonEta-addedEta;
-    Float_t dPhi = photonPhi-addedPhi;
-    Float_t distance = TMath::Sqrt(dEta*dEta + dPhi*dPhi);
-    
-    if (( momLabel != momLabelOrg && momLabelOrg >= 0) || momLabelOrg < 0)
-    {
-      if(!genName2.Contains("ijing"))
-      {
-        if(grandMomLabel < 0)
-        {
-          if ( !genName.Contains("ijing") ) fhDistanceAddedPhotonAddedPrimarySignal  ->Fill(photonE,distance,GetEventWeight());
-          if (  genName.Contains("ijing") ) fhDistanceHijingPhotonAddedPrimarySignal ->Fill(photonE,distance,GetEventWeight());
-        }
-        else
-        {
-          if ( !genName.Contains("ijing") ) fhDistanceAddedPhotonAddedSecondarySignal ->Fill(photonE,distance,GetEventWeight());
-          if (  genName.Contains("ijing") ) fhDistanceHijingPhotonAddedSecondarySignal->Fill(photonE,distance,GetEventWeight());
-        }
-      }
-    }
-    
-    if(!genName.Contains("ijing") &&  genName2.Contains("ijing") && status == 0) fhDistanceAddedPhotonHijingSecondary->Fill(photonE,distance,GetEventWeight());
-  }
-}
-
+//void AliAnaPhoton::DistanceToAddedSignal(Int_t label, Int_t nprim, 
+//                                         AliStack * stack, TClonesArray*  mcparticles,
+//                                         Float_t photonE, Float_t photonEta, Float_t photonPhi)
+//{
+//  //Double_t addedY   = -100 ;
+//  //Double_t addedE   = -1 ;
+//  Double_t addedPt  = -1 ;
+//  Double_t addedPhi =  100 ;
+//  Double_t addedEta = -1 ;
+//  
+//  //Int_t    pdg       =  0 ;
+//  Int_t    status    =  0 ;
+//  Bool_t   inacceptance = kFALSE ;
+//    
+//  Int_t pdgMomOrg = 0, statusMomOrg = -1, momLabelOrg = -1;
+//  Bool_t okMomOrg = kFALSE;
+//  GetMCAnalysisUtils()->GetMother(label,GetReader(), pdgMomOrg, statusMomOrg, okMomOrg, momLabelOrg);     
+//  
+//  TParticle        * primStack = 0;
+//  AliAODMCParticle * primAOD   = 0;
+//
+//  TParticle        * primStackMom = 0;
+//  AliAODMCParticle * primAODMom   = 0;
+//
+//  TString genName;
+//  (GetReader()->GetMC())->GetCocktailGenerator(label,genName);
+//  
+//  for(Int_t i=0 ; i < nprim; i++)
+//  {
+//    if( i == label ) continue ;
+//    
+//    if ( !GetReader()->AcceptParticleMCLabel( i ) ) continue ;
+//    
+//    //printf("particle %d\n",i);
+//    
+//    Int_t pdgMom = 0, statusMom = -1, momLabel = -1;
+//    Bool_t okMom = kFALSE;
+//    GetMCAnalysisUtils()->GetMother(i,GetReader(), pdgMom, statusMom, okMom, momLabel);    
+//    //printf("\t mom label %d\n",momLabel);
+//
+//    if(momLabel < 0) continue;
+//    
+//    Int_t grandMomLabel = -1;
+//    if(GetReader()->ReadStack())
+//    {
+//      primStack = stack->Particle(i) ;
+//      if(!primStack)
+//      {
+//        AliWarning("ESD primaries pointer not available!!");
+//        continue;
+//      }
+//      
+//      //pdg    = primStack->GetPdgCode();
+//      status = primStack->GetStatusCode();
+//      
+//      // Protection against floating point exception
+//      if ( primStack->Energy() == TMath::Abs(primStack->Pz()) || 
+//          (primStack->Energy() - primStack->Pz()) < 1e-3      ||
+//          (primStack->Energy() + primStack->Pz()) < 0           )  continue ; 
+//      
+//      //printf("i %d, %s %d  %s %d \n",i, stack->Particle(i)->GetName(), stack->Particle(i)->GetPdgCode(),
+//      //       prim->GetName(), prim->GetPdgCode());
+//      
+//      // Photon kinematics
+//      primStack->Momentum(fMomentum);
+//      
+//      //addedY = 0.5*TMath::Log((primStack->Energy()+primStack->Pz())/(primStack->Energy()-primStack->Pz())) ;
+//      
+//      if(momLabel >= 0)
+//      {
+//        primStackMom = stack->Particle(momLabel) ;
+//        grandMomLabel = primStackMom->GetFirstMother();      
+//      }
+//    }
+//    else
+//    {
+//      primAOD = (AliAODMCParticle *) mcparticles->At(i);
+//      if(!primAOD)
+//      {
+//        AliWarning("AOD primaries pointer not available!!");
+//        continue;
+//      }
+//      //pdg    = primAOD->GetPdgCode();
+//      status = primAOD->GetStatus();
+//      
+//      //printf("\t pdg %d, status %d, E %f, pz %f\n",pdg,status,primAOD->E(),primAOD->Pz());
+//
+//      // Protection against floating point exception
+//      if ( primAOD->E() == TMath::Abs(primAOD->Pz()) || 
+//          (primAOD->E() - primAOD->Pz()) < 1e-3      || 
+//          (primAOD->E() + primAOD->Pz()) < 0           )  continue ; 
+//      
+//      // Photon kinematics
+//      fMomentum.SetPxPyPzE(primAOD->Px(),primAOD->Py(),primAOD->Pz(),primAOD->E());
+//
+//      //addedY = 0.5*TMath::Log((primAOD->E()+primAOD->Pz())/(primAOD->E()-primAOD->Pz())) ;
+//      
+//      if(momLabel >= 0)
+//      {
+//        primAODMom = (AliAODMCParticle *) mcparticles->At(momLabel);
+//        grandMomLabel = primAODMom->GetMother();
+//      }
+//    }
+//    //printf("\t grandmom %d\n",grandMomLabel);
+//   
+//    // Select only photons in the final state
+//    //if(pdg != 22 ) continue ;
+//    
+//    // If too small or too large pt, skip, same cut as for data analysis
+//    addedPt  = fMomentum.Pt () ;
+//    
+//    if(addedPt < GetMinPt() || addedPt > GetMaxPt() ) continue ;
+//    
+//    //addedE   = fMomentum.E  () ;
+//    addedEta = fMomentum.Eta() ;
+//    addedPhi = fMomentum.Phi() ;
+//    
+//    if(addedPhi < 0) addedPhi+=TMath::TwoPi();
+//    
+//    // Check if photons hit desired acceptance
+//    inacceptance = kTRUE;
+//    
+//    // Check same fidutial borders as in data analysis on top of real acceptance if real was requested.
+//    if( IsFiducialCutOn() && !GetFiducialCut()->IsInFiducialCut(fMomentum.Eta(),fMomentum.Phi(),GetCalorimeter())) inacceptance = kFALSE ;
+//    
+//    // Check if photons hit the Calorimeter acceptance
+//    if(IsRealCaloAcceptanceOn()) // defined on base class
+//    {
+//      if(GetReader()->ReadStack()          &&
+//         !GetCaloUtils()->IsMCParticleInCalorimeterAcceptance(GetCalorimeter(), primStack)) inacceptance = kFALSE ;
+//      if(GetReader()->ReadAODMCParticles() &&
+//         !GetCaloUtils()->IsMCParticleInCalorimeterAcceptance(GetCalorimeter(), primAOD  )) inacceptance = kFALSE ;
+//    }
+//    //printf("\t in acceptance %d", inacceptance);
+//    if(!inacceptance) continue;
+//    
+//    TString genName2;
+//    (GetReader()->GetMC())->GetCocktailGenerator(i,genName2);
+//    
+//    Float_t dEta = photonEta-addedEta;
+//    Float_t dPhi = photonPhi-addedPhi;
+//    Float_t distance = TMath::Sqrt(dEta*dEta + dPhi*dPhi);
+//    
+//    if (( momLabel != momLabelOrg && momLabelOrg >= 0) || momLabelOrg < 0)
+//    {
+//      if(!genName2.Contains("ijing"))
+//      {
+//        if(grandMomLabel < 0)
+//        {
+//          if ( !genName.Contains("ijing") ) fhDistanceAddedPhotonAddedPrimarySignal  ->Fill(photonE,distance,GetEventWeight());
+//          if (  genName.Contains("ijing") ) fhDistanceHijingPhotonAddedPrimarySignal ->Fill(photonE,distance,GetEventWeight());
+//        }
+//        else
+//        {
+//          if ( !genName.Contains("ijing") ) fhDistanceAddedPhotonAddedSecondarySignal ->Fill(photonE,distance,GetEventWeight());
+//          if (  genName.Contains("ijing") ) fhDistanceHijingPhotonAddedSecondarySignal->Fill(photonE,distance,GetEventWeight());
+//        }
+//      }
+//    }
+//    
+//    if(!genName.Contains("ijing") &&  genName2.Contains("ijing") && status == 0) fhDistanceAddedPhotonHijingSecondary->Fill(photonE,distance,GetEventWeight());
+//  }
+//}
+//
 //________________________________________________________________________________
 /// Fill some histograms to understand effect of pile-up.
 //________________________________________________________________________________
@@ -3976,41 +4018,99 @@ TList *  AliAnaPhoton::GetCreateOutputObjects()
       }
     }
     
+    if(IsDataMC())
+    {
+      fhLocalRegionClusterEnergySumHijing2 = new TH2F 
+      ("hLocalRegionClusterEnergySumHijing2",
+       "Sum of cluster energy (HIJING) around trigger cluster #it{E} with R=0.2", 
+       nptbins,ptmin,ptmax, 200,0,100);
+      fhLocalRegionClusterEnergySumHijing2->SetXTitle("#it{E} (GeV)");
+      fhLocalRegionClusterEnergySumHijing2->SetYTitle("#Sigma #it{E} (GeV)");
+      outputContainer->Add(fhLocalRegionClusterEnergySumHijing2);    
+      
+      fhLocalRegionClusterMultiplicityHijing2 = new TH2F 
+      ("hLocalRegionClusterMultiplicityHijing2",
+       "Cluster multiplicity (HIJING) around trigger cluster #it{E} with R=0.2", 
+       nptbins,ptmin,ptmax, 200,0,200);
+      fhLocalRegionClusterMultiplicityHijing2->SetXTitle("#it{E} (GeV)");
+      fhLocalRegionClusterMultiplicityHijing2->SetYTitle("Multiplicity");
+      outputContainer->Add(fhLocalRegionClusterMultiplicityHijing2); 
+      
+      if(IsHighMultiplicityAnalysisOn())
+      {
+        fhLocalRegionClusterEnergySumPerCentralityHijing2 = new TH2F 
+        ("hLocalRegionClusterEnergySumPerCentralityHijing2",
+         "Sum of cluster energy (HIJING) around trigger cluster vs centrality with R=0.2", 
+         100,0,100, 200,0,100);
+        fhLocalRegionClusterEnergySumPerCentralityHijing2->SetXTitle("Centrality");
+        fhLocalRegionClusterEnergySumPerCentralityHijing2->SetYTitle("#Sigma #it{E} (GeV)");
+        outputContainer->Add(fhLocalRegionClusterEnergySumPerCentralityHijing2);    
+        
+        fhLocalRegionClusterMultiplicityPerCentralityHijing2 = new TH2F 
+        ("hLocalRegionClusterMultiplicityPerCentralityHijing2",
+         "Cluster multiplicity (HIJING) around trigger cluster vs centrality with R=0.2", 
+         100,0,100, 200,0,200);
+        fhLocalRegionClusterMultiplicityPerCentralityHijing2->SetXTitle("Centrality");
+        fhLocalRegionClusterMultiplicityPerCentralityHijing2->SetYTitle("Multiplicity");
+        outputContainer->Add(fhLocalRegionClusterMultiplicityPerCentralityHijing2);     
+      }
+    }
+    //    fhDistanceAddedPhotonAddedPrimarySignal = new TH2F
+    //    ("hDistanceAddedPhotonAddedPrimarySignal", "Distance added #gamma to primary particle from added generator"
+    //    ,nptbins,ptmin,ptmax,100,0,0.4);
+    //    fhDistanceAddedPhotonAddedPrimarySignal->SetYTitle("#it{R}");
+    //    fhDistanceAddedPhotonAddedPrimarySignal->SetXTitle("#it{p}_{T}");
+    //    outputContainer->Add(fhDistanceAddedPhotonAddedPrimarySignal) ;
+    //    
+    //    fhDistanceHijingPhotonAddedPrimarySignal = new TH2F
+    //    ("hDistanceHijingPhotonAddedPrimarySignal", "Distance Hijing #gamma to primary particle from added generator"
+    //     ,nptbins,ptmin,ptmax,100,0,0.4);
+    //    fhDistanceHijingPhotonAddedPrimarySignal->SetYTitle("#it{R}");
+    //    fhDistanceHijingPhotonAddedPrimarySignal->SetXTitle("#it{p}_{T}");
+    //    outputContainer->Add(fhDistanceHijingPhotonAddedPrimarySignal) ;
+    //
+    //    fhDistanceAddedPhotonAddedSecondarySignal = new TH2F
+    //    ("hDistanceAddedPhotonAddedSecondarySignal", "Distance added #gamma to secondary particle from added generator"
+    //     ,nptbins,ptmin,ptmax,100,0,0.4);
+    //    fhDistanceAddedPhotonAddedSecondarySignal->SetYTitle("#it{R}");
+    //    fhDistanceAddedPhotonAddedSecondarySignal->SetXTitle("#it{p}_{T}");
+    //    outputContainer->Add(fhDistanceAddedPhotonAddedSecondarySignal) ;
+    //    
+    //    fhDistanceHijingPhotonAddedSecondarySignal = new TH2F
+    //    ("hDistanceHijingPhotonAddedSecondarySignal", "Distance Hijing #gamma to secondary particle from added generator"
+    //     ,nptbins,ptmin,ptmax,100,0,0.4);
+    //    fhDistanceHijingPhotonAddedSecondarySignal->SetYTitle("#it{R}");
+    //    fhDistanceHijingPhotonAddedSecondarySignal->SetXTitle("#it{p}_{T}");
+    //    outputContainer->Add(fhDistanceHijingPhotonAddedSecondarySignal) ;
+    //
+    //    fhDistanceAddedPhotonHijingSecondary = new TH2F
+    //    ("hDistanceAddedPhotonHijingSecondary", "Distance added #gamma to secondary particle from hijing"
+    //     ,nptbins,ptmin,ptmax,100,0,0.4);
+    //    fhDistanceAddedPhotonHijingSecondary->SetYTitle("#it{R}");
+    //    fhDistanceAddedPhotonHijingSecondary->SetXTitle("#it{p}_{T}");
+    //    outputContainer->Add(fhDistanceAddedPhotonHijingSecondary) ;
     
-    fhDistanceAddedPhotonAddedPrimarySignal = new TH2F
-    ("hDistanceAddedPhotonAddedPrimarySignal", "Distance added #gamma to primary particle from added generator"
-    ,nptbins,ptmin,ptmax,100,0,0.4);
-    fhDistanceAddedPhotonAddedPrimarySignal->SetYTitle("#it{R}");
-    fhDistanceAddedPhotonAddedPrimarySignal->SetXTitle("#it{p}_{T}");
-    outputContainer->Add(fhDistanceAddedPhotonAddedPrimarySignal) ;
     
-    fhDistanceHijingPhotonAddedPrimarySignal = new TH2F
-    ("hDistanceHijingPhotonAddedPrimarySignal", "Distance Hijing #gamma to primary particle from added generator"
+    fhDistance2AddedSignals = new TH2F
+    ("hDistance2AddedSignals", "Distance added signals"
      ,nptbins,ptmin,ptmax,100,0,0.4);
-    fhDistanceHijingPhotonAddedPrimarySignal->SetYTitle("#it{R}");
-    fhDistanceHijingPhotonAddedPrimarySignal->SetXTitle("#it{p}_{T}");
-    outputContainer->Add(fhDistanceHijingPhotonAddedPrimarySignal) ;
-
-    fhDistanceAddedPhotonAddedSecondarySignal = new TH2F
-    ("hDistanceAddedPhotonAddedSecondarySignal", "Distance added #gamma to secondary particle from added generator"
-     ,nptbins,ptmin,ptmax,100,0,0.4);
-    fhDistanceAddedPhotonAddedSecondarySignal->SetYTitle("#it{R}");
-    fhDistanceAddedPhotonAddedSecondarySignal->SetXTitle("#it{p}_{T}");
-    outputContainer->Add(fhDistanceAddedPhotonAddedSecondarySignal) ;
+    fhDistance2AddedSignals->SetYTitle("#it{R}");
+    fhDistance2AddedSignals->SetXTitle("#it{p}_{T} (GeV/#it{c})");
+    outputContainer->Add(fhDistance2AddedSignals) ;
     
-    fhDistanceHijingPhotonAddedSecondarySignal = new TH2F
-    ("hDistanceHijingPhotonAddedSecondarySignal", "Distance Hijing #gamma to secondary particle from added generator"
+    fhDistance2Hijing = new TH2F
+    ("hDistance2Hijing", "Distance 2 hijing clusters"
      ,nptbins,ptmin,ptmax,100,0,0.4);
-    fhDistanceHijingPhotonAddedSecondarySignal->SetYTitle("#it{R}");
-    fhDistanceHijingPhotonAddedSecondarySignal->SetXTitle("#it{p}_{T}");
-    outputContainer->Add(fhDistanceHijingPhotonAddedSecondarySignal) ;
-
-    fhDistanceAddedPhotonHijingSecondary = new TH2F
-    ("hDistanceAddedPhotonHijingSecondary", "Distance added #gamma to secondary particle from hijing"
+    fhDistance2Hijing->SetYTitle("#it{R}");
+    fhDistance2Hijing->SetXTitle("#it{p}_{T} (GeV/#it{c})");
+    outputContainer->Add(fhDistance2Hijing) ;
+    
+    fhDistanceAddedSignalsHijing = new TH2F
+    ("hDistanceAddedSignalsHijing", "Distance added signals to hijing"
      ,nptbins,ptmin,ptmax,100,0,0.4);
-    fhDistanceAddedPhotonHijingSecondary->SetYTitle("#it{R}");
-    fhDistanceAddedPhotonHijingSecondary->SetXTitle("#it{p}_{T}");
-    outputContainer->Add(fhDistanceAddedPhotonHijingSecondary) ;
+    fhDistanceAddedSignalsHijing->SetYTitle("#it{R}");
+    fhDistanceAddedSignalsHijing->SetXTitle("#it{p}_{T} (GeV/#it{c})");
+    outputContainer->Add(fhDistanceAddedSignalsHijing) ;
   }
 
   if(IsStudyClusterOverlapsPerGeneratorOn() && IsDataMC())

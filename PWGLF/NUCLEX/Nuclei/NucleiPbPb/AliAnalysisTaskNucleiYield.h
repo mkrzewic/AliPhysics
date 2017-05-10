@@ -73,7 +73,6 @@ public:
   void SetDisableITSatHighPt (float pt) { fDisableITSatHighPt = pt; }
   void SetDisableTPCpidAtHighPt (float pt) { fDisableTPCpidAtHighPt = pt; }
   void SetFixForLHC14a6 (bool fix) { fFixForLHC14a6 = fix; }
-  void SetRequireTrackLength(float len) { fRequireTrackLength = len; }
   void SetForceMassAndZ(float mass, float z = 1) { fPDGMass = mass; fPDGMassOverZ = mass / z; }
 
   void SetCentBins (Int_t nbins, Float_t *bins);
@@ -86,7 +85,8 @@ public:
   void SetFlatteningProbabilities (Int_t n, Float_t *probs) { fFlatteningProbs.Set(n,probs); }
   void SetUseFlattening (bool useIt) { fEnableFlattening = useIt; }
 
-  void SetEnableLogarithmicBinning (bool useit) { fEnableLogAxisInPerformancePlots = useit; }
+  static int    GetNumberOfITSclustersPerLayer(AliVTrack *track, unsigned int &nSPD, unsigned int &nSDD, unsigned int &nSSD);
+  static float  HasTOF(AliAODTrack *t, AliPIDResponse* pid);
 
   virtual void   UserCreateOutputObjects();
   virtual void   UserExec(Option_t *);
@@ -98,10 +98,9 @@ private:
   AliAnalysisTaskNucleiYield (const AliAnalysisTaskNucleiYield &source);
   AliAnalysisTaskNucleiYield &operator=(const AliAnalysisTaskNucleiYield &source);
 
-  Bool_t  AcceptTrack(AliAODTrack *t, Double_t dca[2]);
-  Bool_t  PassesPIDSelection(AliAODTrack *t);
-  Float_t HasTOF(AliAODTrack *t);
-  float   GetTPCsigmas(AliVTrack *t);
+  bool   AcceptTrack(AliAODTrack *t, Double_t dca[2]);
+  bool   PassesPIDSelection(AliAODTrack *t);
+  float  GetTPCsigmas(AliVTrack *t);
 
   Bool_t Flatten(float cent);
   void PtCorrection(float &pt, bool positiveCharge);
@@ -154,11 +153,9 @@ private:
   Float_t               fRequireMinEnergyLoss;  ///<  Cut on the minimum energy loss counts in TPC
   Bool_t                fRequireVetoSPD;        ///<  Cut away all the tracks with at least 1 SPD cluster
   Float_t               fRequireMaxMomentum;    ///<  Cut in momentum for TPC only spectrum
-  Float_t               fRequireTrackLength;    ///<  Cut on the track length
   Bool_t                fFixForLHC14a6;         ///<  Switch on/off the fix for the MC centrality distribution
 
   Bool_t                fEnableFlattening;      ///<  Switch on/off the flattening
-  Bool_t                fEnableLogAxisInPerformancePlots; ///< Switch on/off logarithmic bins
 
   AliPID::EParticleType fParticle;              ///<  Particle specie
   TArrayF               fCentBins;              ///<  Centrality bins
@@ -175,15 +172,14 @@ private:
   TH1F                 *fProduction;             //!<! *(MC only)* Total number of produced particles
   TH2F                 *fReconstructed[2][2];    //!<! *(MC only)* Positive and negative tracks reconstructed in the acceptance (ITS-TPC,ITS-TPC-TOF)
   TH2F                 *fTotal[2];               //!<! *(MC only)* Positively and negatively charged particles in acceptance
-  TH2F                 *fPtCorrection[2];        //!<! *(MC only)* \f$p_{T}^{rec}-p_{T}^{MC}\f$ as a function of \f$p_{T}^{rec}\f$ for positive and negative tracks 
+  TH2F                 *fPtCorrection[2];        //!<! *(MC only)* \f$p_{T}^{rec}-p_{T}^{MC}\f$ as a function of \f$p_{T}^{rec}\f$ for positive and negative tracks
   TH3F                 *fDCAPrimary[2][2];       //!<! *(MC only)* \f$DCA_{xy}\f$ distribution of primaries
   TH3F                 *fDCASecondary[2][2];     //!<! *(MC only)* \f$DCA_{xy}\f$ distribution of secondaries from material
   TH3F                 *fDCASecondaryWeak[2][2]; //!<! *(MC only)* \f$DCA_{xy}\f$ distribution of secondaries from Weak Decay
 
   // Data histograms
-  TH3F                 *fTOFsignal[2];           //!<! *(Data only)* TOF signal for anti-matter
-  TH3F                 *fTPCcounts[2];           //!<! *(Data only)* TPC counts for anti-matter
-  TH2F                 *fTPCeLoss[2];            //!<! *(Data only)* TPC dE/dx for anti-matter
+  TH3F                 *fTOFsignal[2];           //!<! *(Data only)* TOF signal for (anti-)matter
+  TH3F                 *fTPCcounts[2];           //!<! *(Data only)* TPC counts for (anti-)matter
   TH3F                 *fDCAxy[2][2];            //!<! *(Data only)* \f$DCA_{xy}\f$ distribution for ITS+TPC tracks
   TH3F                 *fDCAz[2][2];             //!<! *(Data only)* \f$DCA_{z}\f$ distribution for ITS+TPC tracks
   TH3F                 *fTOFtemplates[5];        //!<! *(Data only)* TOF signal templates for pi/k/p/d/t

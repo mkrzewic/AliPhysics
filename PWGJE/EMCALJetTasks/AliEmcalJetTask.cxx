@@ -67,6 +67,7 @@ AliEmcalJetTask::AliEmcalJetTask() :
   fJetEtaMax(+1),
   fGhostArea(0.005),
   fTrackEfficiency(1.),
+  fTrackEfficiencyOnlyForEmbedding(kFALSE),
   fUtilities(0),
   fLocked(0),
   fJetsName(),
@@ -76,6 +77,8 @@ AliEmcalJetTask::AliEmcalJetTask() :
   fLegacyMode(kFALSE),
   fFillGhost(kFALSE),
   fJets(0),
+  fClusterContainerIndexMap(),
+  fParticleContainerIndexMap(),
   fFastJetWrapper("AliEmcalJetTask","AliEmcalJetTask")
 {
 }
@@ -99,6 +102,7 @@ AliEmcalJetTask::AliEmcalJetTask(const char *name) :
   fJetEtaMax(+1),
   fGhostArea(0.005),
   fTrackEfficiency(1.),
+  fTrackEfficiencyOnlyForEmbedding(kFALSE),
   fUtilities(0),
   fLocked(0),
   fJetsName(),
@@ -108,6 +112,8 @@ AliEmcalJetTask::AliEmcalJetTask(const char *name) :
   fLegacyMode(kFALSE),
   fFillGhost(kFALSE),
   fJets(0),
+  fClusterContainerIndexMap(),
+  fParticleContainerIndexMap(),
   fFastJetWrapper(name,name)
 {
 }
@@ -145,6 +151,16 @@ void AliEmcalJetTask::InitUtilities()
   TIter next(fUtilities);
   AliEmcalJetUtility *utility = 0;
   while ((utility=static_cast<AliEmcalJetUtility*>(next()))) utility->Init();
+}
+/**
+ * This method is called before analyzing each event. It executes
+ * the InitEvent() method of all utilities (if any).
+ */
+void AliEmcalJetTask::InitEvent()
+{
+  TIter next(fUtilities);
+  AliEmcalJetUtility *utility = 0;
+  while ((utility=static_cast<AliEmcalJetUtility*>(next()))) utility->InitEvent(fFastJetWrapper);
 }
 
 /**
@@ -187,9 +203,9 @@ void AliEmcalJetTask::TerminateUtilities()
  */
 Bool_t AliEmcalJetTask::Run()
 {
+  InitEvent();
   // clear the jet array (normally a null operation)
   fJets->Delete();
-
   Int_t n = FindJets();
 
   if (n == 0) return kFALSE;
@@ -221,15 +237,17 @@ Int_t AliEmcalJetTask::FindJets()
   TIter nextPartColl(&fParticleCollArray);
   AliParticleContainer* tracks = 0;
   while ((tracks = static_cast<AliParticleContainer*>(nextPartColl()))) {
-    AliDebug(2,Form("Tracks from collection %d: '%s'.", iColl-1, tracks->GetName()));
+    AliDebug(2,Form("Tracks from collection %d: '%s'. Embedded: %i, nTracks: %i", iColl-1, tracks->GetName(), tracks->GetIsEmbedding(), tracks->GetNParticles()));
     AliParticleIterableMomentumContainer itcont = tracks->accepted_momentum();
     for (AliParticleIterableMomentumContainer::iterator it = itcont.begin(); it != itcont.end(); it++) {
       // artificial inefficiency
       if (fTrackEfficiency < 1.) {
-        Double_t rnd = gRandom->Rndm();
-        if (fTrackEfficiency < rnd) {
-          AliDebug(2,Form("Track %d rejected due to artificial tracking inefficiency", it.current_index()));
-          continue;
+        if (fTrackEfficiencyOnlyForEmbedding == kFALSE || (fTrackEfficiencyOnlyForEmbedding == kTRUE && tracks->GetIsEmbedding())) {
+          Double_t rnd = gRandom->Rndm();
+          if (fTrackEfficiency < rnd) {
+            AliDebug(2,Form("Track %d rejected due to artificial tracking inefficiency", it.current_index()));
+            continue;
+          }
         }
       }
 
@@ -244,7 +262,7 @@ Int_t AliEmcalJetTask::FindJets()
   TIter nextClusColl(&fClusterCollArray);
   AliClusterContainer* clusters = 0;
   while ((clusters = static_cast<AliClusterContainer*>(nextClusColl()))) {
-    AliDebug(2,Form("Clusters from collection %d: '%s'.", iColl-1, clusters->GetName()));
+    AliDebug(2,Form("Clusters from collection %d: '%s'. Embedded: %i, nClusters: %i", iColl-1, clusters->GetName(), clusters->GetIsEmbedding(), clusters->GetNClusters()));
     AliClusterIterableMomentumContainer itcont = clusters->accepted_momentum();
     for (AliClusterIterableMomentumContainer::iterator it = itcont.begin(); it != itcont.end(); it++) {
       AliDebug(2,Form("Cluster %d accepted (label = %d, energy = %.3f)", it.current_index(), it->second->GetLabel(), it->first.E()));
@@ -376,6 +394,7 @@ void AliEmcalJetTask::ExecOnce()
   fFastJetWrapper.SetAlgorithm(ConvertToFJAlgo(fJetAlgo));
   fFastJetWrapper.SetRecombScheme(ConvertToFJRecoScheme(fRecombScheme));
   fFastJetWrapper.SetMaxRap(1);
+ 
 
   // setting legacy mode
   if (fLegacyMode) {
@@ -385,6 +404,11 @@ void AliEmcalJetTask::ExecOnce()
   InitUtilities();
 
   AliAnalysisTaskEmcal::ExecOnce();
+
+  // Setup container utils. Must be called after AliAnalysisTaskEmcal::ExecOnce() so that the
+  // containers' arrays are setup.
+  fClusterContainerIndexMap.CopyMappingFrom(AliClusterContainer::GetEmcalContainerIndexMap(), fClusterCollArray);
+  fParticleContainerIndexMap.CopyMappingFrom(AliParticleContainer::GetEmcalContainerIndexMap(), fParticleCollArray);
 }
 
 /**
@@ -397,7 +421,7 @@ void AliEmcalJetTask::ExecOnce()
  * @param particles_sub Array containing subtracted constituents
  */
 void AliEmcalJetTask::FillJetConstituents(AliEmcalJet *jet, std::vector<fastjet::PseudoJet>& constituents,
-    std::vector<fastjet::PseudoJet>& constituents_unsub, Int_t flag, TClonesArray *particles_sub)
+    std::vector<fastjet::PseudoJet>& constituents_unsub, Int_t flag, TString particlesSubName)
 {
   Int_t nt            = 0;
   Int_t nc            = 0;
@@ -411,6 +435,7 @@ void AliEmcalJetTask::FillJetConstituents(AliEmcalJet *jet, std::vector<fastjet:
   Int_t nneutral      = 0;
   Double_t mcpt       = 0.;
   Double_t emcpt      = 0.;
+  TClonesArray * particles_sub = 0;
 
   Int_t uid   = -1;
 
@@ -427,7 +452,7 @@ void AliEmcalJetTask::FillJetConstituents(AliEmcalJet *jet, std::vector<fastjet:
         uid=-1;
       }
       else {
-        uid = GetIndexSub(constituents[ic].phi(), constituents_unsub);
+        uid = constituents[ic].user_index();
       }
       if (uid==0) {
         AliError("correspondence between un/subtracted constituent not found");
@@ -495,14 +520,18 @@ void AliEmcalJetTask::FillJetConstituents(AliEmcalJet *jet, std::vector<fastjet:
         }
       }
 
-      if (flag == 0 || particles_sub == 0) {
-        jet->AddTrackAt(tid, nt);
+      if (flag == 0 || particlesSubName == "") {
+        jet->AddTrackAt(fParticleContainerIndexMap.GlobalIndexFromLocalIndex(partCont, tid), nt);
       }
       else {
+        // Get the particle container and array corresponding to the subtracted particles
+        partCont = GetParticleContainer(particlesSubName);
+        particles_sub = partCont->GetArray();
+        // Create the new particle in the particles_sub array and add it to the jet
         Int_t part_sub_id = particles_sub->GetEntriesFast();
         AliEmcalParticle* part_sub = new ((*particles_sub)[part_sub_id]) AliEmcalParticle(dynamic_cast<AliVTrack*>(t));   // SA: probably need to be fixed!!
         part_sub->SetPtEtaPhiM(constituents[ic].perp(),constituents[ic].eta(),constituents[ic].phi(),constituents[ic].m());
-        jet->AddTrackAt(part_sub_id, nt);
+        jet->AddTrackAt(fParticleContainerIndexMap.GlobalIndexFromLocalIndex(partCont, part_sub_id), nt);
       }
 
       ++nt;
@@ -511,6 +540,7 @@ void AliEmcalJetTask::FillJetConstituents(AliEmcalJet *jet, std::vector<fastjet:
       Int_t iColl = -uid / fgkConstIndexShift;
       Int_t cid = -uid - iColl * fgkConstIndexShift;
       iColl--;
+      AliDebug(3,Form("Constituent %d is a cluster from collection %d and with ID %d", uid, iColl, cid));
       AliClusterContainer* clusCont = GetClusterContainer(iColl);
       AliVCluster *c = clusCont->GetCluster(cid);
 
@@ -540,14 +570,18 @@ void AliEmcalJetTask::FillJetConstituents(AliEmcalJet *jet, std::vector<fastjet:
         }
       }
 
-      if (flag == 0 || particles_sub == 0) {
-        jet->AddClusterAt(cid, nc);
+      if (flag == 0 || particlesSubName == "") {
+        jet->AddClusterAt(fClusterContainerIndexMap.GlobalIndexFromLocalIndex(clusCont, cid), nc);
       }
       else {
+        // Get the cluster container and array corresponding to the subtracted particles
+        clusCont = GetClusterContainer(particlesSubName);
+        particles_sub = clusCont->GetArray();
+        // Create the new particle in the particles_sub array and add it to the jet
         Int_t part_sub_id = particles_sub->GetEntriesFast();
         AliEmcalParticle* part_sub = new ((*particles_sub)[part_sub_id]) AliEmcalParticle(c);
         part_sub->SetPtEtaPhiM(constituents[ic].perp(),constituents[ic].eta(),constituents[ic].phi(),constituents[ic].m());
-        jet->AddTrackAt(part_sub_id, nt);
+        jet->AddClusterAt(fClusterContainerIndexMap.GlobalIndexFromLocalIndex(clusCont, part_sub_id), nc);
       }
 
       ++nc;
@@ -572,30 +606,6 @@ void AliEmcalJetTask::FillJetConstituents(AliEmcalJet *jet, std::vector<fastjet:
   jet->SetMCPt(mcpt);
   jet->SetPtEmc(emcpt);
   jet->SortConstituents();
-}
-
-/**
- * Search for the index of the unsubtracted constituents by comparing the azimuthal angles
- * @param phi_sub Azimuthal angle of the subtracted constituent
- * @param constituents_unsub Vector containing the list of unsubtracted constituents
- * @return Index of the subtracted constituent
- */
-Int_t AliEmcalJetTask::GetIndexSub(Double_t phi_sub, std::vector<fastjet::PseudoJet>& constituents_unsub) 
-{
-  Double_t dphi=0;
-  Double_t phimin=100;
-  Int_t index=0;
-  for (UInt_t ii = 0; ii < constituents_unsub.size(); ii++) {
-    dphi=0;
-    Double_t phi_unsub = constituents_unsub[ii].phi();
-    dphi=phi_unsub-phi_sub;
-    if (dphi < -1*TMath::Pi()) dphi += (2*TMath::Pi());
-    else if (dphi > TMath::Pi()) dphi -= (2*TMath::Pi());
-    if(TMath::Abs(dphi)<phimin){ phimin=TMath::Abs(dphi);
-      index=ii;} }
-    if (constituents_unsub[index].user_index()!=-1)  return constituents_unsub[index].user_index();
-
-  return 0;
 }
 
 /**
@@ -807,12 +817,28 @@ UInt_t AliEmcalJetTask::FindJetAcceptanceType(Double_t eta, Double_t phi, Double
       jetAcceptanceType |= AliEmcalJet::kEMCALfid;
   }
   
-  // Check if DCAL
+  // Check if DCAL (i.e. eta-phi rectangle spanning DCal, which includes most of PHOS)
   if( IsJetInDcal(eta, phi, 0) ) {
     jetAcceptanceType |= AliEmcalJet::kDCAL;
     // Check if DCALfid
     if( IsJetInDcal(eta, phi, r) )
       jetAcceptanceType |= AliEmcalJet::kDCALfid;
+  }
+  
+  // Check if DCALonly (i.e. ONLY DCal, does not include any of PHOS region)
+  if( IsJetInDcalOnly(eta, phi, 0) ) {
+    jetAcceptanceType |= AliEmcalJet::kDCALonly;
+    // Check if DCALonlyfid
+    if( IsJetInDcalOnly(eta, phi, r) )
+      jetAcceptanceType |= AliEmcalJet::kDCALonlyfid;
+  }
+  
+  // Check if PHOS
+  if( IsJetInPhos(eta, phi, 0) ) {
+    jetAcceptanceType |= AliEmcalJet::kPHOS;
+    // Check if PHOSfid
+    if( IsJetInPhos(eta, phi, r) )
+      jetAcceptanceType |= AliEmcalJet::kPHOSfid;
   }
  
   return jetAcceptanceType;
@@ -840,13 +866,59 @@ Bool_t AliEmcalJetTask::IsJetInEmcal(Double_t eta, Double_t phi, Double_t r)
 }
 
 /**
- * Returns whether or not jet with given eta, phi, R is in DCal.
+ * Returns whether or not jet with given eta, phi, R is in DCal region (note: spans most of PHOS as well).
  */
 Bool_t AliEmcalJetTask::IsJetInDcal(Double_t eta, Double_t phi, Double_t r)
 {
   if (!fGeom) return kFALSE;
   if (eta < fGeom->GetArm1EtaMax() - r && eta > fGeom->GetArm1EtaMin() + r ) {
     if ( phi < fGeom->GetDCALPhiMax() * TMath::DegToRad() - r && phi > fGeom->GetDCALPhiMin() * TMath::DegToRad() + r)
+      return kTRUE;
+  }
+  return kFALSE;
+}
+
+/**
+ * Returns whether or not jet with given eta, phi, R is in DCal (note: ONLY DCal -- none of PHOS included).
+ * Assumes DCAL_8SM geometry.
+ * For r=0, use the entire DCal acceptance, including both of the connecting 1/3 SMs.
+ * For r>0, use only the two "disjoint" fiducial regions of the DCal (i.e. ignore the connecting portions of the 1/3 SMs)
+ */
+Bool_t AliEmcalJetTask::IsJetInDcalOnly(Double_t eta, Double_t phi, Double_t r)
+{
+  if (!fGeom) return kFALSE;
+  
+  if (eta < fGeom->GetArm1EtaMax() - r && eta > fGeom->GetArm1EtaMin() + r) {
+    if ( phi < fGeom->GetDCALPhiMax() * TMath::DegToRad() - r && phi > fGeom->GetDCALPhiMin() * TMath::DegToRad() + r) {
+      
+      if (TMath::Abs(eta) > fGeom->GetDCALInnerExtandedEta() + r) {
+        return kTRUE;
+      }
+      if (r < 1e-6) {
+        if (phi > fGeom->GetEMCGeometry()->GetDCALStandardPhiMax() * TMath::DegToRad())
+          return kTRUE;
+      }
+      
+    }
+  }
+  
+  return kFALSE;
+}
+
+/**
+ * Returns whether or not jet with given eta, phi, R is in PHOS.
+ */
+Bool_t AliEmcalJetTask::IsJetInPhos(Double_t eta, Double_t phi, Double_t r)
+{
+  Double_t etaMax = 0.130;
+  Double_t etaMin = -0.130;
+  Double_t phiMax = 320;
+  Double_t phiMin = 260; // Run 1
+  if (fRunNumber > 209121)
+    phiMin = 250; // Run 2
+  
+  if (eta < etaMax - r && eta > etaMin + r ) {
+    if (phi < phiMax * TMath::DegToRad() - r && phi > phiMin * TMath::DegToRad() + r)
       return kTRUE;
   }
   return kFALSE;

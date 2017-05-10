@@ -19,7 +19,10 @@ AliAnalysisTaskPhiFlow* AddTaskPhiFlow(Bool_t SP = kFALSE, // select flow analys
         Bool_t VZERO_SP = kTRUE, // use vzero sp method
         Float_t centrMin = 20., // centrality selection
         Float_t centrMax = 40.,
+        Int_t harm = 3, // harmonic vn
         Double_t ITSsigma = 3., // pid mode (see task implementation)
+        Float_t POIPtMin = 0.2,  // pt of daughters
+        Float_t POIPtMax = 5., // max pt of daughterp particles
         Bool_t centralityWeights = kFALSE,
         Double_t ITSrange = 0.,
         Double_t TPCcontrol = 1.,
@@ -31,19 +34,16 @@ AliAnalysisTaskPhiFlow* AddTaskPhiFlow(Bool_t SP = kFALSE, // select flow analys
         Bool_t bCentralTrigger = kTRUE, // trigger selection
         Float_t EtaGap = 0., // eta gap for SPSUB
         TString DCA = "pt", // dca mode (see task implementation)
-        Int_t harm = 3, // harmonic vn
         UInt_t poi_filter = 32, // aod filterbits
         UInt_t rp_filter = 1,
         Bool_t event_mixing = kTRUE,
         Bool_t highPtMode = kFALSE, // use with caution !!! disables invariant mass fit method
         Float_t deltaPhiMass = 0.0003, // dM in which to look for phi 
-        Float_t POIPtMax = 5., // max pt of daughterp particles
         Bool_t shrinkSP = kFALSE, // shrink output
         Bool_t fullUforVZERO_SP = kTRUE, // do full u for VZERO_SP
         Bool_t debug = kTRUE) // macro debug mode, for task's debug mode see header
 {
     // some defaults that have been removed as function arguments (august 30 2012)
-    Float_t POIPtMin = 0.2;  // pt of daughters
     Float_t deltaDip = 0.;
     Float_t deltaDipMaxPt = 0.;
     Bool_t TPCStandAloneTracks = kFALSE; // deprecated
@@ -262,6 +262,8 @@ AliAnalysisTaskPhiFlow* AddTaskPhiFlow(Bool_t SP = kFALSE, // select flow analys
     //   AliFlowTrackCuts* cutsPOI = cutsPOI->GetStandardGlobalTrackCuts2010();
     cutsPOI->SetPtRange(POIPtMin, POIPtMax); // pt range of DAUGHTERS !!!
     cutsPOI->SetEtaRange(-.8, .8);
+    //cutsPOI->SetPhiMin(0.);
+    //cutsPOI->SetPhiMax(5.);
     //   cutsPOI->SetMaxDCAToVertexXY(0.3); // FIXME not implemented in aod086 aod095 see PassesDCACut() in implementation
     //   cutsPOI->SetMaxDCAToVertexZ(0.3);
 

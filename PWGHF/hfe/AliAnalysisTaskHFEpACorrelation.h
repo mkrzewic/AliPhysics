@@ -114,7 +114,7 @@ public:
     
     void SetUseAlternativeBinning() {fUseAlternativeBinnig = kTRUE;};
     
-    void SetCentralityEstimator(Int_t Estimator) { fEstimator=Estimator; }; //0 = V0A, 1 = Other
+    void SetCentralityEstimator(Int_t Estimator) { fEstimator=Estimator; }; //0 = ZNA, 1 = V0A
     void SetAdditionalCuts(Double_t PtMinAsso, Int_t TpcNclsAsso) {fPtMinAsso = PtMinAsso; fTpcNclsAsso = TpcNclsAsso;};
     void SetSPDCutForHadrons() {fAssocWithSPD = kTRUE;};
     
@@ -180,6 +180,7 @@ private:
     AliCentrality			*fCentrality; //!
     Double_t				fCentralityMin;
     Double_t				fCentralityMax;
+    Double_t				fCentralityValue;
     Bool_t					fHasCentralitySelection;
     TH1F					*fCentralityHist; //!
     TH1F					*fCentralityHistPass; //!
@@ -257,8 +258,8 @@ private:
     TH2F				**fCEtaPhi_ULS_NoP_Weight; //!
     TH2F				**fCEtaPhi_LS_NoP_Weight; //!
     
-    TH1F				*fInvMass; //!
-    TH1F				*fInvMassBack; //!
+    TH1F				**fInvMassULS; //!
+    TH1F				**fInvMassLS; //!
     TH1F				*fDCA; //!
     TH1F				*fDCABack; //!
     TH1F				*fOpAngle; //!
@@ -396,6 +397,13 @@ private:
     TH1F                *fEtaCutElectronBKULSMainSources_WithMotherW_NW; //!
     TH1F                *fEtaCutElectronBKLSMainSources_WithMotherW; //!
     TH1F                *fEtaCutElectronBKLSMainSources_WithMotherW_NW; //!
+    //Background weight calculation
+    TH1F                *fPtMCpi0_all; //!
+    TH1F                *fPtMCeta_all; //!
+    TH1F                *fPtMCpi0_PhysicalPrimary; //!
+    TH1F                *fPtMCeta_PhysicalPrimary; //!
+    TH1F                *fPtMCpi0_Primary; //!
+    TH1F                *fPtMCeta_Primary; //!
     
     //DPhi MC
     TH2F                **fCEtaPhiNoEtaCutInclusive;  //!
@@ -426,7 +434,7 @@ private:
     AliAnalysisTaskHFEpACorrelation(const AliAnalysisTaskHFEpACorrelation&); 			// not implemented
     AliAnalysisTaskHFEpACorrelation& operator=(const AliAnalysisTaskHFEpACorrelation&); 		// not implemented
     
-    ClassDef(AliAnalysisTaskHFEpACorrelation, 1); 								// example of analysis
+    ClassDef(AliAnalysisTaskHFEpACorrelation, 2); 								// example of analysis
     //______________________________________________________________________
 };
 

@@ -47,6 +47,7 @@ const char* AliDielectronVarManager::fgkParticleNames[AliDielectronVarManager::k
   {"Y",                      "#it{y}",                                             ""},
   {"E",                      "E",                                                  "(GeV)"},
   {"M",                      "m_{inv}",                                            "(GeV/#it{c^{2}})"},
+  {"MCorr",                      "m_{inv}, corrected",                                            "(GeV/#it{c^{2}})"},
   {"MMC",                    "m_{inv} (MC)",                                       "(GeV/#it{c^{2}})"},
   {"Charge",                 "q",                                                  "(e)"},
   {"NclsITS",                "N_{cls}^{ITS}",                                      ""},
@@ -186,6 +187,7 @@ const char* AliDielectronVarManager::fgkParticleNames[AliDielectronVarManager::k
   {"DecayLength",            "l_{decay}",                                          "(cm)"},
   {"R",                      "d(#vec{x}_{vtx},#vec{x}_{part.})",                   "(cm)"},
   {"OpeningAngle",           "#varphi",                                            "(rad.)"},
+  {"OpeningAngleCorr",       "#varphi, corrected",                                            "(rad.)"},
   {"OpeningAngleXY",         "#varphi in XY",                                      "(rad.)"},
   {"OpeningAngleRZ",         "#varphi in RZ",                                      "(rad.)"},
   {"TriangularConversionCut","#Phi_{v}^{pair} - 21M",                              ""},
@@ -446,12 +448,21 @@ const char* AliDielectronVarManager::fgkParticleNames[AliDielectronVarManager::k
   {"QnTPCrpH2",                "#Psi^{TPC}",                                ""},
   {"QnTPCxH2",                 "Q_{x}^{TPC}",                               ""},
   {"QnTPCyH2",                 "Q_{y}^{TPC}",                               ""},
+  {"QnTPCaSiderpH2",                "#Psi^{TPC_{A-Side}}",                                ""},
+  {"QnTPCaSidexH2",                 "Q_{x}^{TPC_{A-Side}}",                               ""},
+  {"QnTPCaSideyH2",                 "Q_{y}^{TPC_{A-Side}}",                               ""},
+  {"QnTPCcSiderpH2",                "#Psi^{TPC_{C-Side}}",                                ""},
+  {"QnTPCcSidexH2",                 "Q_{x}^{TPC_{C-Side}}",                               ""},
+  {"QnTPCcSideyH2",                 "Q_{y}^{TPC_{C-Side}}",                               ""},
   {"QnV0ArpH2",                "#Psi^{V0A}",                                ""},
   {"QnV0AxH2",                 "Q_{x}^{V0A}",                               ""},
   {"QnV0AyH2",                 "Q_{y}^{V0A}",                               ""},
   {"QnV0CrpH2",                "#Psi^{V0C}",                                ""},
   {"QnV0CxH2",                 "Q_{x}^{V0C}",                               ""},
   {"QnV0CyH2",                 "Q_{y}^{V0C}",                               ""},
+  {"QnV0rpH2",                "#Psi^{V0}",                                 ""},
+  {"QnV0xH2",                 "Q_{x}^{V0}",                                ""},
+  {"QnV0yH2",                 "Q_{y}^{V0}",                                ""},
   {"QnSPDrpH2",                "#Psi^{SPD}",                                ""},
   {"QnSPDxH2",                 "Q_{x}^{SPD}",                               ""},
   {"QnSPDyH2",                 "Q_{y}^{SPD}",                               ""},
@@ -467,6 +478,13 @@ const char* AliDielectronVarManager::fgkParticleNames[AliDielectronVarManager::k
   {"QnTPC_SPDDiffH2",          "cos(2(#Psi^{TPC}-#Psi^{SPD}))",             ""},
   {"QnTPC_FMDADiffH2",         "cos(2(#Psi^{TPC}-#Psi^{FMDA}))",            ""},
   {"QnTPC_FMDCDiffH2",         "cos(2(#Psi^{TPC}-#Psi^{FMDC}))",            ""},
+  {"QnTPCaSide_V0DiffH2",      "cos(2(#Psi^{TPC_{A-Side}}-#Psi^{V0}))",     ""},
+  {"QnTPCaSide_V0ADiffH2",     "cos(2(#Psi^{TPC_{A-Side}}-#Psi^{V0A}))",    ""},
+  {"QnTPCaSide_V0CDiffH2",     "cos(2(#Psi^{TPC_{A-Side}}-#Psi^{V0C}))",    ""},
+  {"QnTPCaSide_TPCcSideDiffH2", "cos(2(#Psi^{TPC_{A-Side}}-#Psi^{TPC_{C-Side}}))",             ""},
+  {"QnTPCcSide_V0DiffH2",      "cos(2(#Psi^{TPC_{C-Side}}-#Psi^{V0}))",     ""},
+  {"QnTPCcSide_V0ADiffH2",     "cos(2(#Psi^{TPC_{C-Side}}-#Psi^{V0A}))",    ""},
+  {"QnTPCcSide_V0CDiffH2",     "cos(2(#Psi^{TPC_{C-Side}}-#Psi^{V0C}))",    ""},
   {"QnV0A_V0CDiffH2",          "cos(2(#Psi^{V0A}-#Psi^{V0C}))",             ""},
   {"QnV0A_SPDDiffH2",          "cos(2(#Psi^{V0A}-#Psi^{SPD}))",             ""},
   {"QnV0A_FMDADiffH2",         "cos(2(#Psi^{V0A}-#Psi^{FMDA}))",            ""},
@@ -542,10 +560,12 @@ const char* AliDielectronVarManager::fgkParticleNames[AliDielectronVarManager::k
   {"QnDeltaPhiTPCrpH2",         "#phi^{pair}-#Psi^{TPC}",                     ""},
   {"QnDeltaPhiV0ArpH2",         "#phi^{pair}-#Psi^{V0A}",                     ""},
   {"QnDeltaPhiV0CrpH2",         "#phi^{pair}-#Psi^{V0C}",                     ""},
+  {"QnDeltaPhiV0rpH2",          "#phi^{pair}-#Psi^{V0}",                      ""},
   {"QnDeltaPhiSPDrpH2",         "#phi^{pair}-#Psi^{SPD}",                     ""},
   {"QnTPCrpH2FlowV2",           "cos(2(#phi^{pair}-#Psi^{TPC}))",             ""},
   {"QnV0ArpH2FlowV2",           "cos(2(#phi^{pair}-#Psi^{V0A}))",             ""},
   {"QnV0CrpH2FlowV2",           "cos(2(#phi^{pair}-#Psi^{V0C}))",             ""},
+  {"QnV0rpH2FlowV2",            "cos(2(#phi^{pair}-#Psi^{V0}))",              ""},
   {"QnSPDrpH2FlowV2",           "cos(2(#phi^{pair}-#Psi^{SPD}))",             ""},
   // End of Eventplane variables from Qn Framework
 
@@ -587,8 +607,11 @@ const char* AliDielectronVarManager::fgkParticleNames[AliDielectronVarManager::k
   {"RefMultOvRefMultTPConly",  "N_{trk}/N_{trk}^{TPConly}",                        ""},
 
   {"Nch",                    "N_{ch} #cbar_{#||{#eta}<1.6}",                       ""},
+  {"NchJpsiExcl",           "N_{ch} #cbar_{#||{#eta}<1.6} without J/#psi daughters ",  ""},
   {"Nch05",                  "N_{ch} #cbar_{#||{#eta}<0.5}",                       ""},
+  {"Nch05JpsiExcl",           "N_{ch} #cbar_{#||{#eta}<0.5} without J/#psi daughters ",  ""},
   {"Nch10",                  "N_{ch} #cbar_{#||{#eta}<1.0}",                       ""},
+  {"Nch10JpsiExcl",           "N_{ch} #cbar_{#||{#eta}<1.0} without J/#psi daughters ",  ""},
   {"Centrality",             "centrality_{V0M}",                                  "(%)"},
   {"CentralityV0A",          "centrality_{V0A}",                                  "(%)"},
   {"CentralityV0C",          "centrality_{V0C}",                                  "(%)"},
@@ -632,6 +655,7 @@ TProfile2D*     AliDielectronVarManager::fgVZERORecentering[2][2] = {{0x0,0x0},{
 TProfile3D*     AliDielectronVarManager::fgZDCRecentering[3][2] = {{0x0,0x0},{0x0,0x0},{0x0,0x0}};
 AliDielectronQnEPcorrection* AliDielectronVarManager::fgQnEPacRemoval = 0x0;
 Bool_t          AliDielectronVarManager::fgEventPlaneACremoval = kFALSE;
+TString         AliDielectronVarManager::fgQnVectorNorm = "";
 Int_t           AliDielectronVarManager::fgCurrentRun = -1;
 Double_t        AliDielectronVarManager::fgData[AliDielectronVarManager::kNMaxValues] = {0.};
 //________________________________________________________________

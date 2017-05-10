@@ -39,6 +39,7 @@ void Usage(std::ostream& o)
     << "  0x0004   Do scaling by eta differential\n"
     << "  0x0008   Do scaling by fully differential\n"
     << "  0x0010   Correct for decay of strange to secondary \n"
+    << "  0x0020   Correct for fake tracklets\n"
     << "  0x1000   MC closure test\n"
     << std::endl;
   o << "Visualization options:\n"
@@ -72,10 +73,11 @@ const TString& FormatInput(const char* inp, TString& shrt)
   static TString tmp;
   tmp = "";
   Long_t flags;
-  if (gSystem->GetFileStat(inp, 0, 0, flags, 0) != 0) {
+  if (gSystem->GetPathInfo(inp, 0, (Long_t*)0, &flags, 0) != 0) {
     Warning("FormatInput", "Cannot stat %s", inp);
     return tmp;
   }
+  Info("FormatInput", "Input=%s stat=0x%x", inp, flags);
   if (flags & 0x1) {
     shrt = inp;
     tmp.Form("%s/tracklet_dndeta.root", inp);
@@ -103,6 +105,7 @@ const TString& FormatInput(const char* inp, TString& shrt)
  * - 0x0004   Do scaling by eta differential
  * - 0x0008   Do scaling by fully differential
  * - 0x0010   Correct for decay of strange to secondary 
+ * - 0x0020   Correct for fake tracklets
  * - 0x1000   MC closure test
  *
  * Visualization options: 
@@ -120,6 +123,7 @@ const TString& FormatInput(const char* inp, TString& shrt)
  * - 0x0800   Alternative markers
  * 
  * @ingroup pwglf_forward_tracklets
+ * @relates AliTrackletdNdeta2
  */
 void Post(const char* sim,
 	  const char* real,
@@ -144,8 +148,8 @@ void Post(const char* sim,
 
   // Set inputs and output
   TString realShrt, simShrt;  
-  TString realFile = FormatInput(real);
-  TString simFile  = FormatInput(sim);
+  TString realFile = FormatInput(real, realShrt);
+  TString simFile  = FormatInput(sim,  simShrt);
   TString outFile(output && output[0] != '\0' ? output :
 		  Form("%s_%s",realShrt.Data(),simShrt.Data()));
   if (proc & 0x1) outFile.Append("_unit");

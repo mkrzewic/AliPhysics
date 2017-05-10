@@ -43,6 +43,7 @@
 #include "AliESDUtils.h"
 #include "AliMCEventHandler.h"
 #include "AliMCEvent.h"
+#include "AliMultSelection.h"
 #include "AliStack.h"
 #include "AliLog.h"
 //
@@ -55,48 +56,68 @@ ClassImp(AliAnalysisTrackingUncertaintiesAOT)
 //________________________________________________________________________
 AliAnalysisTrackingUncertaintiesAOT::AliAnalysisTrackingUncertaintiesAOT()
 : AliAnalysisTaskSE("TaskTestPA"),
+  fUseCentrality(kCentOff),
   fMaxDCAxy(2.4),
   fMaxDCAz(3.2),
   fMaxEta(0.8),
+  fSPDlayerReq(AliESDtrackCuts::kAny),
   fCrossRowsOverFndCltTPC(0.8),
+  fminCent(0.),
+  fmaxCent(100.),
   fTriggerClass("CINT1B"),
   fTriggerMask(AliVEvent::kMB),
   fESD(0),
   fESDpid(0),
   fspecie(0),
   fHistNEvents(0x0),
+  fHistCent(0x0),
   fHistMC(0x0),
   fHistMCTPConly(0x0),
   fHistData(0x0),
+  fHistAllV0multNTPCout(0),
+  fHistSelV0multNTPCout(0),
   fMC(0),
   fRequireVtxTracks(kTRUE),
+  fUsePtLogAxis(kFALSE),
+  fDoCutV0multTPCout(kFALSE),
   fListHist(0x0),
   fESDtrackCuts(0x0),
-  fVertex(0x0)
+  fVertex(0x0),
+  fMultSelectionObjectName("MultSelection")
 {
     
 }
 //________________________________________________________________________
 AliAnalysisTrackingUncertaintiesAOT::AliAnalysisTrackingUncertaintiesAOT(const char *name)
   : AliAnalysisTaskSE(name),
+    fUseCentrality(kCentOff),
     fMaxDCAxy(2.4),
     fMaxDCAz(3.2),
     fMaxEta(0.8),
+    fSPDlayerReq(AliESDtrackCuts::kAny),
     fCrossRowsOverFndCltTPC(0.8),
+    fminCent(0.),
+    fmaxCent(100.),
     fTriggerClass("CINT1B"),
     fTriggerMask(AliVEvent::kMB),
     fESD(0),
     fESDpid(0),
     fspecie(0),
     fHistNEvents(0x0),
+    fHistCent(0x0),
     fHistMC(0x0),
     fHistMCTPConly(0x0),
     fHistData(0x0),
+    fHistAllV0multNTPCout(0),
+    fHistSelV0multNTPCout(0),
     fMC(0),
     fRequireVtxTracks(kTRUE),
+    fUsePtLogAxis(kFALSE),
+    fDoCutV0multTPCout(kFALSE),
     fListHist(0x0),
     fESDtrackCuts(0x0),
-    fVertex(0x0)
+    fVertex(0x0),
+    fMultSelectionObjectName("MultSelection")
 {
   //
   // standard constructur
@@ -112,11 +133,15 @@ AliAnalysisTrackingUncertaintiesAOT::~AliAnalysisTrackingUncertaintiesAOT()
   if (fListHist) {
         
     delete fHistNEvents;
-        
+    delete fHistCent;
+      
     delete fHistMC;
     delete fHistMCTPConly;
     delete fHistData;
-        
+      
+    delete fHistAllV0multNTPCout;
+    delete fHistSelV0multNTPCout;
+
     delete fListHist;
     fListHist = 0;
   }
@@ -132,6 +157,7 @@ void AliAnalysisTrackingUncertaintiesAOT::UserCreateOutputObjects()
   fESDtrackCuts = AliESDtrackCuts::GetStandardITSTPCTrackCuts2010(kFALSE,0);
   fESDtrackCuts->SetEtaRange(-fMaxEta, fMaxEta);
   fESDtrackCuts->SetMinRatioCrossedRowsOverFindableClustersTPC(fCrossRowsOverFndCltTPC);
+  
     
   //
   // Create histograms
@@ -154,6 +180,9 @@ void AliAnalysisTrackingUncertaintiesAOT::UserCreateOutputObjects()
     
   fListHist->Add(fHistNEvents);
     
+  fHistCent = new TH1F("histCent","Selected centrality; Percentile",100,0.,100.);
+  fListHist->Add(fHistCent);
+    
   TH2F * histVertexSelection = new TH2F("histVertexSelection", "vertex selection; vertex z (cm); accepted/rejected", 100, -50., 50., 2, -0.5, 1.5);
   fListHist->Add(histVertexSelection);
   TH2F * histTPCITS = new TH2F("histTPCITS", "TPC vs ITS clusters", 100, 0., 500., 1000, 0, 15000);
@@ -162,13 +191,21 @@ void AliAnalysisTrackingUncertaintiesAOT::UserCreateOutputObjects()
   fListHist->Add(histTPCITS);
   fListHist->Add(histTPCCL1);
   fListHist->Add(histTPCntrkl);
+    
+    
+  if(fDoCutV0multTPCout) {
+    fHistAllV0multNTPCout = new TH2F("HistAllV0multNTPCout", "V0mult vs # TPCout (all) ;V0mult ;# TPCout", 1000, 0., 40000, 1000, 0, 30000);
+    fHistSelV0multNTPCout = new TH2F("HistSelV0multNTPCout", "V0mult vs # TPCout (sel) ;V0mult ;# TPCout", 1000, 0., 40000, 1000, 0, 30000);
+    fHistAllV0multNTPCout->Sumw2();
+    fHistSelV0multNTPCout->Sumw2();
+    fListHist->Add(fHistAllV0multNTPCout);
+    fListHist->Add(fHistSelV0multNTPCout);
+  }
+
   //
   // (2.) track cut variation histograms
   //
   InitializeTrackCutHistograms();
-    
-  const int nbPt=40;
-  const double ptMax=5;
     
   //add default track cuts in the output list
   fListHist->Add(fESDtrackCuts);
@@ -178,9 +215,9 @@ void AliAnalysisTrackingUncertaintiesAOT::UserCreateOutputObjects()
   Int_t nEtaBins = 2*fMaxEta/0.1;
   if(fMC) {
     const Int_t nvars = 10;
-    Int_t nBins[nvars]   = {600,   62,   297,  297,   18,   nEtaBins,    3,   2,    5,    2};
-    Double_t xmin[nvars] = {-3., -3.2,  0.15, 0.15,   0.,   -fMaxEta, -0.5, -2., -0.5, -0.5};
-    Double_t xmax[nvars] = {3.,   3.2,   15.,  15., 6.28,    fMaxEta,  2.5,  2.,  4.5,  1.5};
+    Int_t nBins[nvars]   = {300,   64,   29,    29,   18,   nEtaBins,    3,   2,    5,    2};
+    Double_t xmin[nvars] = {-3., -3.2,  0.5,   0.5,   0.,   -fMaxEta, -0.5, -2., -0.5, -0.5};
+    Double_t xmax[nvars] = {3.,   3.2, 15.0,  15.0, 6.28,    fMaxEta,  2.5,  2.,  4.5,  1.5};
     TString axis[nvars]  = {"DCAxy","DCAz","track p_{T}","particle p_{T}","phi","eta","type (0=prim,1=sec,2=mat)","track label (1=lab>0,-1=lab<0)","species (0=e,1=#pi,2=k,3=p) - MC truth","TOFbc"};
         
     fHistMC  = new THnSparseF("fHistMC","fHistMC", nvars, nBins, xmin, xmax);
@@ -194,9 +231,9 @@ void AliAnalysisTrackingUncertaintiesAOT::UserCreateOutputObjects()
   }
   else {
     const Int_t nvars = 6;
-    Int_t nBins[nvars]   = {600,   62,   297,    18,  nEtaBins,    2};
-    Double_t xmin[nvars] = {-3., -3.2,  0.15,    0.,  -fMaxEta, -0.5};
-    Double_t xmax[nvars] = {3.,   3.2,    15., 6.28,   fMaxEta,  1.5};
+    Int_t nBins[nvars]   = {300,   64,    29,    18,  nEtaBins,    2};
+    Double_t xmin[nvars] = {-3., -3.2,   0.5,    0.,  -fMaxEta, -0.5};
+    Double_t xmax[nvars] = {3.,   3.2,  15.0,  6.28,   fMaxEta,  1.5};
     TString axis[nvars]  = {"DCAxy","DCAz","track p_{T}","phi","eta","TOFbc"};
         
     fHistData  = new THnSparseF("fHistData","fHistData", nvars, nBins, xmin, xmax);
@@ -204,7 +241,7 @@ void AliAnalysisTrackingUncertaintiesAOT::UserCreateOutputObjects()
     for (Int_t j=0; j<nvars; j++) fHistData->GetAxis(j)->SetTitle(Form("%s",axis[j].Data()));
     fListHist->Add(fHistData);
   }
-
+    
   TH1F * histTOFBC = new TH1F("histTOFBC", "TOF  BC!=0;pt (GeV/c)", 100, 0., 25.);
   fListHist->Add(histTOFBC);
   TH1F * histTOFBC0 = new TH1F("histTOFBC0", "TOF  BC==0;pt (GeV/c)", 100, 0., 25);
@@ -285,9 +322,13 @@ void AliAnalysisTrackingUncertaintiesAOT::UserExec(Option_t *)
   if (IsVertexAccepted(fESD)) {
     histVertexSelection->Fill(fVertex->GetZ(), 0);
   } else {
-    histVertexSelection->Fill(fVertex->GetZ(), 1);
+    if(fVertex) histVertexSelection->Fill(fVertex->GetZ(), 1);
     PostData(1, fListHist);
     return;
+  }
+    
+  if (fUseCentrality!=kCentOff) {
+    if(!IsEventSelectedInCentrality(fESD)) return;
   }
   //
   // Fill track cut variation histograms
@@ -298,7 +339,58 @@ void AliAnalysisTrackingUncertaintiesAOT::UserExec(Option_t *)
   //
   PostData(1, fListHist);
 }
+//---------------------------------------------------------------------------
+void AliAnalysisTrackingUncertaintiesAOT::SetUseCentrality(AliAnalysisTrackingUncertaintiesAOT::ECentrality flag) {
+  //
+  // set centrality estimator
+  //
+  fUseCentrality=flag;
+  if(fUseCentrality<kCentOff||fUseCentrality>=kCentInvalid) Printf("Centrality estimator not valid");
+    
+  return;
+}
 
+//________________________________________________________________________
+Bool_t AliAnalysisTrackingUncertaintiesAOT::IsEventSelectedInCentrality(AliESDEvent *ESDevent) {
+    
+  if(fUseCentrality<kCentOff||fUseCentrality>=kCentInvalid){
+    Printf("Centrality estimator not valid");
+    return kFALSE;
+  }else{
+    if(ESDevent->GetRunNumber()<244824) {
+      Printf("use OLD centrality fw -- not yet implemented!");
+      return kFALSE;
+    }
+    else {
+      Double_t cent=-999;
+      AliMultSelection *multSelection = (AliMultSelection*)ESDevent->FindListObject(fMultSelectionObjectName);
+      if(!multSelection){
+	Printf("AliMultSelection could not be found in the esd event list of objects");
+	return kFALSE;
+      }
+      if(fUseCentrality==kCentV0M){
+	cent=multSelection->GetMultiplicityPercentile("V0M");
+      }else if(fUseCentrality==kCentV0A){
+	cent=multSelection->GetMultiplicityPercentile("V0A");
+      }else if(fUseCentrality==kCentZNA){
+	cent=multSelection->GetMultiplicityPercentile("ZNA");
+      }else if(fUseCentrality==kCentCL1){
+	cent=multSelection->GetMultiplicityPercentile("CL1");
+      }else {
+	Printf("CENTRALITY ESTIMATE WITH ESTIMATOR %d NOT YET IMPLEMENTED FOR NEW FRAMEWORK",(Int_t)fUseCentrality);
+	return kFALSE;
+      }
+      Int_t qual = multSelection->GetEvSelCode();
+      if(qual == 199 ) cent=-999;
+            
+      if(cent>=fminCent && cent<fmaxCent) {
+	fHistCent->Fill(cent);
+	return kTRUE;
+      }
+      else return kFALSE;
+    }
+  }
+}
 //________________________________________________________________________
 void AliAnalysisTrackingUncertaintiesAOT::ProcessTracks(AliStack *stack) {
     
@@ -318,7 +410,7 @@ void AliAnalysisTrackingUncertaintiesAOT::ProcessTracks(AliStack *stack) {
   Float_t label = 1;
   Float_t specie = -10;
   Int_t nTPC=0;
-  Int_t nITS=0; 
+  Int_t nITS=0;
   Int_t ntracklets=0;
   fESD->InitMagneticField();
   Int_t ncl1=0;
@@ -327,6 +419,26 @@ void AliAnalysisTrackingUncertaintiesAOT::ProcessTracks(AliStack *stack) {
     ntracklets = mult->GetNumberOfTracklets();
     ncl1 = mult->GetNumberOfITSClusters(1);
   }
+    
+  if(fDoCutV0multTPCout) { //cut on #tracks kTPCout and V0mult
+    Float_t V0mult=0.;
+    AliESDVZERO *esdVZERO = (AliESDVZERO*)fESD->GetVZEROData();
+    if(esdVZERO) {
+      for(int ich=0; ich<64;ich++) V0mult += esdVZERO->GetMultiplicity(ich);
+    }
+    Int_t nTPCout=0;
+    for (Int_t i=0;i<fESD->GetNumberOfTracks();++i) {
+      AliESDtrack *track =fESD->GetTrack(i);
+      if (!track) continue;
+      track->SetESDEvent(fESD);
+      if(!track->RelateToVertex(fVertex,fESD->GetMagneticField(),100)) continue;
+      if((track->GetStatus() & AliESDtrack::kTPCout)) nTPCout++;
+    }
+    fHistAllV0multNTPCout->Fill(V0mult,nTPCout);
+    if(nTPCout > (0.32*V0mult+750)) return;
+    else fHistSelV0multNTPCout->Fill(V0mult,nTPCout);
+  }
+    
   for (Int_t i=0;i<fESD->GetNumberOfTracks();++i) {
         
     isph=-1;
@@ -341,7 +453,7 @@ void AliAnalysisTrackingUncertaintiesAOT::ProcessTracks(AliStack *stack) {
     //fill TPCcls histo
     nTPC+=track->GetTPCncls();
     nITS+=track->GetITSNcls();
-
+        
     track->GetImpactParameters(dca, cov);
     if(fMC){
       part    = (TParticle*)stack->Particle(TMath::Abs(track->GetLabel()));
@@ -434,11 +546,11 @@ void AliAnalysisTrackingUncertaintiesAOT::ProcessTracks(AliStack *stack) {
 	  histTOFBC->Fill(track->Pt());
 	  bcTOF_d=1;
 	}
-        histTOFBC0->Fill(track->Pt());
+	histTOFBC0->Fill(track->Pt());
 	for(int iSpec=0; iSpec<5; iSpec++) {
 	  if(fspecie&BIT(iSpec)) {
 	    if(IsConsistentWithPid(iSpec, track)) {
-	      Double_t vecHistTpcItsMatch[kNumberOfAxes] = {static_cast<Double_t>(isMatched), pT, eta, phi, (Double_t)iSpec, (Double_t)isph,(Double_t)bcTOF_d,dca[0],dca[1]};
+	      Double_t vecHistTpcItsMatch[kNumberOfAxes] = {static_cast<Double_t>(isMatched), pT, eta, phi, (Double_t)iSpec, (Double_t)isph,(Double_t)bcTOF_d,dca[0]};
 	      histTpcItsMatch->Fill(vecHistTpcItsMatch);
 	      if(fMC){
 		Double_t vec4Sparse[10] = {dca[0],dca[1],pT,part->Pt(),phi,eta,partType,label,specie,(Double_t)bcTOF_d};
@@ -455,9 +567,8 @@ void AliAnalysisTrackingUncertaintiesAOT::ProcessTracks(AliStack *stack) {
     fESDtrackCuts->SetRequireITSRefit(refit);
     fESDtrackCuts->SetMaxChi2TPCConstrainedGlobal(chi2tpc);
     fESDtrackCuts->SetMaxChi2PerClusterITS(chi2its);
-    //
-    fESDtrackCuts->SetClusterRequirementITS(AliESDtrackCuts::kSPD,AliESDtrackCuts::kAny);
-        
+    //set the SPD cluster requirement
+    fESDtrackCuts->SetClusterRequirementITS(AliESDtrackCuts::kSPD,fSPDlayerReq);
     //set is matched
     isMatched=kTRUE;
     Int_t bcTOF_n=0;
@@ -465,11 +576,11 @@ void AliAnalysisTrackingUncertaintiesAOT::ProcessTracks(AliStack *stack) {
       if(track->GetTOFBunchCrossing()!=0){
 	bcTOF_n=1;
       }
-
+            
       for(int iSpec=0; iSpec<5; iSpec++) {
 	if(fspecie&BIT(iSpec)) {
 	  if(IsConsistentWithPid(iSpec, track)) {
-	    Double_t vecHistTpcItsMatch[kNumberOfAxes] = {static_cast<Double_t>(isMatched), pT, eta, phi, (Double_t)iSpec, (Double_t)isph,(Double_t)bcTOF_n,dca[0],dca[1]};
+	    Double_t vecHistTpcItsMatch[kNumberOfAxes] = {static_cast<Double_t>(isMatched), pT, eta, phi, (Double_t)iSpec, (Double_t)isph,(Double_t)bcTOF_n,dca[0]};
 	    histTpcItsMatch->Fill(vecHistTpcItsMatch);
 	    if(fMC){
 	      Double_t vec4Sparse[10] = {dca[0],dca[1],pT,part->Pt(),phi,eta,partType,label,specie,(Double_t)bcTOF_n};
@@ -659,16 +770,17 @@ void AliAnalysisTrackingUncertaintiesAOT::InitializeTrackCutHistograms() {
   // create histograms for the track cut studies
   //
   //  match TPC->ITS
-  //                                  0-is matched, 1-pt, 2-eta,   3-phi,   4-pid(0-3 -> electron-proton, 4 -> undef, 5 -> all) 6-bcTOF 7-DCAxy 8-DCAz
-  Int_t    binsTpcItsMatch[kNumberOfAxes] = {    2,   50,    20,            18,  6,      3,    2,600,62};   
-  Double_t minTpcItsMatch[kNumberOfAxes]  = { -0.5,  0.1,    -1,             0, -0.5, -1.5, -0.5,-3.,-3.2};
-  Double_t maxTpcItsMatch[kNumberOfAxes]  = {  1.5,   20,    +1, 2*TMath::Pi(),  5.5,  1.5,  1.5, 3., 3.2};
+  //                                  0-is matched, 1-pt, 2-eta,   3-phi,   4-pid(0-3 -> electron-proton, 4 -> undef, 5 -> all) 6-bcTOF 7-DCAxy
+  Int_t nEtaBins = 2*fMaxEta/0.1;
+  Int_t    binsTpcItsMatch[kNumberOfAxes] = {    2,   29, nEtaBins,            18,  6,      3,    2,  30};
+  Double_t minTpcItsMatch[kNumberOfAxes]  = { -0.5,  0.5, -fMaxEta,             0, -0.5, -1.5, -0.5, -3.};
+  Double_t maxTpcItsMatch[kNumberOfAxes]  = {  1.5, 15.0,  fMaxEta, 2*TMath::Pi(),  5.5,  1.5,  1.5,  3.};
   //
-  TString axisNameTpcItsMatch[kNumberOfAxes]  = {"isMatched","pT","eta","phi","pid","primSec","bcTOF","dcaxy","dcaz"};
-  TString axisTitleTpcItsMatch[kNumberOfAxes] = {"isMatched","pT","eta","phi","pid","primSec","bcTOF","dcaxy","dcaz"};
+  TString axisNameTpcItsMatch[kNumberOfAxes]  = {"isMatched","pT","eta","phi","pid","primSec","bcTOF","dcaxy"};
+  TString axisTitleTpcItsMatch[kNumberOfAxes] = {"isMatched","pT","eta","phi","pid","primSec","bcTOF","dcaxy"};
   //
   THnSparseF * histTpcItsMatch = new THnSparseF("histTpcItsMatch","TPC -> ITS matching",kNumberOfAxes, binsTpcItsMatch, minTpcItsMatch, maxTpcItsMatch);
-  BinLogAxis(histTpcItsMatch, 1);
+  if(fUsePtLogAxis)BinLogAxis(histTpcItsMatch, 1);
   fListHist->Add(histTpcItsMatch);
   //
   for (Int_t iaxis=0; iaxis<kNumberOfAxes;iaxis++){

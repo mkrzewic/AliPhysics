@@ -31,13 +31,13 @@ class AliEmcalCorrectionCellBadChannel : public AliEmcalCorrectionComponent {
   Bool_t Initialize();
   void UserCreateOutputObjects();
   Bool_t Run();
+  Bool_t CheckIfRunChanged();
   
 protected:
   TH1F* fCellEnergyDistBefore;              //!<! cell energy distribution, before bad channel correction
   TH1F* fCellEnergyDistAfter;               //!<! cell energy distribution, after bad channel correction
   
 private:
-  Int_t      InitBadChannels();
 
   AliEmcalCorrectionCellBadChannel(const AliEmcalCorrectionCellBadChannel &);             // Not implemented
   AliEmcalCorrectionCellBadChannel &operator=(const AliEmcalCorrectionCellBadChannel &);   // Not implemented

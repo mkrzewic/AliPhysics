@@ -9,12 +9,13 @@
 
 namespace AliUtilTOFParams {
   
-  enum {nMultBin = 12, kPtBins = 59, kCharges = 2, kSpecies = 3, kFModes = 4};
+  enum {nMultBin = 12, kPtBins = 59, kSpecies = 3, kFModes = 4};
   //Indexes for PID
   enum {kExpSpecies = 6, ke = 0, kmu, kpi, kK, kp, kd};
+  enum {kpos = 0, kneg, kCharges = 2};
   //Indexes to store event
   //Track info
-  enum fTrkMaskIndex {kNegTrk, kIsMismatch, kT0_0, kT0_1, kT0_2, kIsTOFout, kIsTOFTime, kIsTRDout, kLimitfTrkMask};//Track information bitmask fTrkMask - kT0_0 (T0 TOF) kT0_1 (T0 T0A) kT0_2 (T0C)
+  enum fTrkMaskIndex {kNegTrk, kIsMismatch, kT0_0, kT0_1, kT0_2, kIsTOFout, kIsTOFTime, kIsTRDout, kPassGoldenChi2, kLimitfTrkMask};//Track information bitmask fTrkMask - kT0_0 (T0 TOF) kT0_1 (T0 T0A) kT0_2 (T0C)
   //Track cuts
   enum fTrkCutMaskIndex {kTPCSetL, kTPCSetT, kTPCChi2SetL, kTPCChi2SetT, kDCAzSetL, kDCAzSetT, kPrimSetL, kPrimSetL01, kPrimSetT01, kPrimSetT, kGeoCutSet1, kGeoCutSet2, kLimitfTrkCutMask};//Track cut information bitmask fTrkCutMask
   //Track PID
@@ -27,7 +28,7 @@ namespace AliUtilTOFParams {
   const Double_t fDCAXYRange = 3.;
   const Double_t fDCAZRange = 3.;
   //DCA binning in histograms 
-  const Int_t fDCAXYbins = 1000;
+  const Int_t fDCAXYbins = 2000;
   
   //Dimensions of the screen
   const Double_t screendim[2] = {1366, 768};
@@ -90,6 +91,7 @@ namespace AliUtilTOFParams {
   const Double_t MultBin[nMultBin] = { 0., 5., 10., 20., 30., 40., 50., 60., 70., 80., 90., 100};
   const TString MultBinString[nMultBin] = { "0to5", "5to10", "10to20", "20to30", "30to40", "40to50", "50to60", "60to70", "70to80", "80to90", "90to100", "MB"};
   const TString MultBinStringInSquare[nMultBin] = { "[0-5]%", "[5-10]%", "[10-20]%", "[20-30]%", "[30-40]%", "[40-50]%", "[50-60]%", "[60-70]%", "[70-80]%", "[80-90]%", "[90-100]%", "MB"};
+  const TString MultBinStringDash[nMultBin] = { "0-5%", "5-10%", "10-20%", "20-30%", "30-40%", "40-50%", "50-60%", "60-70%", "70-80%", "80-90%", "90-100%", "MB"};
   // const Int_t multcolor[nMultBin] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, -1};//Blue Central
   const Int_t multcolor[nMultBin] = {10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, -1};//Red Central
   const Int_t multdraw[nMultBin] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
@@ -139,10 +141,8 @@ namespace AliUtilTOFParams {
   const TString CutVarsTitle[nCutVars + 1] = {"TPCRows 60", "TPCRows 80", "Chi2 5", "Chi2 3", "DCAz 3", "DCAz 1", "DCAxy x10", "DCAxy x0.9", "DCAxy x1.1", "DCAxy x0.1", "GeoCut 0", "GeoCut 1", "Std"};
   const TString primfunct = "0.0105+0.0350/pt^1.1";//Standard pt dependence of the DCAxy cut
   
-  //Corrections
-  const Bool_t truematch = kTRUE;//Use the matching efficiency with the true match
-  const Int_t nCorr = 3;//Number of corrections applied to the final spectra
-  const TString CorrName[nCorr] = {truematch ? "T_Matching" : "Matching", "Tracking", "Primaries"};
+  //Golden Chis cut
+  const Double_t primchi2 = 36;
   
   const UInt_t nMCs_Hi = 2;//Number of different MC productions for PbPb
   const UInt_t nMCs_pp = 2;//Number of different MC productions for pp

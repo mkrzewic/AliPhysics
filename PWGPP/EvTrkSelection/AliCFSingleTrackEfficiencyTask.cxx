@@ -4,6 +4,7 @@
 #include <TDatabasePDG.h>
 
 #include "AliAnalysisDataSlot.h"
+#include "AliMultSelection.h"
 #include "AliAnalysisDataContainer.h"
 #include "AliAnalysisManager.h"
 #include "AliAODEvent.h"
@@ -46,6 +47,8 @@ AliCFSingleTrackEfficiencyTask::AliCFSingleTrackEfficiencyTask() :
   fSetFilterBit(kFALSE),
   fbit(0),
   fRemoveNegativeLabelTracks(kTRUE),
+  fMatchToKinematicTrack(kTRUE),
+  fUseGeneratedKine(kFALSE),
   fEvalCentrality(kFALSE),
   fCentralityEstimator("V0M"),
   fConfiguration(kFast), // default  use the minimal configuration
@@ -68,6 +71,8 @@ AliCFSingleTrackEfficiencyTask::AliCFSingleTrackEfficiencyTask(const Char_t* nam
   fSetFilterBit(kFALSE),
   fbit(0),
   fRemoveNegativeLabelTracks(kTRUE),
+  fMatchToKinematicTrack(kTRUE),
+  fUseGeneratedKine(kFALSE),
   fEvalCentrality(kFALSE),
   fCentralityEstimator("V0M"),
   fConfiguration(kFast), // default  use the minimal configuration
@@ -110,6 +115,8 @@ AliCFSingleTrackEfficiencyTask& AliCFSingleTrackEfficiencyTask::operator=(const 
     fSetFilterBit  = c.fSetFilterBit;
     fbit = c.fbit;
     fRemoveNegativeLabelTracks = c.fRemoveNegativeLabelTracks;
+    fMatchToKinematicTrack = c.fMatchToKinematicTrack;
+    fUseGeneratedKine = c.fUseGeneratedKine;
 
     fEvalCentrality = c.fEvalCentrality;
     fCentralityEstimator = c.fCentralityEstimator;
@@ -133,6 +140,8 @@ AliCFSingleTrackEfficiencyTask::AliCFSingleTrackEfficiencyTask(const AliCFSingle
   fSetFilterBit(c.fSetFilterBit),
   fbit(c.fbit),
   fRemoveNegativeLabelTracks(c.fRemoveNegativeLabelTracks),
+  fMatchToKinematicTrack(c.fMatchToKinematicTrack),
+  fUseGeneratedKine(c.fUseGeneratedKine),
   fEvalCentrality(c.fEvalCentrality),
   fCentralityEstimator(c.fCentralityEstimator),
   fConfiguration(c.fConfiguration),
@@ -608,16 +617,20 @@ void AliCFSingleTrackEfficiencyTask::CheckReconstructedParticles()
     //
 
     // check particle selections at MC level
-    AliVParticle *mcPart  = (AliVParticle*)fMCEvent->GetTrack(label);
-    if(!mcPart) continue;
-    containerInputMC[0] = (Float_t)mcPart->Pt();
-    containerInputMC[1] = mcPart->Eta();
-    containerInputMC[2] = mcPart->Phi();
-    containerInputMC[3] = mcPart->Theta();
+    if(fMatchToKinematicTrack){
+        AliVParticle *mcPart  = (AliVParticle*)fMCEvent->GetTrack(TMath::Abs(label));
+        if(!mcPart) continue;
+        containerInputMC[0] = (Float_t)mcPart->Pt();
+        containerInputMC[1] = mcPart->Eta();
+        containerInputMC[2] = mcPart->Phi();
+        containerInputMC[3] = mcPart->Theta();
 
-    if (!fMCCuts->IsMCParticleGenerated(mcPart)) continue;
-    //    cout<< "MC matching did work"<<endl;
-
+        if (!fMCCuts->IsMCParticleGenerated(mcPart)) continue;
+        //    cout<< "MC matching did work"<<endl;
+	if(fUseGeneratedKine){
+	  for(Int_t ivar=0; ivar<=3; ivar++) containerInput[ivar] = containerInputMC[ivar];
+	}
+    }
 
     // for filter bit selection
     AliAODTrack *aodTrack = dynamic_cast<AliAODTrack*>(track);
@@ -715,7 +728,26 @@ Double_t AliCFSingleTrackEfficiencyTask::GetCentrality()
   //
   // Get centrality
   //
+  if(fInputEvent->GetRunNumber()<244824) return GetCentralityOldFramework();
+  Double_t cent=-1;
+  AliMultSelection *multSelection = (AliMultSelection*)fInputEvent->FindListObject("MultSelection");
+  if(!multSelection){
+    AliWarning("AliMultSelection could not be found in the aod event list of objects");
+    return cent;
+  }
+  cent=multSelection->GetMultiplicityPercentile(fCentralityEstimator.Data());
+  Int_t qual = multSelection->GetEvSelCode();
+  if(qual == 199 ) cent=-1;
+  return cent;
 
+}
+
+//______________________________________________________________________
+Double_t AliCFSingleTrackEfficiencyTask::GetCentralityOldFramework()
+{
+  //
+  // Get centrality, Run1 framework
+  //
   Bool_t isAOD = fInputEvent->IsA()->InheritsFrom("AliAODEvent");
   Double_t cent = -1;
 

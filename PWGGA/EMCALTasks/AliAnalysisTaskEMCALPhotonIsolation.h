@@ -56,6 +56,7 @@ class AliESDCaloCluster;
 class AliVCaloCells;
 class AliAODMCParticle;
 class AliGenPythiaEventHeader;
+class AliAODMCHeader;
   //class AliEventPoolManager;
 
 #include "AliAnalysisTaskEmcal.h"
@@ -109,14 +110,15 @@ public:
   void			   SetDxBinning(vector<Double_t> binedges)			   { fBinsDx = binedges; }
   void			   SetDzBinning(vector<Double_t> binedges)			   { fBinsDz = binedges; }
   void			   SetDecayBinning(vector<Double_t> binedges)			   { fBinsDecay = binedges; }
-
+  void         SetMCtruth(Bool_t mctruth)                       {fMCtruth=mctruth;}
+  
 protected:
   
   void                     FillQAHistograms(AliVCluster *coi, TLorentzVector vecCOI); // Fill some QA histograms
   void                     EtIsoCellPhiBand(TLorentzVector c, Double_t &etIso, Double_t &phiBand);    //EIsoCone via Cells UE via PhiBand EMCAL
   void                     EtIsoCellEtaBand(TLorentzVector c, Double_t &etIso, Double_t &etaBand);    //EIsoCone via Cells UE via EtaBand EMCAL
-  void                     EtIsoClusPhiBand(TLorentzVector c, Double_t &etIso, Double_t &etaBand, Int_t index);    //EIsoCone via Clusters UE via EtaBand EMCAL
-  void                     EtIsoClusEtaBand(TLorentzVector c, Double_t &etIso, Double_t &etaBand, Int_t index);    //EIsoCone via Clusters UE via EtaBand EMCAL
+  void                     EtIsoClusPhiBand(TLorentzVector c, Double_t &etIso, Double_t &etaBand, Int_t index);    //EIsoCone via Clusters + Track UE via EtaBand EMCAL
+  void                     EtIsoClusEtaBand(TLorentzVector c, Double_t &etIso, Double_t &etaBand, Int_t index);    //EIsoCone via Clusters + Track UE via EtaBand EMCAL
   void                     PtIsoTrackPhiBand(TLorentzVector c, Double_t &ptIso, Double_t &phiBand);   //PIsoCone via Track UE via PhiBand TPC
   void                     PtIsoTrackEtaBand(TLorentzVector c, Double_t &ptIso, Double_t &etaBand);   //PIsoCone via Track UE via EtaBand TPC
   void                     PtIsoTrackOrthCones(TLorentzVector c, Double_t &ptIso, Double_t &cones);   //PIsoCone via Tracks UE via Orthogonal Cones in Phi
@@ -137,6 +139,7 @@ protected:
   Double_t*                 GenerateFixedBinArray(Int_t n, Double_t min, Double_t max) const;
   void                     ExecOnce();
   Bool_t                   Run();
+  Bool_t                   SelectCandidate(AliVCluster* );
   void                     AnalyzeMC();
   void                     LookforParticle(Int_t, Double_t, Double_t, Double_t,Double_t,Double_t, Double_t);
   Bool_t                   MCSimTrigger(AliVEvent *eventIn, Int_t triggerLevel=0); // for the trigger level 1 = EMCEGA1 level 2 = EMCEGA2
@@ -155,6 +158,7 @@ protected:
   
   TClonesArray               *fNCluster;       // Neutral clusters
   TClonesArray               *fAODMCParticles; //!<!
+  AliAODMCHeader             *fmcHeader;
   TClonesArray               *fTracksAna;      //!<! hybrid track array in
   AliStack                   *fStack;          //!<!
   AliEMCALRecoUtils          *fEMCALRecoUtils; //!<!  EMCAL utils for cluster rereconstruction.
@@ -181,7 +185,7 @@ protected:
   Bool_t      fQA;                             // Flag for few further QA plots wrt the ones already done in the EMCALTask
   Bool_t      fIsMC;                           // Flag for MC Truth Analysis
   Bool_t      fTPC4Iso;                        // 0=EMCAL_ONLY; 1=Candidate in EMCAL+ TPC for Isolation and UE
-  Int_t       fIsoMethod;                      // 0=Cells, 1=Clusters (EMCAL_ONLY),  2=Tracks (EMCAL w/o TPC)
+  Int_t       fIsoMethod;                      // 0=Cells, 1=Clusters (EMCAL_ONLY)+Track,  2=Tracks (within EMCAL or TPC acceptance), 3=Clusters Only (No Tracks)
   Int_t       fUEMethod;                       // 0=PhiBand, 1=EtaBand, (EMCAL or TPC) 2= Ort Cones, 3=FullTPC (only with TPC)
   Int_t       fNDimensions;                    //!<!number of Dimensions for the THnSPARSE Reconstruction
   Int_t       fMCDimensions;                   //!<!number of Dimensions for the THnSPARSE Truth
@@ -197,6 +201,7 @@ protected:
   Int_t       fTriggerLevel1;                  // enable to choose the trigger L1 gamma to "simulate" for the MC 1 = EMCEGA1 and 2 = EMCEGA2
   Int_t       fTest1;
   Int_t       fTest2;
+  Bool_t      fMCtruth;
   
     // Initialization for TTree variables
   Double_t    fEClustersT;                     // E for all clusters
@@ -246,6 +251,7 @@ protected:
   TH1D        *fPT;                             //!<! Pt distribution
   TH1D        *fE;                              //!<! E distribution
   TH2D        *fNLM;                            //!<! NLM distribution
+  TH2D        *fNLM2_NC_Acc;                    //!<! NLM (1,2) distribution for Neutral Clusters in Acceptance
   TH1D        *fVz;                             //!<! Veretex Z distribution
   TH1D        *fEvents;                         //!<! Number of Events
   TH1D        *fPtaftTime;                      //!<! E distribution for clusters after cluster time cut
@@ -304,6 +310,8 @@ protected:
   TH3F        *fpi0VSclusterVSIsolation;       //!<!
   TH3F        *fpi0VSclusterVSM02;             //!<!
   TH3F        *fpi0VSM02VSIsolation;           //!<!
+  TH3F        *fEtVSM02VSPisotrack;           //!<!
+  TH3F        *fEtVSM02VSEisoclust;           //!<!
   TH2F        *fPhiTracksVSclustPt;            //!<!
   TH2F        *fEtaTracksVSclustPt;            //!<!
   
@@ -331,7 +339,7 @@ private:
   AliAnalysisTaskEMCALPhotonIsolation&operator=(const AliAnalysisTaskEMCALPhotonIsolation&); // not implemented
   
     /// \cond CLASSIMP
-  ClassDef(AliAnalysisTaskEMCALPhotonIsolation, 12);    //EMCAL Neutrals base analysis task
+  ClassDef(AliAnalysisTaskEMCALPhotonIsolation, 14);    //EMCAL Neutrals base analysis task
                                                        /// \endcond
 };
 #endif

@@ -40,6 +40,7 @@ class TFile;
 class TH1F;
 class TH2F;
 class TProfile;
+class TProfile2D;
 class TProfile3D;
 class TH3D;
 class TH3F;
@@ -56,6 +57,7 @@ public:
   enum DataSet { k2010,
     k2011,
     k2015,
+    k2015v6,
     kAny
   };
   
@@ -150,16 +152,26 @@ public:
   void SetMCInput() {fIsMCInput = kTRUE;}
   void SetUseMCCen( Bool_t kB ) { fUseMCCen = kB; }
   void SetRejectPileUp( Bool_t kB ) { fRejectPileUp = kB; }
+  void SetRejectPileUpTight( Bool_t kB ) { fRejectPileUpTight = kB; }
   void SetCentralityRange(Float_t centrlow=0., Float_t centrup=100.) {fCentrLowLim=centrlow;
     fCentrUpLim=centrup;}
   void SetCentralityEstimator(CentrEstimator centrest) {fCentrEstimator=centrest;}
   void SetDataSet(DataSet cDataSet) {fDataSet = cDataSet;}
   void SetZDCGainAlpha( Float_t a ) { fZDCGainAlpha = a; }
-  void SetTowerEqList(TList* const kList) {this->fTowerEqList = (TList*)kList->Clone();};
+  void SetTowerEqList(TList* const kList) {this->fTowerEqList = (TList*)kList->Clone(); fUseTowerEq=kTRUE;};
   TList* GetTowerEqList() const {return this->fTowerEqList;};
+  void SetBadTowerCalibList(TList* const kList) {this->fBadTowerCalibList = (TList*)kList->Clone(); fUseBadTowerCalib=kTRUE;};
+  TList* GetBadTowerCalibList() const {return this->fBadTowerCalibList;};
+  void SetVZEROGainEqList(TList* const kList) {this->fVZEROGainEqList = (TList*)kList->Clone();};
+  TList* GetVZEROGainEqList() const {return this->fVZEROGainEqList;};
+  void SetVZEROQVecRecList(TList* const kList) {this->fVZEROQVecRecList = (TList*)kList->Clone();};
+  TList* GetVZEROQVecRecList() const {return this->fVZEROQVecRecList;};
+  void SetZDCSpectraCorrList(TList* const kList) {this->fZDCSpectraCorrList = (TList*)kList->Clone(); fUseZDCSpectraCorr=kTRUE;};
+  TList* GetZDCSpectraCorrList() const {return this->fZDCSpectraCorrList;};
   virtual Int_t GetCenBin(Double_t Centrality);
   Double_t GetWDist(const AliVVertex* v0, const AliVVertex* v1);
   Bool_t plpMV(const AliAODEvent* aod);
+  Double_t GetBadTowerResp(Double_t Et, TH2D* BadTowerCalibHist);
   
 private:
   AliAnalysisTaskCRCZDC(const AliAnalysisTaskCRCZDC& dud);
@@ -248,6 +260,7 @@ private:
   Float_t  fCentrUpLim;		// centrality upper limit
   CentrEstimator  fCentrEstimator;     // string for the centrality estimator
   Bool_t   fRejectPileUp;
+  Bool_t   fRejectPileUpTight;
   //
   TList       *fOutput;	   	//! list send on output slot 0
   //
@@ -267,8 +280,7 @@ private:
   TH2F *fhZDCvsTracklets;	//! ZDC vs N_tracklets;
   TH2F *fhZDCvsNclu1;		//! ZDC vs N_cluster layer 1;
   TH2F *fhDebunch;		//! Debunch;
-  TH2F *fhZNCcentroid;		//! ZNC centroid
-  TH2F *fhZNAcentroid;		//! ZNA centroid
+  TH3D *fhZNCenDis[2];		//! ZN centroid vs centrality
   //
   TH1F *fhAsymm;		//! ZN asymmetry
   TH2F *fhZNAvsAsymm;		//! ZNA vs asymmetry
@@ -280,18 +292,25 @@ private:
   TH2F *fhZNCpmcvscentr;	//! ZNC vs. centrality
   TH2F *fhZNApmcvscentr;   	//! ZNA vs. centrality
   
+  TH3D *fhZNSpectra;   	//! ZNA vs. centrality
+  TH3D *fhZNSpectraCor;   	//! ZNA vs. centrality
+  TH3D *fhZNSpectraPow;   	//! ZNA vs. centrality
+  TH3D *fhZNBCCorr;   	//! ZNA vs. centrality
+  
   const static Int_t fCRCMaxnRun = 211;
-  const static Int_t fCRCnTow = 8;
+  
+//  TH3D *fhZNSpectraRbR[fCRCMaxnRun]; //! ZNA vs. centrality
+  
+  const static Int_t fCRCnTow = 5;
   const static Int_t fnCen = 10;
   Int_t fCRCnRun;
   Float_t fZDCGainAlpha;
   DataSet fDataSet;
   Int_t fRunList[fCRCMaxnRun];                   //! Run list
-  // TProfile *fhnTowerGain[fCRCnTow]; //! towers gain
-  // TProfile3D *fhnTowerGainVtx[fnCen][fCRCnTow]; //! towers gain vtx
+//  TProfile *fhnTowerGain[fCRCnTow]; //! towers gain
   TList *fCRCQVecListRun[fCRCMaxnRun]; //! Q Vectors list per run
-  // TProfile *fZNCTower[fCRCMaxnRun];		//! ZNC tower spectra
-  // TProfile *fZNATower[fCRCMaxnRun];		//! ZNA tower spectra
+  TProfile *fZNCTower[fCRCMaxnRun][fCRCnTow];		//! ZNC tower spectra
+  TProfile *fZNATower[fCRCMaxnRun][fCRCnTow];		//! ZNA tower spectra
   TClonesArray* fStack; //!
   TList *fSpectraMCList;   //! list with pt spectra
   TH1F *fPtSpecGen[2][10];		//! PtSpecGen
@@ -305,13 +324,36 @@ private:
   TH1F *fPileUpMultSelCount; //! centrality distribution
   TF1 *fMultTOFLowCut; //!
   TF1 *fMultTOFHighCut; //!
+  TProfile2D *fVZEROMult; //!
   
   AliMultSelection* fMultSelection; //! MultSelection (RUN2 centrality estimator)
+  Bool_t fUseTowerEq; //
   TList *fTowerEqList;   // list with weights
   TH1D *fTowerGainEq[2][5]; //!
+  TList *fBadTowerStuffList; //! list for storing calib files
+  Bool_t fUseBadTowerCalib; //
+  TList *fBadTowerCalibList; // list with original calib files
+  TList *fVZEROGainEqList; //
+  TList *fVZEROQVecRecList; //
+  TList *fVZEROStuffList; //!
+  Bool_t fUseZDCSpectraCorr; //
+  TList *fZDCSpectraCorrList; //
+  TH1D *SpecCorMu1[8]; //!
+  TH1D *SpecCorMu2[8]; //!
+  TH1D *SpecCorAv[8]; //!
+  TH1D *SpecCorSi[8]; //!
+  TH2D *fBadTowerCalibHist[100]; //!
+  TH2D *fVZEROGainEqHist; //!
+  const static Int_t fkVZEROnHar = 4;
+//  TProfile3D *fVZEROQVectorRecQx[fkVZEROnHar]; //!
+//  TProfile3D *fVZEROQVectorRecQy[fkVZEROnHar]; //!
+  TProfile3D *fVZEROQVectorRecQxStored[fkVZEROnHar]; //!
+  TProfile3D *fVZEROQVectorRecQyStored[fkVZEROnHar]; //!
+  const static Int_t fkVZEROnQAplots = 8;
+  TProfile2D *fVZEROQVectorRecFinal[fkVZEROnHar][fkVZEROnQAplots]; //!
   Int_t fCachedRunNum;   //
   
-  ClassDef(AliAnalysisTaskCRCZDC,7);
+  ClassDef(AliAnalysisTaskCRCZDC,8);
   
 };
 

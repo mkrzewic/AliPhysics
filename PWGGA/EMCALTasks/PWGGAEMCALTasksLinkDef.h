@@ -4,6 +4,7 @@
 #pragma link off all classes;
 #pragma link off all functions;
 
+#pragma link C++ class AliAnalysisTaskEMCALClusterTurnOn+;
 #pragma link C++ class AliAnalysisTaskEMCALIsoPhoton+;
 #pragma link C++ class AliAnalysisTaskEMCALPhoton+;
 #pragma link C++ class AliAnalysisTaskEMCALPi0PbPb+;
@@ -25,6 +26,7 @@
 #pragma link C++ class AliAnalysisTaskEMCALPi0V2ShSh+;
 #pragma link C++ class AliAnalysisTaskEMCALIsolation+;
 #pragma link C++ class AliAnalysisTaskEMCALPhotonIsolation+;
+#pragma link C++ class AliAnalysisTaskEMCALTrackIsolation+;
 #pragma link C++ class AliAnalysisTaskEMCALPhotonTagged+;
 #pragma link C++ class AliAnalysisTaskEMCALMesonGGSDM+;
 #pragma link C++ class AliAnalysisTaskEMCALMesonGGSDMpPb+;

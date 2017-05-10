@@ -292,20 +292,22 @@ class AliAnalysisTaskGammaConvV1 : public AliAnalysisTaskSE {
     Int_t                             fDoPhotonQA;                                //
     Bool_t                            fDoChargedPrimary;                          //
     Bool_t                            fDoPlotVsCentrality;                        //
-    Bool_t                            fIsFromMBHeader;                            //
+    Bool_t                            fIsFromSelectedHeader;                      //
     Int_t                             fIsMC;                                      //
     Bool_t                            fDoTHnSparse;                               // flag for using THnSparses for background estimation
     Int_t                             fDoCentralityFlat;                          //flag for centrality flattening
     Double_t                          fWeightJetJetMC;                            // weight for Jet-Jet MC
     Double_t*                         fWeightCentrality;                          //[fnCuts], weight for centrality flattening
-    Bool_t                            fEnableClusterCutsForTrigger;                //enables ClusterCuts for Trigger
+    Bool_t                            fEnableClusterCutsForTrigger;               //enables ClusterCuts for Trigger
     Bool_t                            fDoMaterialBudgetWeightingOfGammasForTrueMesons;
-    
+    TTree*                            tBrokenFiles;                               // tree for keeping track of broken files
+    TObjString*                       fFileNameBroken;                            // string object for broken file name
+
   private:
 
     AliAnalysisTaskGammaConvV1(const AliAnalysisTaskGammaConvV1&); // Prevent copy-construction
     AliAnalysisTaskGammaConvV1 &operator=(const AliAnalysisTaskGammaConvV1&); // Prevent assignment
-    ClassDef(AliAnalysisTaskGammaConvV1, 39);
+    ClassDef(AliAnalysisTaskGammaConvV1, 40);
 };
 
 #endif

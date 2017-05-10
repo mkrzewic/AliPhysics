@@ -25,6 +25,7 @@
 # include <TClass.h>
 # include "AliAODTracklet.C"
 # include <TParameter.h>
+# include <TParticle.h>
 #else
 class TH1D;
 class TH2D;
@@ -38,6 +39,7 @@ class THStack;
 class AliAODTracklet;
 class TCanvas; // Autoload
 class TVirtualPad;
+class TParticle;
 #endif
 
 //====================================================================
@@ -126,7 +128,9 @@ public:
     : TNamed(),
       fCalc(kProduct),
       fMask(0xFF),
-      fVeto(0x0)
+      fVeto(0x0),
+      fInverse(false),
+      fDebug(0)
   {}
   /**
    * Named constructor 
@@ -140,7 +144,8 @@ public:
       fCalc(kProduct),
       fMask(0xFF),
       fVeto(0x0),
-      fInverse(false)
+      fInverse(false),
+      fDebug(0)
   {}
   /**
    * Copy constructor 
@@ -152,7 +157,8 @@ public:
       fCalc   (o.fCalc),
       fMask   (o.fMask),
       fVeto   (o.fVeto),
-      fInverse(o.fInverse)
+      fInverse(o.fInverse),
+      fDebug  (o.fDebug)
   {}
   /**
    * Destructor 
@@ -174,6 +180,7 @@ public:
     fMask    = o.fMask;
     fVeto    = o.fVeto;
     fInverse = o.fInverse;
+    fDebug   = o.fDebug;
     return *this;
   }
   /** 
@@ -245,6 +252,12 @@ public:
    */
   void SetInverse(Bool_t inv) { fInverse = inv; }
   /** 
+   * Set the debug level 
+   * 
+   * @param lvl Debug level 
+   */
+  void SetDebug(Int_t lvl) { fDebug = lvl; }
+  /** 
    * Check if tracklet is to be reweighed according to mask and veto 
    * 
    * @param tracklet Tracklet 
@@ -255,12 +268,14 @@ public:
   {
     UChar_t flags = tracklet->GetFlags();
     if (fMask != 0xFF && (fMask & flags) == 0) {
-      // Info("LookupWeight", "Tracklet 0x%02x does not fullfill mask 0x%02x",
-      //       flags, fMask);	  
+      if (fDebug > 3) 
+	Info("LookupWeight", "Tracklet 0x%02x does not fullfill mask 0x%02x",
+             flags, fMask);	  
       return false;
     }
     if ((fVeto & flags) != 0) {
-      // Info("LookupWeight", "Tracklet 0x%02x vetoed by 0x%02x",flags, fVeto);
+      if (fDebug > 3) 
+	Info("LookupWeight", "Tracklet 0x%02x vetoed by 0x%02x",flags, fVeto);
       return false;
     }
     return true;
@@ -286,6 +301,23 @@ public:
     return w;
   }
   /** 
+   * Look-up weight of a particle 
+   * 
+   * @param particle Particle 
+   * @param cent     Centrality 
+   * @param ipz      Interaction point z-coordinate 
+   * 
+   * @return The weight
+   */
+  Double_t LookupWeight(TParticle* particle,
+			Double_t   cent,
+			Double_t   ipz) const
+  {
+    Double_t w = CalcWeight(particle, cent, ipz);
+    if (fInverse) w = 1/w;
+    return w;
+  }
+  /** 
    * Calculate the weight of a tracklet.  This member function must be
    * overloaded.
    * 
@@ -301,6 +333,18 @@ public:
 			      Double_t        ipz,
 			      TH2*            corr) const = 0;
   /** 
+   * Calculate weight of a particle 
+   * 
+   * @param particle Particle 
+   * @param cent     Centrality 
+   * @param ipZ      Interaction point 
+   * 
+   * @return The weight
+   */
+  virtual Double_t CalcWeight(TParticle* particle,
+			      Double_t   cent,
+			      Double_t   ipZ) const = 0;
+  /** 
    * Store values 
    * 
    * @param parent Parent container  
@@ -311,9 +355,10 @@ public:
     top->SetName(GetName());
     top->SetOwner(true);
     parent->Add(top);
-    top->Add(new TParameter<int>("mask", fMask, 'f'));
-    top->Add(new TParameter<int>("veto", fVeto, 'f'));
-    top->Add(new TParameter<int>("calc", fCalc, 'f'));
+    top->Add(new TParameter<int> ("mask", fMask,    'f'));
+    top->Add(new TParameter<int> ("veto", fVeto,    'f'));
+    top->Add(new TParameter<int> ("calc", fCalc,    'f'));
+    top->Add(new TParameter<bool>("inv",  fInverse, 'f'));
     return top;
   }
   /** 
@@ -356,11 +401,13 @@ public:
 	   fCalc == kSum     ? "sum"     : "average");
     Printf(" Tracklet mask:       0x%02x", fMask);
     Printf(" Tracklet veto:       0x%02x", fVeto);
+    Printf(" Take inverse:        %s", fInverse ? "yes" : "no");
   }
   UChar_t fCalc;        // Whether the square of the weight is calculated
   UChar_t fMask;        // Which partiles to take
   UChar_t fVeto;        // Which particles not to take
-  Bool_t  fInverse;     // If true, do 1/w 
+  Bool_t  fInverse;     // If true, do 1/w
+  Int_t   fDebug;       // Debug level
   ClassDef(AliTrackletBaseWeights,1); // Base class of weights 
 };
 
@@ -438,6 +485,9 @@ public:
 			      Double_t        cent,
 			      Double_t        ipz,
 			      TH2*            corr=0) const;
+  virtual Double_t CalcWeight(TParticle* particle,
+			      Double_t   cent,
+			      Double_t   ipZ) const;
   /** 
    * Add a histogram to weight particle abundances 
    * 
@@ -810,15 +860,33 @@ AliTrackletPtPidStrWeights::CalcWeight(Double_t pT,
       Double_t fac = (pT >= 0.05 ?  1 :
 		      (fPt->TestBit(kUp)   ? 1.3 :
 		       fPt->TestBit(kDown) ? 0.7 : 1));
-      w            *= fac*fPt->GetBinContent(bC, bpT);
+      Double_t ptW =  fPt->GetBinContent(bC, bpT);
+      w            *= fac*ptW;
+      if (fDebug > 3)
+	Info("CalcWeight", "pT=%5.2f -> %4.2f * %6.4f = %6.4f",
+	     pT, fac, ptW, fac*ptW);
     }
   }
   UShort_t apdg = TMath::Abs(pdg);
-
-  w *= GetPdgWeight(fAbundance,   apdg, cent);
-  w *= GetPdgWeight(fStrangeness, apdg, cent);
+  Double_t aW   = GetPdgWeight(fAbundance,   apdg, cent);
+  Double_t sW   = GetPdgWeight(fStrangeness, apdg, cent);
+  w *= aW * sW;
+  if (fDebug > 3) 
+    Info("CalcWeight","pdg=%4d -> %6.4f * %6.4f = %6.4f -> %6.4f",
+	 pdg, aW, sW, aW*sW, w);
   // Printf("Weight of pT=%6.3f pdg=%5d cent=%5.1f -> %f", pT, pdg, cent, w);
   return w;
+}
+
+//____________________________________________________________________
+Double_t
+AliTrackletPtPidStrWeights::CalcWeight(TParticle* particle,
+				       Double_t   cent,
+				       Double_t   ipz) const
+{
+  Int_t    pdg = particle->GetPdgCode();
+  Double_t pT  = particle->Pt();
+  return CalcWeight(pT, pdg, cent);
 }
 
 //____________________________________________________________________
@@ -830,7 +898,7 @@ AliTrackletPtPidStrWeights::CalcWeight(AliAODTracklet* tracklet,
 {
 #if 0
   if (!tracklet->IsSimulated()) {
-    Warning("LookupWeight", "Not a simulated tracklet");
+    Warning("CalcWeight", "Not a simulated tracklet");
     return 1;
   }
 #endif
@@ -840,19 +908,25 @@ AliTrackletPtPidStrWeights::CalcWeight(AliAODTracklet* tracklet,
   AliAODTracklet* mc = tracklet;
   Short_t pdg1 = mc->GetParentPdg();
   Short_t pdg2 = mc->GetParentPdg(true);
-  if      (pdg1>0)          w1 = CalcWeight(mc->GetParentPt(),    pdg1,cent);
-  if      (pdg2>0)          w2 = CalcWeight(mc->GetParentPt(true),pdg2,cent);
+  if      (pdg1!=0)         w1 = CalcWeight(mc->GetParentPt(),    pdg1,cent);
+  if      (pdg2!=0)         w2 = CalcWeight(mc->GetParentPt(true),pdg2,cent);
   else if (fCalc!=kProduct) w2 = w1;
 
   if (corr && mc->IsMeasured()) corr->Fill(w1, w2);
 
+  Double_t    ret = 1;
+  const char* cm  = "?";
   switch (fCalc) {
-  case kProduct: return w1 * w2;
-  case kSquare:  return TMath::Sqrt(w1 * w2);
-  case kSum:     return 1+(w1-1)+(w2-1);
-  case kAverage: return 1+((w1-1)+(w2-1))/2;
+  case kProduct: ret = w1 * w2;              cm="product"; break;
+  case kSquare:  ret = TMath::Sqrt(w1 * w2); cm="square";  break;
+  case kSum:     ret = 1+(w1-1)+(w2-1);      cm="sum";     break;
+  case kAverage: ret = 1+((w1-1)+(w2-1))/2;  cm="average"; break;
   }
-  return 1;
+
+  if (fDebug > 1)
+    Printf("pdg1=%5d -> %6.4f  pdg2=%5d -> %6.4f  (%10s) -> %6.4f",
+	   pdg1, w1, pdg2, w2, cm, ret);
+  return ret;
 }
 
 //____________________________________________________________________
@@ -1166,7 +1240,9 @@ public:
 			      Double_t        cent,
 			      Double_t        ipZ,
 			      TH2*            corr=0) const;
-  
+  virtual Double_t CalcWeight(TParticle* particle,
+			      Double_t   cent,
+			      Double_t   ipZ) const;
   /** 
    * Project 3D histogram on 1 axis 
    * 
@@ -1322,6 +1398,24 @@ AliTrackletDeltaWeights::FindBin(Double_t value,
   return bin;
 }
   
+//____________________________________________________________________
+Double_t
+AliTrackletDeltaWeights::CalcWeight(TParticle* particle,
+				    Double_t   cent,
+				    Double_t   ipZ) const
+{
+  // Perhaps this method doesn't really make much sense 
+  TH1* h = FindHisto(cent);
+  if (!h) return 1;
+
+  Double_t eta      = particle->Eta();
+  Double_t delta    = 0;
+  Int_t    etaBin   = FindBin(eta,   h->GetXaxis());
+  Int_t    deltaBin = FindBin(delta, h->GetYaxis());
+  Int_t    ipzBin   = FindBin(ipZ,   h->GetZaxis());
+
+  return h->GetBinContent(etaBin, deltaBin, ipzBin);
+}  
 				   
 //____________________________________________________________________
 Double_t

@@ -11,6 +11,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <algorithm>
 
 #include <TChain.h>
 #include <TSystem.h>
@@ -26,6 +27,9 @@
 #include "AliCentrality.h"
 #include "AliESDEvent.h"
 #include "AliAnalysisManager.h"
+#include "AliAODEvent.h"
+
+#include "AliAnalysisTaskEmcalEmbeddingHelper.h"
 
 /// \cond CLASSIMP
 ClassImp(AliEmcalCorrectionTask);
@@ -35,9 +39,22 @@ ClassImp(AliEmcalCorrectionTask);
 ClassImp(AliEmcalCorrectionCellContainer);
 /// \endcond
 
+const std::map <std::string, AliVCluster::VCluUserDefEnergy_t> AliEmcalCorrectionTask::fgkClusterEnergyTypeMap = {
+  {"kNonLinCorr", AliVCluster::kNonLinCorr },
+  {"kHadCorr", AliVCluster::kHadCorr },
+  {"kUserDefEnergy1", AliVCluster::kUserDefEnergy1 },
+  {"kUserDefEnergy2", AliVCluster::kUserDefEnergy2 }
+};
+
+const std::map <std::string, AliEmcalTrackSelection::ETrackFilterType_t> AliEmcalCorrectionTask::fgkTrackFilterTypeMap = {
+  {"kNoTrackFilter", AliEmcalTrackSelection::kNoTrackFilter },
+  {"kCustomTrackFilter", AliEmcalTrackSelection::kCustomTrackFilter },
+  {"kHybridTracks",  AliEmcalTrackSelection::kHybridTracks },
+  {"kTPCOnlyTracks", AliEmcalTrackSelection::kTPCOnlyTracks }
+};
+
 /**
  * Default constructor.
- *
  */
 AliEmcalCorrectionTask::AliEmcalCorrectionTask() :
   AliAnalysisTaskSE("AliEmcalCorrectionTask"),
@@ -51,7 +68,6 @@ AliEmcalCorrectionTask::AliEmcalCorrectionTask() :
   fCorrectionComponents(),
   fIsEsd(false),
   fForceBeamType(kNA),
-  fRunPeriod("noSetRunPeriod"),
   fConfigurationInitialized(false),
   fOrderedComponentsToExecute(),
   fEventInitialized(false),
@@ -62,6 +78,7 @@ AliEmcalCorrectionTask::AliEmcalCorrectionTask() :
   fNcentBins(4),
   fCentEst("V0M"),
   fUseNewCentralityEstimation(kFALSE),
+  fVertex{0},
   fNVertCont(0),
   fBeamType(kNA),
   fNeedEmcalGeom(kTRUE),
@@ -73,10 +90,6 @@ AliEmcalCorrectionTask::AliEmcalCorrectionTask() :
 {
   // Default constructor
   AliDebug(3, Form("%s", __PRETTY_FUNCTION__));
-
-  fVertex[0] = 0;
-  fVertex[1] = 0;
-  fVertex[2] = 0;
 
   fParticleCollArray.SetOwner(kTRUE);
   fClusterCollArray.SetOwner(kTRUE);
@@ -103,7 +116,6 @@ AliEmcalCorrectionTask::AliEmcalCorrectionTask(const char * name) :
   fCorrectionComponents(),
   fIsEsd(false),
   fForceBeamType(kNA),
-  fRunPeriod("noSetRunPeriod"),
   fConfigurationInitialized(false),
   fOrderedComponentsToExecute(),
   fEventInitialized(false),
@@ -114,6 +126,7 @@ AliEmcalCorrectionTask::AliEmcalCorrectionTask(const char * name) :
   fNcentBins(4),
   fCentEst("V0M"),
   fUseNewCentralityEstimation(kFALSE),
+  fVertex{0},
   fNVertCont(0),
   fBeamType(kNA),
   fNeedEmcalGeom(kTRUE),
@@ -126,15 +139,116 @@ AliEmcalCorrectionTask::AliEmcalCorrectionTask(const char * name) :
   // Standard constructor
   AliDebug(3, Form("%s", __PRETTY_FUNCTION__));
 
-  fVertex[0] = 0;
-  fVertex[1] = 0;
-  fVertex[2] = 0;
-
   fParticleCollArray.SetOwner(kTRUE);
   fClusterCollArray.SetOwner(kTRUE);
 
   DefineInput(0, TChain::Class());
   DefineOutput(1, TList::Class());
+}
+
+/**
+ * Copy constructor.
+ *
+ * Note that it currently takes just the pointer to the correction
+ * components and their output. More care including copy constructors for the components
+ * would be required for this to be more fully copied!
+ */
+AliEmcalCorrectionTask::AliEmcalCorrectionTask(const AliEmcalCorrectionTask & task):
+  fUserConfiguration(task.fUserConfiguration),
+  fDefaultConfiguration(task.fDefaultConfiguration),
+  fSuffix(task.fSuffix),
+  fUserConfigurationString(task.fUserConfigurationString),
+  fDefaultConfigurationString(task.fDefaultConfigurationString),
+  fUserConfigurationFilename(task.fUserConfigurationFilename),
+  fDefaultConfigurationFilename(task.fDefaultConfigurationFilename),
+  fOrderedComponentsToExecute(task.fOrderedComponentsToExecute),
+  fCorrectionComponents(task.fCorrectionComponents),  // TODO: These should be copied!
+  fConfigurationInitialized(task.fConfigurationInitialized),
+  fIsEsd(task.fIsEsd),
+  fEventInitialized(task.fEventInitialized),
+  fCent(task.fCent),
+  fCentBin(task.fCentBin),
+  fMinCent(task.fMinCent),
+  fMaxCent(task.fMaxCent),
+  fNcentBins(task.fNcentBins),
+  fCentEst(task.fCentEst),
+  fUseNewCentralityEstimation(task.fUseNewCentralityEstimation),
+  fVertex{0.},
+  fNVertCont(task.fNVertCont),
+  fBeamType(task.fBeamType),
+  fForceBeamType(task.fForceBeamType),
+  fNeedEmcalGeom(task.fNeedEmcalGeom),
+  fGeom(task.fGeom),
+  fParticleCollArray(*(static_cast<TObjArray *>(task.fParticleCollArray.Clone()))),
+  fClusterCollArray(*(static_cast<TObjArray *>(task.fClusterCollArray.Clone()))),
+  fOutput(task.fOutput)                           // TODO: More care is needed here!
+{
+  // Vertex position
+  std::copy(std::begin(task.fVertex), std::end(task.fVertex), std::begin(fVertex));
+
+  // Cell Collections
+  for (auto cellCont : task.fCellCollArray)
+  {
+    fCellCollArray.push_back(new AliEmcalCorrectionCellContainer(*cellCont));
+  }
+}
+
+/**
+ * Move constructor
+ */
+AliEmcalCorrectionTask::AliEmcalCorrectionTask(AliEmcalCorrectionTask && other):
+  AliEmcalCorrectionTask()
+{
+  swap(*this, other);
+}
+
+/**
+ * Assignment operator. Note that we pass by _value_, so a copy is created and it is
+ * fine to swap the values with the created object!
+ */
+AliEmcalCorrectionTask & AliEmcalCorrectionTask::operator=(AliEmcalCorrectionTask other)
+{
+  swap(*this, other);
+
+  return *this;
+}
+
+/**
+ * Swap function. Created using guide described here: https://stackoverflow.com/a/3279550
+ */
+void swap(AliEmcalCorrectionTask & first, AliEmcalCorrectionTask & second)
+{
+  using std::swap;
+
+  swap(first.fUserConfiguration, second.fUserConfiguration);
+  swap(first.fDefaultConfiguration, second.fDefaultConfiguration);
+  swap(first.fSuffix, second.fSuffix);
+  swap(first.fUserConfigurationString, second.fUserConfigurationString);
+  swap(first.fDefaultConfigurationString, second.fDefaultConfigurationString);
+  swap(first.fUserConfigurationFilename, second.fUserConfigurationFilename);
+  swap(first.fDefaultConfigurationFilename, second.fDefaultConfigurationFilename);
+  swap(first.fOrderedComponentsToExecute, second.fOrderedComponentsToExecute);
+  swap(first.fCorrectionComponents, second.fCorrectionComponents);
+  swap(first.fConfigurationInitialized, second.fConfigurationInitialized);
+  swap(first.fIsEsd, second.fIsEsd);
+  swap(first.fEventInitialized, second.fEventInitialized);
+  swap(first.fCent, second.fCent);
+  swap(first.fCentBin, second.fCentBin);
+  swap(first.fMinCent, second.fMinCent);
+  swap(first.fMaxCent, second.fMaxCent);
+  swap(first.fNcentBins, second.fNcentBins);
+  swap(first.fCentEst, second.fCentEst);
+  swap(first.fUseNewCentralityEstimation, second.fUseNewCentralityEstimation);
+  swap(first.fVertex, second.fVertex);
+  swap(first.fNVertCont, second.fNVertCont);
+  swap(first.fBeamType, second.fBeamType);
+  swap(first.fForceBeamType, second.fForceBeamType);
+  swap(first.fNeedEmcalGeom, second.fNeedEmcalGeom);
+  swap(first.fGeom, second.fGeom);
+  swap(first.fParticleCollArray, second.fParticleCollArray);
+  swap(first.fClusterCollArray, second.fClusterCollArray);
+  swap(first.fCellCollArray, second.fCellCollArray);
+  swap(first.fOutput, second.fOutput);
 }
 
 /**
@@ -184,12 +298,16 @@ void AliEmcalCorrectionTask::Initialize()
     fSuffix = tempName.substr(foundSuffix + 1).c_str();
   }
 
+  if (fSuffix != "") {
+    AliInfoStream() << "Initializing correction task with suffix \"" << fSuffix << "\"" << std::endl;
+  }
+
   // Initialize YAML configuration
   InitializeConfiguration();
   // Check that the configuration is initialized
   if (fConfigurationInitialized != true)
   {
-    AliFatal("YAML configuration must be initialized before running (ie. the AddTask, run macro or wagon)!");
+    AliFatal("YAML configuration must be initialized before running (ie. in the run macro or wagon)!");
   }
 
   // Determine component execution order
@@ -201,24 +319,28 @@ void AliEmcalCorrectionTask::Initialize()
   // Setup input objects
   // Setup Cells
   // Cannot do this entirely yet because we need input objects
-  CreateInputObjects(kCaloCells);
-  PrintRequestedContainersInformation(kCaloCells);
+  CreateInputObjects(AliEmcalContainerUtils::kCaloCells);
+  PrintRequestedContainersInformation(AliEmcalContainerUtils::kCaloCells, AliDebugStream(1));
   // Create cluster input objects
-  CreateInputObjects(kCluster);
-  PrintRequestedContainersInformation(kCluster);
+  CreateInputObjects(AliEmcalContainerUtils::kCluster);
+  PrintRequestedContainersInformation(AliEmcalContainerUtils::kCluster, AliDebugStream(1));
   // Create track input objects
-  CreateInputObjects(kTrack);
-  PrintRequestedContainersInformation(kTrack);
+  CreateInputObjects(AliEmcalContainerUtils::kTrack);
+  PrintRequestedContainersInformation(AliEmcalContainerUtils::kTrack, AliDebugStream(1));
 
   // Initialize components
   InitializeComponents();
+
+  // Print the results of the initialization
+  // Print outside of the ALICE Log system to ensure that it is always available!
+  std::cout << GetName() << " Settings:\n" << *this;
 }
 
 /**
  * Initializes and sets up the user and default configuration files.
- * This includes opening the files, checking to ensure that the run period is valid, and
- * storing the contents of the user and default YAML files into strings so that they can
- * be streamed to the grid. (yaml-cpp objects do not work properly with ROOT streamers).
+ * This includes opening the files and storing the contents of the user and default
+ * YAML files into strings so that they can be streamed to the grid.
+ * (yaml-cpp objects do not work properly with ROOT streamers).
  *
  * NOTE: fConfigurationInitialized is set to true if the function is successful.
  */
@@ -263,41 +385,6 @@ void AliEmcalCorrectionTask::InitializeConfiguration()
   else
   {
     AliInfo(TString::Format("User file at \"%s\" does not exist! All settings will be from the default file!", fUserConfigurationFilename.c_str()));
-  }
-
-  // Ensure that there is a run period
-  if (fRunPeriod == "noSetRunPeriod")
-  {
-    AliFatal("Must pass a run period to the correction task!");
-  }
-  // Check the user provided run period
-  TString userRunPeriod = "kNoUserFile";
-  // Test if the period exists in the user file
-  if (fUserConfiguration.IsNull() != true)
-  {
-    if (fUserConfiguration["period"])
-    {
-      userRunPeriod = fUserConfiguration["period"].as<std::string>();
-    }
-    else
-    {
-      AliFatal("User must specify a period. Leave the period as an empty string to apply to all periods.");
-    }
-  }
-
-  AliDebug(3, TString::Format("userRunPeriod: %s", userRunPeriod.Data()));
-  // Normalize the user run period to lower case to ensure that we don't miss any matches
-  userRunPeriod.ToLower();
-  if (userRunPeriod != "knouserfile" && userRunPeriod != fRunPeriod)
-  {
-    AliFatal(TString::Format("User run period \"%s\" does not match the run period of \"%s\" passed to the correction task!", userRunPeriod.Data(), fRunPeriod.Data()));
-  }
-
-  // "" means the user wants their settings to apply to all periods
-  // Ensure that the user is aware!
-  if (userRunPeriod == "")
-  {
-    AliWarning("User run period is an empty string. Settings apply to all run periods!");
   }
 
   // Save configuration into strings so that they can be streamed
@@ -410,6 +497,10 @@ void AliEmcalCorrectionTask::DetermineComponentsToExecute(std::vector <std::stri
  * be treated as a reference. Thus, if there is a property that is defined in the user configuration that
  * cannot be found in the default configuration, then it must be a typo and we should alert the user.
  *
+ * NOTE: This only checks settings in components. __NOT__ variables defined at the root level, such as
+ *       the pass or name! It also leaves the input objects unchecked, due to lacking a definitive list
+ *       of possible settings.
+ *
  * Utilizes the stored ordered correction component names.
  */
 void AliEmcalCorrectionTask::CheckForUnmatchedUserSettings()
@@ -500,8 +591,8 @@ void AliEmcalCorrectionTask::InitializeComponents()
 
     // Add the require containers to the component
     // Cells must be set during UserExec() because we need to add them as a pointer
-    AddContainersToComponent(component, kCluster);
-    AddContainersToComponent(component, kTrack);
+    AddContainersToComponent(component, AliEmcalContainerUtils::kCluster, true);
+    AddContainersToComponent(component, AliEmcalContainerUtils::kTrack, true);
 
     // Initialize each component
     component->Initialize();
@@ -528,7 +619,7 @@ void AliEmcalCorrectionTask::InitializeComponents()
  *
  * @param inputObjectType Type of the input object(s) to create
  */
-void AliEmcalCorrectionTask::CreateInputObjects(InputObject_t inputObjectType)
+void AliEmcalCorrectionTask::CreateInputObjects(AliEmcalContainerUtils::InputObject_t inputObjectType)
 {
   // Get container node
   std::string inputObjectName = GetInputFieldNameFromInputObjectType(inputObjectType);
@@ -575,7 +666,7 @@ void AliEmcalCorrectionTask::CreateInputObjects(InputObject_t inputObjectType)
  * @param[in] component The correction component to which the input objects will be added
  * @param[in] inputObjectType The type of input object to add to the component
  */
-void AliEmcalCorrectionTask::AddContainersToComponent(AliEmcalCorrectionComponent * component, InputObject_t inputObjectType)
+void AliEmcalCorrectionTask::AddContainersToComponent(AliEmcalCorrectionComponent * component, AliEmcalContainerUtils::InputObject_t inputObjectType, bool checkObjectExists)
 {
   std::string inputObjectName = GetInputFieldNameFromInputObjectType(inputObjectType);
   // Need to be of the form "clusterContainersNames"
@@ -590,21 +681,28 @@ void AliEmcalCorrectionTask::AddContainersToComponent(AliEmcalCorrectionComponen
   // If it is not found, then there will be nothing to iterate over, so we don't need to explicitly check the return value
   for (auto const & str : inputObjects)
   {
-    // TODO: Generalize to arrays for clusters and tracks...
     // NOTE: The AliEmcalContainer derived objects operate differently than the cells. The containers should be added during initialization while the cells should be added during ExecOnce()!
-    if (inputObjectType == kCluster)
+    if (inputObjectType == AliEmcalContainerUtils::kCluster)
     {
       AliEmcalContainer * cont = GetClusterContainer(str.c_str());
       AliDebugStream(2) << "Adding cluster container " << str << " of array " << cont->GetArrayName() << " to component " << component->GetName() << std::endl;
-      component->SetClusterContainer(GetClusterContainer(str.c_str()));
+
+      if (checkObjectExists && !cont) {
+        AliError(TString::Format("%s: Unable to retrieve input object \"%s\" because it is null. Please check your configuration!", GetName(), str.c_str()));
+      }
+      component->AdoptClusterContainer(GetClusterContainer(str.c_str()));
     }
-    else if (inputObjectType == kTrack)
+    else if (inputObjectType == AliEmcalContainerUtils::kTrack)
     {
       AliEmcalContainer * cont = GetParticleContainer(str.c_str());
       AliDebugStream(2) << "Adding particle container " << str << " of array " << cont->GetArrayName() << " to component " << component->GetName() << std::endl;
-      component->SetParticleContainer(GetParticleContainer(str.c_str()));
+
+      if (checkObjectExists && !cont) {
+        AliFatal(TString::Format("%s: Unable to retrieve input object \"%s\" because it is null. Please check your configuration!", GetName(), str.c_str()));
+      }
+      component->AdoptParticleContainer(GetParticleContainer(str.c_str()));
     }
-    else if (inputObjectType == kCaloCells)
+    else if (inputObjectType == AliEmcalContainerUtils::kCaloCells)
     {
       // NOTE: This operates different than the others. This should be executed during run time rather than during initialization!
       if (inputObjects.size() > 1) {
@@ -612,9 +710,30 @@ void AliEmcalCorrectionTask::AddContainersToComponent(AliEmcalCorrectionComponen
       }
 
       // If we've made it here, this must be at least one entry
-      AliDebugStream(2) << "Adding calo cells " << GetCellContainer(str)->GetName() << " of branch name " << GetCellContainer(str)->GetBranchName() << "to component " << component->GetName() << std::endl;
-      component->SetCaloCells(GetCellContainer(str)->GetCells());
-      AliDebugStream(3) << "component GetNumberOfCells: " << component->GetCaloCells()->GetNumberOfCells() << std::endl;
+      AliEmcalCorrectionCellContainer * cellCont = GetCellContainer(str);
+      AliDebugStream(2) << "Adding calo cells \"" << cellCont->GetName() << "\" of branch name \"" << cellCont->GetBranchName() << "\" to component " << component->GetName() << std::endl;
+
+      if (!(cellCont->GetCells())) {
+        // Attempt to re-initialize the cells.
+        // NOTE: This may not succeed. Adding the container may need to be repeated after the
+        // object is created
+        SetCellsObjectInCellContainerBasedOnProperties(cellCont);
+      }
+
+      if (checkObjectExists && !(cellCont->GetCells())) {
+        AliFatal(TString::Format("%s: Unable to retrieve input object \"%s\" because it is null. Please check your configuration!", GetName(), str.c_str()));
+      }
+
+      // Set the calo cells (may be null)
+      component->SetCaloCells(cellCont->GetCells());
+
+      // It is possible that the cells pointer is null because it may not be created yet. For example,
+      // when combining cells. Thus, we must first check whether the pointer is available before checking
+      // for the number of cells. This could potentially decrease the amount of debug information, but this
+      // should rarely be an issue.
+      if (component->GetCaloCells()) {
+        AliDebugStream(3) << "Component GetNumberOfCells: " << component->GetCaloCells()->GetNumberOfCells() << std::endl;
+      }
     }
   }
 }
@@ -627,7 +746,7 @@ void AliEmcalCorrectionTask::AddContainersToComponent(AliEmcalCorrectionComponen
  * @param[in] defaultInputObjectNode YAML Node corresponding to the default input objects configuration
  * @param[in] requestedContainers Containers to be created
  */
-void AliEmcalCorrectionTask::SetupContainersFromInputNodes(InputObject_t inputObjectType, YAML::Node & userInputObjectNode, YAML::Node & defaultInputObjectNode, std::set <std::string> & requestedContainers)
+void AliEmcalCorrectionTask::SetupContainersFromInputNodes(AliEmcalContainerUtils::InputObject_t inputObjectType, YAML::Node & userInputObjectNode, YAML::Node & defaultInputObjectNode, std::set <std::string> & requestedContainers)
 {
   // Our node contains all of the objects that we will want to create.
   for(auto & containerName : requestedContainers)
@@ -640,10 +759,10 @@ void AliEmcalCorrectionTask::SetupContainersFromInputNodes(InputObject_t inputOb
     }
 
     AliDebug(2, TString::Format("Processing container %s of inputType %d", containerName.c_str(), inputObjectType));
-    if (inputObjectType == kCluster || inputObjectType == kTrack) {
+    if (inputObjectType == AliEmcalContainerUtils::kCluster || inputObjectType == AliEmcalContainerUtils::kTrack) {
       SetupContainer(inputObjectType, containerName, userInputObjectNode, defaultInputObjectNode);
     }
-    else if (inputObjectType == kCaloCells) {
+    else if (inputObjectType == AliEmcalContainerUtils::kCaloCells) {
       SetupCellsInfo(containerName, userInputObjectNode, defaultInputObjectNode);
     }
   }
@@ -673,13 +792,13 @@ void AliEmcalCorrectionTask::SetupCellsInfo(std::string containerName, YAML::Nod
   std::string tempString = "";
   AliEmcalCorrectionComponent::GetProperty("branchName", tempString, userNode, defaultNode, true, containerName);
   if (tempString == "usedefault") {
-    tempString = DetermineUseDefaultName(kCaloCells, fIsEsd);
+    tempString = AliEmcalContainerUtils::DetermineUseDefaultName(AliEmcalContainerUtils::kCaloCells, fIsEsd);
   }
   cellObj->SetBranchName(tempString);
 
   // IsEmbedding
   bool tempBool = false;
-  AliEmcalCorrectionComponent::GetProperty("embedded", tempString, userNode, defaultNode, false, containerName);
+  AliEmcalCorrectionComponent::GetProperty("embedding", tempBool, userNode, defaultNode, false, containerName);
   cellObj->SetIsEmbedding(tempBool);
 
   // Add to the array to keep track of it
@@ -703,7 +822,7 @@ void AliEmcalCorrectionTask::SetupCellsInfo(std::string containerName, YAML::Nod
  * @param[in] userNode YAML Node corresponding to the user input object's configuration
  * @param[in] defaultNode YAML Node corresponding to the default input object's configuration
  */
-void AliEmcalCorrectionTask::SetupContainer(InputObject_t inputObjectType, std::string containerName, YAML::Node & userNode, YAML::Node & defaultNode)
+void AliEmcalCorrectionTask::SetupContainer(AliEmcalContainerUtils::InputObject_t inputObjectType, std::string containerName, YAML::Node & userNode, YAML::Node & defaultNode)
 {
   // Create container
   AliDebugStream(2) << "Adding container" << std::endl;
@@ -760,12 +879,11 @@ void AliEmcalCorrectionTask::SetupContainer(InputObject_t inputObjectType, std::
     }
   }
   // Embedded
-  // TODO: Enable embedded when that branch is committed!
-  /*result = AliEmcalCorrectionComponent::GetProperty("IsEmbedded", tempBool, userNode, defaultNode, false, containerName);
+  result = AliEmcalCorrectionComponent::GetProperty("IsEmbedded", tempBool, userNode, defaultNode, false, containerName);
   if (result) {
     AliDebugStream(2) << cont->GetName() << ": Setting embedding to " << (tempBool ? "enabled" : "disabled") << std::endl;
     cont->SetIsEmbedding(tempBool);
-  }*/
+  }
 
   // Cluster specific properties
   AliClusterContainer * clusterContainer = dynamic_cast<AliClusterContainer *>(cont);
@@ -775,7 +893,7 @@ void AliEmcalCorrectionTask::SetupContainer(InputObject_t inputObjectType, std::
     /*result = AliEmcalCorrectionComponent::GetProperty("defaultClusterEnergy", tempString, userNode, defaultNode, false, containerName);
     if (result) {
       // Need to get the enumeration
-      AliVCluster::VCluUserDefEnergy_t clusterEnergyType = clusterEnergyTypeMap.at(tempString);
+      AliVCluster::VCluUserDefEnergy_t clusterEnergyType = fgkClusterEnergyTypeMap.at(tempString);
       AliDebugStream(2) << clusterContainer->GetName() << ": Setting cluster energy type to " << clusterEnergyType << std::endl;
       clusterContainer->SetDefaultClusterEnergy(clusterEnergyType);
     }*/
@@ -822,7 +940,7 @@ void AliEmcalCorrectionTask::SetupContainer(InputObject_t inputObjectType, std::
     result = AliEmcalCorrectionComponent::GetProperty("trackFilterType", tempString, userNode, defaultNode, false, containerName);
     if (result) {
       // Need to get the enumeration
-      AliEmcalTrackSelection::ETrackFilterType_t trackFilterType = trackFilterTypeMap.at(tempString);
+      AliEmcalTrackSelection::ETrackFilterType_t trackFilterType = fgkTrackFilterTypeMap.at(tempString);
       AliDebugStream(2) << trackContainer->GetName() << ": Setting trackFilterType of " << trackFilterType << std::endl;
       trackContainer->SetTrackFilterType(trackFilterType);
     }
@@ -854,11 +972,11 @@ void AliEmcalCorrectionTask::SetupContainer(InputObject_t inputObjectType, std::
  *
  * @return The created container
  */
-AliEmcalContainer * AliEmcalCorrectionTask::AddContainer(InputObject_t contType, std::string & containerName, YAML::Node & userNode, YAML::Node & defaultNode)
+AliEmcalContainer * AliEmcalCorrectionTask::AddContainer(AliEmcalContainerUtils::InputObject_t contType, std::string & containerName, YAML::Node & userNode, YAML::Node & defaultNode)
 {
   // Determine the type of branch to request
   std::string containerBranch = "";
-  if (contType != kCluster && contType != kTrack){
+  if (contType != AliEmcalContainerUtils::kCluster && contType != AliEmcalContainerUtils::kTrack){
     AliFatal("Must specify type of container when requesting branch.");
   }
 
@@ -875,17 +993,17 @@ AliEmcalContainer * AliEmcalCorrectionTask::AddContainer(InputObject_t contType,
 
   // Determine proper name if using "usedefault" pattern
   if (containerBranch == "usedefault") {
-    containerBranch = DetermineUseDefaultName(contType, fIsEsd);
+    containerBranch = AliEmcalContainerUtils::DetermineUseDefaultName(contType, fIsEsd);
   }
 
   // Create containers and set them to the name of the component
   AliEmcalContainer * cont = 0;
-  if (contType == kCluster)
+  if (contType == AliEmcalContainerUtils::kCluster)
   {
     cont = new AliClusterContainer(containerBranch.c_str());
     AdoptClusterContainer(dynamic_cast<AliClusterContainer *>(cont));
   }
-  else if (contType == kTrack)
+  else if (contType == AliEmcalContainerUtils::kTrack)
   {
     if (containerBranch == "mcparticles") {
       cont = new AliMCParticleContainer(containerBranch.c_str());
@@ -910,8 +1028,6 @@ AliEmcalContainer * AliEmcalCorrectionTask::AddContainer(InputObject_t contType,
  */
 void AliEmcalCorrectionTask::UserCreateOutputObjects()
 {
-  AliDebug(3, Form("%s", __PRETTY_FUNCTION__));
-
   // Check that the configuration is initialized
   if (fConfigurationInitialized != true)
   {
@@ -965,7 +1081,6 @@ void AliEmcalCorrectionTask::UserCreateOutputObjects()
 void AliEmcalCorrectionTask::UserCreateOutputObjectsComponents()
 {
   // Run the initialization for all derived classes.
-  AliDebug(3, Form("%s", __PRETTY_FUNCTION__));
   for (auto component : fCorrectionComponents)
   {
     // Set cent bins (usually used for hist creation)
@@ -1001,9 +1116,7 @@ void AliEmcalCorrectionTask::UserCreateOutputObjectsComponents()
  */
 void AliEmcalCorrectionTask::UserExec(Option_t *option)
 {
-  AliDebug(3, Form("%s", __PRETTY_FUNCTION__));
-
-  // Initialize the event if not intialized
+  // Initialize the event if not initialized
   if (!fEventInitialized)
     ExecOnce();
 
@@ -1014,8 +1127,6 @@ void AliEmcalCorrectionTask::UserExec(Option_t *option)
   // Get the objects for each event
   if (!RetrieveEventObjects())
     return;
-
-  // TODO: Consider adding IsEventSelected()??
 
   // Call run for each correction
   if (!Run())
@@ -1038,6 +1149,13 @@ void AliEmcalCorrectionTask::ExecOnce()
     AliError("Could not retrieve event! Returning!");
     return;
   }
+  
+  // This warning was extracted out from the cell components
+  if (dynamic_cast<AliAODEvent*>(InputEvent())) {
+    AliWarning("=============================================================");
+    AliWarning("===  Running on AOD is not equivalent to running on ESD!  ===");
+    AliWarning("=============================================================");
+  }
 
   if (fNeedEmcalGeom) {
     fGeom = AliEMCALGeometry::GetInstanceFromRunNumber(InputEvent()->GetRunNumber());
@@ -1050,18 +1168,18 @@ void AliEmcalCorrectionTask::ExecOnce()
   // Load all requested track branches - each container knows name already
   for (Int_t i =0; i<fParticleCollArray.GetEntriesFast(); i++) {
     AliParticleContainer *cont = static_cast<AliParticleContainer*>(fParticleCollArray.At(i));
-    CheckForContainerArray(cont, kTrack);
+    CheckForContainerArray(cont, AliEmcalContainerUtils::kTrack);
     cont->SetArray(InputEvent());
   }
 
   // Load all requested cluster branches - each container knows name already
   for (Int_t i =0; i<fClusterCollArray.GetEntriesFast(); i++) {
     AliClusterContainer *cont = static_cast<AliClusterContainer*>(fClusterCollArray.At(i));
-    CheckForContainerArray(cont, kCluster);
+    CheckForContainerArray(cont, AliEmcalContainerUtils::kCluster);
     cont->SetArray(InputEvent());
   }
 
-  // Determine the proper pointer for each cell object and save them to the cell contianer
+  // Determine the proper pointer for each cell object and save them to the cell container
   // At this point, they should all be created
   for (auto cellObj : fCellCollArray)
   {
@@ -1070,6 +1188,11 @@ void AliEmcalCorrectionTask::ExecOnce()
 
   fEventInitialized = kTRUE;
 
+  // Print warning to the user that the rest of the configuration information is available in the generation log
+  // when the Analysis Manager was created. Using cout to be certain that it is shown on the train!
+  std::cout << "=== NOTE: Additional EMCal Corrections configuration information can be found when the Analysis Manager is configured. For a run macro, see above, while for a LEGO train, see the generation.log ===\n";
+
+  // Setup the components
   ExecOnceComponents();
 }
 
@@ -1080,19 +1203,28 @@ void AliEmcalCorrectionTask::ExecOnce()
 void AliEmcalCorrectionTask::ExecOnceComponents()
 {
   // Run the initialization for all derived classes.
-  AliDebug(3, Form("%s", __PRETTY_FUNCTION__));
   for (auto component : fCorrectionComponents)
   {
-    // Setup geomertry
+    // Setup geometry
     component->SetEMCALGeometry(fGeom);
 
+    // Set the input events. This is redundant to where it is set during Run(), but the events need to be
+    // available to components, and they are only called one extra time.
+    component->SetEvent(InputEvent());
+    component->SetMCEvent(MCEvent());
+
     // Add the requested cells to the component
-    //AliDebugStream(3) << "Adding CaloCells" << std::endl;
-    AddContainersToComponent(component, kCaloCells);
-    //AliDebugStream(3) << "Added CaloCells" << std::endl;
+    AddContainersToComponent(component, AliEmcalContainerUtils::kCaloCells);
 
     // Component ExecOnce()
     component->ExecOnce();
+
+    // If the cells were created during ExecOnce(), then we need to re-initialize the pointer to ensure
+    // that it is not null!
+    if (!(component->GetCaloCells())) {
+      AliDebugStream(2) << "Re-initializing cells for component " << component->GetName() << std::endl;
+      AddContainersToComponent(component, AliEmcalContainerUtils::kCaloCells, true);
+    }
   }
 }
 
@@ -1196,7 +1328,6 @@ Bool_t AliEmcalCorrectionTask::RetrieveEventObjects()
 Bool_t AliEmcalCorrectionTask::Run()
 {
   // Run the initialization for all derived classes.
-  AliDebug(3, Form("%s", __PRETTY_FUNCTION__));
   for (auto component : fCorrectionComponents)
   {
     component->SetEvent(InputEvent());
@@ -1214,12 +1345,10 @@ Bool_t AliEmcalCorrectionTask::Run()
 
 /**
  * Executed when the file is changed. Also calls UserNotify() for each component.
- *
  */
 Bool_t AliEmcalCorrectionTask::UserNotify()
 {
   // Run the initialization for all derived classes.
-  AliDebug(3, Form("%s", __PRETTY_FUNCTION__));
   for (auto component : fCorrectionComponents)
   {
     component->UserNotify();
@@ -1229,13 +1358,30 @@ Bool_t AliEmcalCorrectionTask::UserNotify()
 }
 
 /**
+ * Print configuration string
+ *
+ * @param in Stream to which the configuration string should be added
+ * @param userConfig True if the user configuration should be printed
+ */
+std::ostream & AliEmcalCorrectionTask::PrintConfigurationString(std::ostream & in, bool userConfig) const
+{
+  std::string stringToWrite = userConfig ? fUserConfigurationString : fDefaultConfigurationString;
+  if (stringToWrite == "") {
+    AliWarning(TString::Format("%s configuration is empty!", userConfig ? "User" : "Default"));
+  }
+  in << stringToWrite;
+
+  return in;
+}
+
+/**
  * Write the desired YAML configuration to a file.
  *
  * @param filename The name of the file to write
  * @param userConfig True to write the user configuration
  * @return True when writing the configuration to the file was successful
  */
-bool AliEmcalCorrectionTask::WriteConfigurationFile(std::string filename, bool userConfig)
+bool AliEmcalCorrectionTask::WriteConfigurationFile(std::string filename, bool userConfig) const
 {
   bool returnValue = false;
   if (filename != "")
@@ -1243,132 +1389,67 @@ bool AliEmcalCorrectionTask::WriteConfigurationFile(std::string filename, bool u
     if (fConfigurationInitialized == true)
     {
       std::ofstream outFile(filename);
-      std::string stringToWrite = userConfig ? fUserConfigurationString : fDefaultConfigurationString;
-      if (stringToWrite == "") {
-        AliWarning(TString::Format("%s configuration is empty!", userConfig ? "User" : "Default"));
-      }
-      outFile << stringToWrite;
+      PrintConfigurationString(outFile, userConfig);
       outFile.close();
 
       returnValue = true;
     }
     else
     {
-      AliWarning(TString::Format("Configuration not properly initialized! Cannot print %s configuration!", userConfig ? "user" : "default"));
+      AliError(TString::Format("Configuration not properly initialized! Cannot print %s configuration!", userConfig ? "user" : "default"));
     }
 
   }
   else
   {
-    AliWarning("Please pass a valid filename instead of empty quotes!");
+    AliError("Please pass a valid filename instead of empty quotes!");
   }
   return returnValue;
 }
 
 /**
- * Given a container type, it returns the proper default branch name based on the "usedefault" pattern.
- * This is useful to properly handle creating input objects such as AliEmcalContainer derived objects.
- * If returnObjectType is true, it returns the "default" (unlikely to change) object type instead of the
- * branch name. This is useful to properly determine the type of an object for a TClonesArray.
+ * Compare the passed YAML configuration to the stored YAML configuration.
  *
- * This function can also be very useful in places such as an AddTask(). Using it can significantly reduce
- * code duplication!
- *
- * @param[in] objType Type of the input object
- * @param[in] esdMode True if running with an ESD
- * @param[in] returnObjectType Returns the "default" type of the object rather than the branch name
- *
- * @return The name corresponding to the request branch name or object type.
+ * @param filename The filename of the YAML configuration to compare
+ * @param userConfig True to compare against the user configuration
+ * @return True when the passed YAML configuration is the same as the stored YAML configuration
  */
-std::string AliEmcalCorrectionTask::DetermineUseDefaultName(InputObject_t objType, bool esdMode, bool returnObjectType)
+bool AliEmcalCorrectionTask::CompareToStoredConfiguration(std::string filename, bool userConfig) const
 {
-  std::string returnValue = "";
-  if (objType == kCluster) {
-    if (esdMode == true) {
-      if (returnObjectType == true) {
-        returnValue = "AliESDCaloCluster";
-      }
-      else {
-        returnValue = "CaloClusters";
-      }
-    }
-    else {
-      if (returnObjectType == true) {
-        returnValue = "AliAODCaloCluster";
-      }
-      else {
-        returnValue = "caloClusters";
-      }
-    }
-  }
-  else if (objType == kTrack) {
-    if (esdMode == true) {
-      if (returnObjectType == true) {
-        returnValue = "AliESDtrack";
-      }
-      else {
-        returnValue = "Tracks";
-      }
-    }
-    else {
-      if (returnObjectType == true) {
-        returnValue = "AliAODTrack";
-      }
-      else {
-        returnValue = "tracks";
-      }
-    }
-  }
-  else if (objType == kCaloCells) {
-    if (esdMode == true) {
-      if (returnObjectType == true) {
-        returnValue = "AliESDCaloCells";
-      }
-      else {
-        returnValue = "EMCALCells";
-      }
-    }
-    else {
-      if (returnObjectType == true) {
-        returnValue = "AliAODCaloCells";
-      }
-      else {
-        returnValue = "emcalCells";
-      }
-    }
-  }
-  else {
-    // Default to empty if we are given an unrecognized type with "usedefault"
-    returnValue = "";
-  }
+  bool returnValue = false;
+  if (filename != "")
+  {
+    if (fConfigurationInitialized == true)
+    {
+      // Generate YAML nodes for the comparison
+      YAML::Node passedNode = YAML::LoadFile(filename);
+      YAML::Node comparisonNode = YAML::Load(userConfig ? fUserConfigurationString : fDefaultConfigurationString);
 
+      // Need to stream the configuration back to a string to remove the comments
+      // since they are not preserved in the YAML node.
+      std::stringstream passedNodeSS;
+      passedNodeSS << passedNode;
+
+      // Compare the nodes. Make the comparison as strings, as the YAML nodes do _not_ match, despite the strings matching.
+      // In fact, the YAML nodes will _not_ match even if they are generated from the same string....
+      if (passedNodeSS.str() == (userConfig ? fUserConfigurationString : fDefaultConfigurationString)) {
+        returnValue = true;
+      }
+      else {
+        AliWarningStream() << "Passed YAML config:\n" << passedNode << "\n\nStored YAML config:\n" << comparisonNode << "\nPassed config located in file \"" << filename << "\" is not the same as the stored " << (userConfig ? "user" : "default") << "configuration file! YAML configurations printed above.\n";
+      }
+    }
+    else
+    {
+      AliError(TString::Format("Configuration not properly initialized! Cannot compare %s configuration!", userConfig ? "user" : "default"));
+    }
+
+  }
+  else
+  {
+    AliError("Please pass a valid filename instead of empty quotes!");
+  }
   return returnValue;
-}
-
-/**
- * Get the proper event based on whether embedding is enabled or not. Useful when determining from which event
- * an input object should be retrieved. It could either be the current input event or an embedded event.
- *
- * @param[in] inputEvent The input event of the analysis. Will be returned if nothing else is requested
- * @param[in] isEmbedding True if the event from embedding should be used.
- *
- * @return The input event to be used
- */
-AliVEvent * AliEmcalCorrectionTask::GetEvent(AliVEvent * inputEvent, bool isEmbedding)
-{
-  AliVEvent * event = 0;
-  if (isEmbedding) {
-    // TODO: Enable embedded when that branch is committed!
-    /*const AliAnalysisTaskEmcalEmbeddingHelper* embedding = AliAnalysisTaskEmcalEmbeddingHelper::GetInstance();
-    if (!embedding) return 0;
-
-    event = embedding->GetExternalEvent();*/
-  }
-  else {
-    event = inputEvent;
-  }
-
-  return event;
 }
 
 /**
@@ -1433,7 +1514,7 @@ void AliEmcalCorrectionTask::SetCellsObjectInCellContainerBasedOnProperties(AliE
 {
   AliDebugStream(2) << "Retrieving cells object " << cellContainer->GetName() << std::endl;
   // Check for embedding and return object
-  AliVEvent * event = GetEvent(InputEvent(), cellContainer->GetIsEmbedding());
+  AliVEvent * event = AliEmcalContainerUtils::GetEvent(InputEvent(), cellContainer->GetIsEmbedding());
 
   cellContainer->SetCells(dynamic_cast<AliVCaloCells *>(event->FindListObject(cellContainer->GetBranchName().c_str())));
 }
@@ -1447,16 +1528,14 @@ void AliEmcalCorrectionTask::SetCellsObjectInCellContainerBasedOnProperties(AliE
  * @param cont The container which is requesting the branch
  * @param objectType The type of the input object
  */
-void AliEmcalCorrectionTask::CheckForContainerArray(AliEmcalContainer * cont, InputObject_t objectType)
+void AliEmcalCorrectionTask::CheckForContainerArray(AliEmcalContainer * cont, AliEmcalContainerUtils::InputObject_t objectType)
 {
-  // TODO: Enable embedded when that branch is committed!
-  //AliVEvent * event = GetEvent(InputEvent(), cont->GetIsEmbedding());
-  AliVEvent * event = GetEvent(InputEvent());
+  AliVEvent * event = AliEmcalContainerUtils::GetEvent(InputEvent(), cont->GetIsEmbedding());
 
   TClonesArray *  array = dynamic_cast<TClonesArray *>(event->FindListObject(cont->GetArrayName()));
   if (!array) {
     AliWarning(TString::Format("Container %s requested branch %s, but it does not exist! Creating it for you! Please check that this is the proper action!", cont->GetName(), cont->GetArrayName().Data()));
-    array = new TClonesArray(DetermineUseDefaultName(objectType, fIsEsd, true).c_str());
+    array = new TClonesArray(AliEmcalContainerUtils::DetermineUseDefaultName(objectType, fIsEsd, true).c_str());
     array->SetName(cont->GetArrayName());
     event->AddObject(array);
   }
@@ -1469,17 +1548,17 @@ void AliEmcalCorrectionTask::CheckForContainerArray(AliEmcalContainer * cont, In
  * @param inputObjectType The type of the input object
  * @return The name of the field of the requested input object in the YAML configuration file
  */
-std::string AliEmcalCorrectionTask::GetInputFieldNameFromInputObjectType(InputObject_t inputObjectType)
+std::string AliEmcalCorrectionTask::GetInputFieldNameFromInputObjectType(AliEmcalContainerUtils::InputObject_t inputObjectType)
 {
   // Get container node
   std::string inputObjectName = "";
-  if (inputObjectType == kCluster) {
+  if (inputObjectType == AliEmcalContainerUtils::kCluster) {
     inputObjectName = "clusterContainers";
   }
-  else if (inputObjectType == kTrack) {
+  else if (inputObjectType == AliEmcalContainerUtils::kTrack) {
     inputObjectName = "trackContainers";
   }
-  else if (inputObjectType == kCaloCells) {
+  else if (inputObjectType == AliEmcalContainerUtils::kCaloCells) {
     inputObjectName = "cells";
   }
   else {
@@ -1520,7 +1599,7 @@ bool AliEmcalCorrectionTask::CheckPossibleNamesForComponentName(std::string & na
  *
  * @return Beam type of the run.
  */
-AliEmcalCorrectionTask::BeamType AliEmcalCorrectionTask::GetBeamType()
+AliEmcalCorrectionTask::BeamType AliEmcalCorrectionTask::GetBeamType() const
 {
   if (fForceBeamType != kNA)
     return fForceBeamType;
@@ -1539,11 +1618,14 @@ AliEmcalCorrectionTask::BeamType AliEmcalCorrectionTask::GetBeamType()
       return kNA;
   } else {
     Int_t runNumber = InputEvent()->GetRunNumber();
-    if ((runNumber >= 136851 && runNumber <= 139517) ||  // LHC10h
-        (runNumber >= 166529 && runNumber <= 170593)) {  // LHC11h
+    // All run number ranges taken from the RCT
+    if ((runNumber >= 136833 && runNumber <= 139517) ||  // LHC10h
+        (runNumber >= 167693 && runNumber <= 170593) || // LHC11h
+        (runNumber >= 244824 && runNumber <= 246994)) { // LHC15o
       return kAA;
-    } else if ((runNumber>=188365 && runNumber <= 188366) ||   // LHC12g
-        (runNumber >= 195344 && runNumber <= 196608)) { // LHC13b-f
+    } else if ((runNumber >= 188356 && runNumber <= 188366) ||   // LHC12g
+               (runNumber >= 195164 && runNumber <= 197388) ||  // LHC13b-f
+               (runNumber >= 265015 && runNumber <= 267166)) {  // LHC16q-t
       return kpA;
     } else {
       return kpp;
@@ -1552,24 +1634,22 @@ AliEmcalCorrectionTask::BeamType AliEmcalCorrectionTask::GetBeamType()
 }
 
 /**
- *
+ * Print information about the input object containers
  */
-void AliEmcalCorrectionTask::PrintRequestedContainersInformation(InputObject_t inputObjectType)
+void AliEmcalCorrectionTask::PrintRequestedContainersInformation(AliEmcalContainerUtils::InputObject_t inputObjectType, std::ostream & stream) const
 {
-  if (inputObjectType == kCaloCells) {
-    AliInfoStream() << "Cells info: " << std::endl;
+  if (inputObjectType == AliEmcalContainerUtils::kCaloCells) {
+    stream << "Cells info: " << std::endl;
     for (auto cellInfo : fCellCollArray) {
-      AliInfoStream() << "\tName: " << cellInfo->GetName() << "\tBranch: " << cellInfo->GetBranchName() << "\tIsEmbedding: " << std::boolalpha << cellInfo->GetIsEmbedding() << std::endl;
+      stream << "\tName: " << cellInfo->GetName() << "\tBranch: " << cellInfo->GetBranchName() << "\tIsEmbedding: " << std::boolalpha << cellInfo->GetIsEmbedding() << std::endl;
     }
   }
-  else if (inputObjectType == kCluster || inputObjectType == kTrack) {
-    AliInfoStream() << (inputObjectType == kCluster ? "Cluster" : "Track") << " container info: " << std::endl;
+  else if (inputObjectType == AliEmcalContainerUtils::kCluster || inputObjectType == AliEmcalContainerUtils::kTrack) {
+    stream << (inputObjectType == AliEmcalContainerUtils::kCluster ? "Cluster" : "Track") << " container info: " << std::endl;
     AliEmcalContainer * cont = 0;
-    for (auto containerInfo : (inputObjectType == kCluster ? fClusterCollArray : fParticleCollArray) ) {
+    for (auto containerInfo : (inputObjectType == AliEmcalContainerUtils::kCluster ? fClusterCollArray : fParticleCollArray) ) {
       cont = static_cast<AliEmcalContainer *>(containerInfo);
-      AliInfoStream() << "\tName: " << cont->GetName() << "\tBranch: " << cont->GetArrayName() << "\tTitle: " << cont->GetTitle() << std::endl;
-      // TODO: Enable in embedding branch
-      //AliInfoStream() << "\tName: " << cont->GetName() << "\tBranch: " << cont->GetArrayName() << "\tTitle: " << cont->GetTitle() << "\tIsEmbedding:" << std::boolalpha << cont->GetIsEmbedding() << std::endl;
+      stream << "\tName: " << cont->GetName() << "\tBranch: " << cont->GetArrayName() << "\tTitle: " << cont->GetTitle() << "\tIsEmbedding:" << std::boolalpha << cont->GetIsEmbedding() << std::endl;
     }
   }
   else {
@@ -1615,124 +1695,6 @@ void AliEmcalCorrectionTask::GetPropertyNamesFromNode(const std::string & compon
   {
     propertyNames.insert(propertyName.first.as<std::string>());
   }
-}
-
-/**
- * Create new container for MC particles and attach it to the task. The name
- * provided to this function must match the name of the array attached
- * to the new container inside the input event.
- * @param[in] n Name of the container and the array the container points to
- * @return Pointer to the new container for MC particles
- */
-AliMCParticleContainer* AliEmcalCorrectionTask::AddMCParticleContainer(const char *n)
-{
-  if (TString(n).IsNull()) return 0;
-
-  AliMCParticleContainer* cont = new AliMCParticleContainer(n);
-
-  fParticleCollArray.Add(cont);
-
-  return cont;
-}
-
-/**
- * Create new track container and attach it to the task. The name
- * provided to this function must match the name of the array attached
- * to the new container inside the input event.
- * @param[in] n Name of the container and the array the container points to
- * @return Pointer to the new track container
- */
-AliTrackContainer* AliEmcalCorrectionTask::AddTrackContainer(const char *n)
-{
-  if (TString(n).IsNull()) return 0;
-
-  AliTrackContainer* cont = new AliTrackContainer(n);
-
-  fParticleCollArray.Add(cont);
-
-  return cont;
-}
-
-/**
- * Create new particle container and attach it to the task. The name
- * provided to this function must match the name of the array attached
- * to the new container inside the input event.
- * @param[in] n Name of the container and the array the container points to
- * @return Pointer to the new particle container
- */
-AliParticleContainer* AliEmcalCorrectionTask::AddParticleContainer(const char *n) 
-{
-  if (TString(n).IsNull()) return 0;
-
-  AliParticleContainer* cont = new AliParticleContainer(n);
-
-  fParticleCollArray.Add(cont);
-
-  return cont;
-}
-
-/**
- * Create new cluster container and attach it to the task. The name
- * provided to this function must match the name of the array attached
- * to the new container inside the input event.
- * @param[in] n Name of the container and the array the container points to
- * @return Pointer to the new cluster container
- */
-AliClusterContainer* AliEmcalCorrectionTask::AddClusterContainer(const char *n) 
-{
-  if (TString(n).IsNull()) return 0;
-
-  AliClusterContainer* cont = new AliClusterContainer(n);
-
-  fClusterCollArray.Add(cont);
-
-  return cont;
-}
-
-/**
- * Get \f$ i^{th} \f$ particle container attached to this task
- * @param[in] i Index of the particle container
- * @return Particle container found for the given index (NULL if no particle container exists for that index)
- */
-AliParticleContainer* AliEmcalCorrectionTask::GetParticleContainer(Int_t i) const 
-{
-  if (i<0 || i>fParticleCollArray.GetEntriesFast()) return 0;
-  AliParticleContainer *cont = static_cast<AliParticleContainer*>(fParticleCollArray.At(i));
-  return cont;
-}
-
-/**
- * Get \f$ i^{th} \f$ cluster container attached to this task
- * @param[in] i Index of the cluster container
- * @return Cluster container found for the given index (NULL if no cluster container exists for that index)
- */
-AliClusterContainer* AliEmcalCorrectionTask::GetClusterContainer(Int_t i) const 
-{
-  if (i<0 || i>fClusterCollArray.GetEntriesFast()) return 0;
-  AliClusterContainer *cont = static_cast<AliClusterContainer*>(fClusterCollArray.At(i));
-  return cont;
-}
-
-/**
- * Find particle container attached to this task according to its name
- * @param[in] name Name of the particle container
- * @return Particle container found under the given name
- */
-AliParticleContainer* AliEmcalCorrectionTask::GetParticleContainer(const char *name) const 
-{
-  AliParticleContainer *cont = static_cast<AliParticleContainer*>(fParticleCollArray.FindObject(name));
-  return cont;
-}
-
-/**
- * Find cluster container attached to this task according to its name
- * @param[in] name Name of the cluster container
- * @return Cluster container found under the given name
- */
-AliClusterContainer* AliEmcalCorrectionTask::GetClusterContainer(const char *name) const 
-{
-  AliClusterContainer *cont = static_cast<AliClusterContainer*>(fClusterCollArray.FindObject(name));
-  return cont;
 }
 
 /**
@@ -1808,4 +1770,75 @@ AliEmcalCorrectionTask * AliEmcalCorrectionTask::AddTaskEmcalCorrectionTask(TStr
   //TObjArray* cnt = mgr->GetContainers();
 
   return correctionTask;
+}
+
+/**
+ * Prints information about the correction task.
+ *
+ * @return std::string containing information about the task.
+ */
+std::string AliEmcalCorrectionTask::toString(bool includeYAMLConfigurationInfo) const
+{
+  std::stringstream tempSS;
+
+  // Show the correction components
+  tempSS << "Correction components:\n";
+  for (auto component : fOrderedComponentsToExecute) {
+    tempSS << "\t" << component << "\n";
+  }
+  // Input objects
+  tempSS << "\nInput objects:\n";
+  PrintRequestedContainersInformation(AliEmcalContainerUtils::kCaloCells, tempSS);
+  PrintRequestedContainersInformation(AliEmcalContainerUtils::kCluster, tempSS);
+  PrintRequestedContainersInformation(AliEmcalContainerUtils::kTrack, tempSS);
+
+  if (includeYAMLConfigurationInfo == true) {
+    tempSS << "\nUser Configuration:\n";
+    PrintConfigurationString(tempSS, true);
+    tempSS << "\n\nDefault Configuration:\n";
+    PrintConfigurationString(tempSS);
+    tempSS << "\n";
+  }
+
+  return tempSS.str();
+}
+
+/**
+ * Print correction task information on an output stream using the string representation provided by
+ * AliEmcalCorrectionTask::toString. Used by operator<<
+ * @param in output stream stream
+ * @return reference to the output stream
+ */
+std::ostream & AliEmcalCorrectionTask::Print(std::ostream & in) const {
+  in << toString();
+  return in;
+}
+
+/**
+ * Implementation of the output stream operator for AliEmcalCorrectionTask. Printing
+ * basic correction task information provided by function toString
+ * @param in output stream
+ * @param myTask Task which will be printed
+ * @return Reference to the output stream
+ */
+std::ostream & operator<<(std::ostream & in, const AliEmcalCorrectionTask & myTask)
+{
+  std::ostream & result = myTask.Print(in);
+  return result;
+}
+
+/**
+ * Print basic correction task information using the string representation provided by
+ * AliEmcalCorrectionTask::toString
+ *
+ * @param opt If "YAML" is passed, then the YAML configuration is also printed
+ */
+void AliEmcalCorrectionTask::Print(Option_t* opt) const
+{
+  std::string temp(opt);
+  bool includeYAMLConfig = false;
+  if (temp == "YAML") {
+    includeYAMLConfig = true;
+  }
+  Printf("%s", toString(includeYAMLConfig).c_str());
 }

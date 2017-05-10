@@ -174,9 +174,12 @@ public:
   void SetWidthCorrFunctionITS(TH1 *fun, UInt_t varx, UInt_t vary=0, UInt_t varz=0);
 
   void SetQnTPCACcuts(AliDielectronQnEPcorrection *acCuts){ fQnTPCACcuts = acCuts; fACremovalIsSetted = kTRUE;}
+  void SetQnVectorNormalisation(TString norm) {fQnVectorNorm = norm;}
   void SaveDebugTree();
   Bool_t DoEventProcess() const { return fEventProcess; }
   void SetEventProcess(Bool_t setValue=kTRUE) { fEventProcess=setValue; }
+  Bool_t GammaTracksUsed() const { return fUseGammaTracks; }
+  void SetUseGammaTracks(Bool_t setValue=kTRUE) { fUseGammaTracks=setValue; }
   void  FillHistogramsFromPairArray(Bool_t pairInfoOnly=kFALSE);
 
 private:
@@ -203,6 +206,7 @@ private:
   AliAnalysisFilter fEventPlanePreFilter;  // event plane prefilter cuts
   AliAnalysisFilter fEventPlanePOIPreFilter;  // PoI cuts in the event plane prefilter
   AliDielectronQnEPcorrection *fQnTPCACcuts; // QnFramework est. 2016 ac removal
+  TString fQnVectorNorm;
 
   Int_t fPdgMother;     // pdg code of mother tracks
   Int_t fPdgLeg1;       // pdg code leg1
@@ -253,6 +257,7 @@ private:
   Bool_t fStoreRotatedPairs;    //It the rotated pairs should be stored in the pair array
   Bool_t fDontClearArrays;      //Don't clear the arrays at the end of the Process function, needed for external use of pair and tracks
   Bool_t fEventProcess;         //Process event (or pair array)
+  Bool_t fUseGammaTracks;       // use function SetGammaTracks for MCtruth photons
 
   void FillTrackArrays(AliVEvent * const ev, Int_t eventNr=0);
   void EventPlanePreFilter(Int_t arr1, Int_t arr2, TObjArray arrTracks1, TObjArray arrTracks2, const AliVEvent *ev);
@@ -292,7 +297,7 @@ private:
   AliDielectron(const AliDielectron &c);
   AliDielectron &operator=(const AliDielectron &c);
 
-  ClassDef(AliDielectron,16);
+  ClassDef(AliDielectron,17);
 };
 
 inline void AliDielectron::InitPairCandidateArrays()

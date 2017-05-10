@@ -409,7 +409,23 @@ void AliJHSInterplayTask::UserExec(Option_t *) {
 		}
 	}
 
-	if(fESMethod==4) { // di-jet
+	if(fESMethod==5) { // di-jet Asymm
+		// Make a decision for running the analysis or not
+		// analyze the events only if we find a pt > PtHardMin
+		TObjArray *fjets = (TObjArray*)fJetTask->GetAliJJetList(fJetSel); // only selected jet
+		AliJJet *Ljet = dynamic_cast<AliJJet*>( fjets->At(0) );
+		AliJJet *subLjet = dynamic_cast<AliJJet*>( fjets->At(1) );
+		double minSubLeadingJetPt = 5.0;
+		if(  Ljet && subLjet ) { 
+			double ptt = Ljet->Pt();
+			fHistos->fhJetPt[cBin]->Fill(ptt);
+			double asym = (Ljet->Pt() - subLjet->Pt())/(Ljet->Pt() + subLjet->Pt());
+			double InvM = ( *Ljet + *subLjet).M();
+			fHistos->fhDiJetAsym[cBin]->Fill( asym );
+			fHistos->fhRecoDiJetM[cBin]->Fill( InvM );
+			if( ptt > fPtHardMin && ptt < fPtHardMax && subLjet->Pt()>minSubLeadingJetPt && asym > fDiJetAsymMin ) TagThisEvent = kTRUE;
+		}
+	} else if(fESMethod==4) { // di-jet
 		// Make a decision for running the analysis or not
 		// analyze the events only if we find a pt > PtHardMin
 		TObjArray *fjets = (TObjArray*)fJetTask->GetAliJJetList(fJetSel); // only selected jet
@@ -420,6 +436,12 @@ void AliJHSInterplayTask::UserExec(Option_t *) {
 			double ptt = Ljet->Pt();
 			fHistos->fhJetPt[cBin]->Fill(ptt);
 			if( ptt > fPtHardMin && ptt < fPtHardMax && subLjet->Pt()>minSubLeadingJetPt ) TagThisEvent = kTRUE;
+			if( TagThisEvent ) {
+				double asym = (Ljet->Pt() - subLjet->Pt())/(Ljet->Pt() + subLjet->Pt());
+				double InvM = ( *Ljet + *subLjet).M();
+				fHistos->fhDiJetAsym[cBin]->Fill( asym );
+				fHistos->fhRecoDiJetM[cBin]->Fill( InvM );
+			}
 		}
 	} else if(fESMethod==3) { // Leading jet
 		// Make a decision for running the analysis or not
@@ -472,6 +494,8 @@ void AliJHSInterplayTask::UserExec(Option_t *) {
 			fHistos->fhChargedEta->Fill(etat, effCorr);
 			//fHistos->fhChargedPtJacek[cBin]->Fill(ptt, effCorr );
 			fHistos->fhChargedPtJacek[cBin]->Fill(ptt, ptt>0 ? 1./ptt*effCorr : 0); //One CANNOT do 1/ptt here!! First unfold.
+			if(track->GetCharge()>0.) fHistos->fhChargedPtJacekPos[cBin]->Fill(ptt, ptt>0 ? 1./ptt*effCorr : 0); //One CANNOT do 1/ptt here!! First unfold.
+			if(track->GetCharge()<0.) fHistos->fhChargedPtJacekNeg[cBin]->Fill(ptt, ptt>0 ? 1./ptt*effCorr : 0); //One CANNOT do 1/ptt here!! First unfold.
 			if( -0.8<etat && etat<-0.2) fHistos->fhChargedPtJacekEta[cBin][0]->Fill(ptt, ptt>0 ? 1./ptt*effCorr : 0);
 			if( -0.2<etat && etat< 0.3) fHistos->fhChargedPtJacekEta[cBin][1]->Fill(ptt, ptt>0 ? 1./ptt*effCorr : 0);
 			if(  0.3<etat && etat< 0.8) fHistos->fhChargedPtJacekEta[cBin][2]->Fill(ptt, ptt>0 ? 1./ptt*effCorr : 0);

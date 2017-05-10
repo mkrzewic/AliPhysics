@@ -31,6 +31,7 @@
 #include "TH1F.h"
 #include "TH2F.h"
 #include "TH3F.h"
+#include "TH3I.h"
 #include "TList.h"
 #include "TMath.h"
 #include "TCanvas.h"
@@ -65,6 +66,7 @@
 #include "AliMultSelection.h"
 #include "AliMultSelectionCuts.h"
 #include "AliPPVsMultUtils.h"
+#include "AliTOFGeometry.h"
 #ifdef USETREECLASS
 #include "TClonesArray.h"
 #include "AliAnTOFtrack.h"
@@ -96,6 +98,7 @@ fTOFout(kFALSE),
 fTRDout(kFALSE),
 fTime(kFALSE),
 fMismatch(kFALSE),
+fPassGoldenChi2(kFALSE),
 fPassDCAxy(kFALSE),
 fPassDCAz(kFALSE),
 fITSTPCMatch(kFALSE),
@@ -109,6 +112,7 @@ fTPCChi2(-999),
 fTPCChi2PerNDF(-999),
 fITSChi2(-999),
 fITSChi2PerNDF(-999),
+fGoldenChi2(-999),
 fLengthActiveZone(-999),
 fLength(-999),
 fLengthRatio(-999),
@@ -169,11 +173,12 @@ fChannelmode(chan),
 fCutmode(cuts),
 fSimpleCutmode(simplecuts),
 fBuilTPCTOF(kFALSE),
+fBuilDCAchi2(kFALSE),
 fUseTPCShift(kFALSE),
 fPerformance(kFALSE),
 fSelectBit(AliVEvent::kINT7),
 
-tb(),
+tb(),//TBenchmark
 hPerformanceTime(0x0),
 hPerformanceCPUTime(0x0),
 
@@ -185,6 +190,7 @@ hEvtVtxXY(0x0),
 hEvtVtxZ(0x0),
 hNTrk(0x0),
 hPadDist(0x0),
+hTOFDist(0x0),
 hBeta(0x0),
 hBetaNoMismatch(0x0),
 hBetaNoMismatchEtaCut(0x0),
@@ -417,6 +423,7 @@ void AliAnalysisTaskTOFSpectra::Init(){//Sets everything to default values
         hNumPrimMCTrueMatch[charge][species][mult] = 0x0;
         hNumPrimMCTrueMatchYCut[charge][species][mult] = 0x0;
         hNumPrimMCTrueMatchYCutTPC[charge][species][mult] = 0x0;
+        hNumPrimMCConsistentMatchYCut[charge][species][mult] = 0x0;
       }
       
     }
@@ -425,6 +432,9 @@ void AliAnalysisTaskTOFSpectra::Init(){//Sets everything to default values
   for(Int_t charge = 0; charge < 2; charge++){//Charge loop Positive/Negative
     hNumMatch[charge] = 0x0;
     hDenMatch[charge] = 0x0;
+    
+    hNumMatchPtEtaPhiout[charge] = 0x0;
+    hDenMatchPtEtaPhiout[charge] = 0x0;
     
     hNumMatchEta[charge] = 0x0;
     hDenMatchEta[charge] = 0x0;
@@ -485,6 +495,7 @@ void AliAnalysisTaskTOFSpectra::Init(){//Sets everything to default values
     for(Int_t charge = 0; charge < kCharges; charge++){
       for(Int_t ptbin = 0; ptbin < kPtBins; ptbin++){//Pt loop
         hTOF[ptbin][charge][species] = 0x0;
+        hTOFNoYCut[ptbin][charge][species] = 0x0;
         hTOFSigma[ptbin][charge][species] = 0x0;
         hTOFNoMismatch[ptbin][charge][species] = 0x0;
         hTOFSigmaNoMismatch[ptbin][charge][species] = 0x0;
@@ -497,7 +508,10 @@ void AliAnalysisTaskTOFSpectra::Init(){//Sets everything to default values
   for(Int_t charge = 0; charge < 2; charge++){//Charge loop Positive/Negative
     for(Int_t species = 0; species < 3; species++){//Species loop
       for(Int_t ptbin = 0; ptbin < kPtBins; ptbin++){//Pt loop
-        hDCAxy[charge][species][ptbin] = 0x0;
+        for(Int_t mult = 0; mult < kEvtMultBins; mult++){//Multiplicity loop
+          hDCAxy[charge][species][ptbin][mult] = 0x0;
+          hDCAxyGoldenChi2[charge][species][ptbin][mult] = 0x0;
+        }
         hDCAxyPrimMC[charge][species][ptbin] = 0x0;
         hDCAxySecStMC[charge][species][ptbin] = 0x0;
         hDCAxySecMatMC[charge][species][ptbin] = 0x0;
@@ -540,7 +554,7 @@ void AliAnalysisTaskTOFSpectra::UserCreateOutputObjects(){
   
   if (!fListHist) fListHist = new TList();
   fListHist->SetOwner();
-
+  
   //Object for the event selection
   if(fHImode) fEventCut.SetupLHC15o();
   else{
@@ -548,12 +562,12 @@ void AliAnalysisTaskTOFSpectra::UserCreateOutputObjects(){
     fEventCut.fCentralityFramework = 0;
   }
   fEventCut.SetManualMode();
-
+  
   //Histograms for event Selection
   fEventCut.AddQAplotsToList(fListHist);
-
+  
   DefineTimePerformance();
-
+  
   if(fChannelmode){
     hChannelTime = new TH2I("hChannelTime", "Histogram with Channel/Time correlation;Channel;TOF (ps)", kChannelBins, fChannelFirst -.5, fChannelLast -.5, kTimeBins, fTOFmin, fTOFmax);
     fListHist->AddLast(hChannelTime);
@@ -600,12 +614,12 @@ void AliAnalysisTaskTOFSpectra::UserCreateOutputObjects(){
     
     hEvtMult = new TH1D("hEvtMult", "Event Multiplicity Before Event Selection;Multiplicity;Counts", 6002, fHImode ? -1. : -301, fHImode ? 6001. : 5701);
     if(hEvtMult->GetXaxis()->GetBinWidth(100) != 1.) AliWarning(Form("Bins have size %f which is different from one!", hEvtMult->GetXaxis()->GetBinWidth(100)));
-    if(hEvtMult->GetXaxis()->GetBinCenter(1) != -0.5) AliWarning(Form("First bin has center in %f which is different from -0.5!", hEvtMult->GetXaxis()->GetBinCenter(1)));
+    if(hEvtMult->GetXaxis()->GetBinCenter(hEvtMult->GetXaxis()->FindBin(-0.5)) != -0.5) AliWarning(Form("First bin has center in %f which is different from -0.5!", hEvtMult->GetXaxis()->GetBinCenter(1)));
     fListHist->AddLast(hEvtMult);
     
     hEvtMultAftEvSel = new TH1D("hEvtMultAftEvSel", "Event Multiplicity After Event Selection;Multiplicity;Counts", 6002, fHImode ? -1. : -301, fHImode ? 6001. : 5701);
     if(hEvtMultAftEvSel->GetXaxis()->GetBinWidth(100) != 1.) AliWarning(Form("Bins have size %f which is different from one!", hEvtMultAftEvSel->GetXaxis()->GetBinWidth(100)));
-    if(hEvtMultAftEvSel->GetXaxis()->GetBinCenter(1) != -0.5) AliWarning(Form("First bin has center in %f which is different from -0.5!", hEvtMultAftEvSel->GetXaxis()->GetBinCenter(1)));
+    if(hEvtMultAftEvSel->GetXaxis()->GetBinCenter(hEvtMultAftEvSel->GetXaxis()->FindBin(-0.5)) != -0.5) AliWarning(Form("First bin has center in %f which is different from -0.5!", hEvtMultAftEvSel->GetXaxis()->GetBinCenter(1)));
     fListHist->AddLast(hEvtMultAftEvSel);
     
     hEvtVtxXY = new TH1F("hEvtVtxXY", "XY primary vertex distance;(x^2+y^2)^(1/2) (cm);Counts", 100, -5., 5.);
@@ -768,32 +782,39 @@ void AliAnalysisTaskTOFSpectra::UserCreateOutputObjects(){
     hPadDist = new TH2F("hPadDist", "Distribution in the pads;#DeltaX_{pad} (cm);#DeltaZ_{pad} (cm)", 400, -10, 10, 400, -10, 10);
     fListHist->AddLast(hPadDist);
     
+    hTOFDist = new TH2F("hTOFDist", "Distribution in the TOF;Sector;Strip", 18, 0, 18, 91, 0, 91);
+    fListHist->AddLast(hTOFDist);
+    
     if(fPerformance){
-      hBeta = new TH2F("hBeta", Form("Distribution of the beta;%s;TOF #beta", pstring.Data()), 400, 0., 10., 400, 0., 1.5);
+      const Int_t Bnbins      = 4000;
+      const Double_t Blim[2]  = {0., 1.5};
+      const Double_t Bplim[2] = {0., 10.};
+      
+      hBeta = new TH2I("hBeta", Form("Distribution of the beta;%s;TOF #beta", pstring.Data()), Bnbins, Bplim[0], Bplim[1], Bnbins, Blim[0], Blim[1]);
       fListHist->AddLast(hBeta);
       
-      hBetaNoMismatch = new TH2F("hBetaNoMismatch", Form("Distribution of the beta w/o Mismatch;%s;TOF #beta", pstring.Data()), 400, 0., 10., 400, 0., 1.5);
+      hBetaNoMismatch = new TH2I("hBetaNoMismatch", Form("Distribution of the beta w/o Mismatch;%s;TOF #beta", pstring.Data()), Bnbins, Bplim[0], Bplim[1], Bnbins, Blim[0], Blim[1]);
       fListHist->AddLast(hBetaNoMismatch);
       
-      hBetaNoMismatchEtaCut = new TH2F("hBetaNoMismatchEtaCut", Form("Distribution of the beta w/o Mismatch and a |#eta| < 0.5;%s;TOF #beta", pstring.Data()), 400, 0., 10., 400, 0., 1.5);
+      hBetaNoMismatchEtaCut = new TH2I("hBetaNoMismatchEtaCut", Form("Distribution of the beta w/o Mismatch and a |#eta| < 0.5;%s;TOF #beta", pstring.Data()), Bnbins, Bplim[0], Bplim[1], Bnbins, Blim[0], Blim[1]);
       fListHist->AddLast(hBetaNoMismatchEtaCut);
       
-      hBetaNoMismatchEtaCutOut = new TH2F("hBetaNoMismatchEtaCutOut", Form("Distribution of the beta w/o Mismatch and a |#eta| > 0.2;%s;TOF #beta", pstring.Data()), 400, 0., 10., 400, 0., 1.5);
+      hBetaNoMismatchEtaCutOut = new TH2I("hBetaNoMismatchEtaCutOut", Form("Distribution of the beta w/o Mismatch and a |#eta| > 0.2;%s;TOF #beta", pstring.Data()), Bnbins, Bplim[0], Bplim[1], Bnbins, Blim[0], Blim[1]);
       fListHist->AddLast(hBetaNoMismatchEtaCutOut);
       
-      hBetaCentral = new TH2F("hBetaCentral", Form("Distribution of the beta Central Events;%s;TOF #beta", pstring.Data()), 400, 0., 10., 400, 0., 1.5);
+      hBetaCentral = new TH2I("hBetaCentral", Form("Distribution of the beta Central Events;%s;TOF #beta", pstring.Data()), Bnbins, Bplim[0], Bplim[1], Bnbins, Blim[0], Blim[1]);
       fListHist->AddLast(hBetaCentral);
       
-      hBetaNoMismatchCentral = new TH2F("hBetaNoMismatchCentral", Form("Distribution of the beta w/o Mismatch Central Events;%s;TOF #beta", pstring.Data()), 400, 0., 10., 400, 0., 1.5);
+      hBetaNoMismatchCentral = new TH2I("hBetaNoMismatchCentral", Form("Distribution of the beta w/o Mismatch Central Events;%s;TOF #beta", pstring.Data()), Bnbins, Bplim[0], Bplim[1], Bnbins, Blim[0], Blim[1]);
       fListHist->AddLast(hBetaNoMismatchCentral);
       
-      hBetaNoMismatchCentralEtaCut = new TH2F("hBetaNoMismatchCentralEtaCut", Form("Distribution of the beta w/o Mismatch Central Events and a |#eta| < 0.5;%s;TOF #beta", pstring.Data()), 400, 0., 10., 400, 0., 1.5);
+      hBetaNoMismatchCentralEtaCut = new TH2I("hBetaNoMismatchCentralEtaCut", Form("Distribution of the beta w/o Mismatch Central Events and a |#eta| < 0.5;%s;TOF #beta", pstring.Data()), Bnbins, Bplim[0], Bplim[1], Bnbins, Blim[0], Blim[1]);
       fListHist->AddLast(hBetaNoMismatchCentralEtaCut);
       
-      hBetaNoMismatchCentralEtaCutOut = new TH2F("hBetaNoMismatchCentralEtaCutOut", Form("Distribution of the beta w/o Mismatch Central Events and a |#eta| > 0.2;%s;TOF #beta", pstring.Data()), 400, 0., 10., 400, 0., 1.5);
+      hBetaNoMismatchCentralEtaCutOut = new TH2I("hBetaNoMismatchCentralEtaCutOut", Form("Distribution of the beta w/o Mismatch Central Events and a |#eta| > 0.2;%s;TOF #beta", pstring.Data()), Bnbins, Bplim[0], Bplim[1], Bnbins, Blim[0], Blim[1]);
       fListHist->AddLast(hBetaNoMismatchCentralEtaCutOut);
       
-      hTPCdEdx = new TH2F("hTPCdEdx", Form("Distribution of the TPC dE/dx;%s;d#it{E}/d#it{x} in TPC (arb. units)", pstring.Data()), 1000, 0.25, 30., 1000, 0., 1000);
+      hTPCdEdx = new TH2I("hTPCdEdx", Form("Distribution of the TPC dE/dx;%s;d#it{E}/d#it{x} in TPC (arb. units)", pstring.Data()), 1000, 0.25, 30., 1000, 0., 1000);
       fListHist->AddLast(hTPCdEdx);
     }
     
@@ -846,6 +867,9 @@ void AliAnalysisTaskTOFSpectra::UserCreateOutputObjects(){
           const TString hname = Form("%s%s_%i", pC[charge].Data(), pS[species].Data(), ptbin);
           hTOF[ptbin][charge][species] = new TH1F(Form("hTOF%s", hname.Data()), Form("TOF %s%s %s;%s;Counts", pC[charge].Data(), pS[species].Data(), ptinterval.Data(), tofsignalstringSpecies[2+species].Data()), 1000, -10000, 10000);
           fListHist->AddLast(hTOF[ptbin][charge][species]);
+          
+          hTOFNoYCut[ptbin][charge][species] = new TH1F(Form("hTOFNoYCut%s", hname.Data()), Form("TOF w/o Y cut %s%s %s;%s;Counts", pC[charge].Data(), pS[species].Data(), ptinterval.Data(), tofsignalstringSpecies[2+species].Data()), 1000, -10000, 10000);
+          fListHist->AddLast(hTOFNoYCut[ptbin][charge][species]);
           
           hTOFSigma[ptbin][charge][species] = new TH1F(Form("hTOFSigma%s", hname.Data()), Form("TOF Sigma %s%s %s;%s;Counts", pC[charge].Data(), pS[species].Data(), ptinterval.Data(), nsigmastringSpecies[2+species].Data()), 1000, -300, 300);
           fListHist->AddLast(hTOFSigma[ptbin][charge][species]);
@@ -977,6 +1001,22 @@ void AliAnalysisTaskTOFSpectra::UserCreateOutputObjects(){
       hDenMatchNoTRDOut[charge]->Sumw2();
       fListHist->AddLast(hDenMatchNoTRDOut[charge]);
       
+      //*****
+      //PT, ETA and PHI
+      //*****
+      
+      //Numerator
+      hNumMatchPtEtaPhiout[charge] = new TH3I(Form("hNumMatchPtEtaPhiout%s", pC[charge].Data()), Form("Matching Numerator %s;%s;%s;%s", pCharge[charge].Data(), ptstring.Data(), etastring.Data(), phistring.Data()), kPtBins, 0, kPtBins, kEtaBins, -fEtaRange, fEtaRange, kPhiBins, 0, TMath::TwoPi());
+      hNumMatchPtEtaPhiout[charge]->Sumw2();
+      hNumMatchPtEtaPhiout[charge]->GetXaxis()->Set(kPtBins, fBinPt);
+      fListHist->AddLast(hNumMatchPtEtaPhiout[charge]);
+      
+      //Denominator
+      hDenMatchPtEtaPhiout[charge] = new TH3I(Form("hDenMatchPtEtaPhiout%s", pC[charge].Data()), Form("Matching Denominator %s;%s;%s;%s", pCharge[charge].Data(), ptstring.Data(), etastring.Data(), phistring.Data()), kPtBins, 0, kPtBins, kEtaBins, -fEtaRange, fEtaRange, kPhiBins, 0, TMath::TwoPi());
+      hDenMatchPtEtaPhiout[charge]->Sumw2();
+      hDenMatchPtEtaPhiout[charge]->GetXaxis()->Set(kPtBins, fBinPt);
+      fListHist->AddLast(hDenMatchPtEtaPhiout[charge]);
+      
       for(Int_t species = 0; charge < 2 && species < 3; species++){//Species loop Pi/Ka/Pr
         
         //*****
@@ -996,13 +1036,19 @@ void AliAnalysisTaskTOFSpectra::UserCreateOutputObjects(){
         //*****
         //Info from the DCAxy
         //*****
-        for(Int_t ptbin = 0; ptbin < kPtBins; ptbin++){//Pt loop
-          hDCAxy[charge][species][ptbin] = new TH1F(Form("hDCAxy%s%s_pt%i", pC[charge].Data(), pS[species].Data(), ptbin), Form("DCAxy Distribution of %s %s in pt %i [%.2f,%.2f];DCA_{xy} (cm);Counts", pCharge[charge].Data(), pSpecies[species].Data(), ptbin, fBinPt[ptbin], fBinPt[ptbin+1]), fDCAXYbins, DCAXYbin);
-          hDCAxy[charge][species][ptbin]->Sumw2();
-          fListHist->AddLast(hDCAxy[charge][species][ptbin]);
+        for(Int_t mult = 0; mult < kEvtMultBins; mult++){//Multiplicity loop
+          for(Int_t ptbin = 0; ptbin < kPtBins; ptbin++){//Pt loop
+            hDCAxy[charge][species][ptbin][mult] = new TH1F(Form("hDCAxy%s%s_pt%i_mult%i", pC[charge].Data(), pS[species].Data(), ptbin, mult), Form("DCAxy Distribution of %s %s in pt %i [%.2f,%.2f] and mult %i;DCA_{xy} (cm);Counts", pCharge[charge].Data(), pSpecies[species].Data(), ptbin, fBinPt[ptbin], fBinPt[ptbin+1], mult), fDCAXYbins, -fDCAXYRange, fDCAXYRange);
+            hDCAxy[charge][species][ptbin][mult]->Sumw2();
+            fListHist->AddLast(hDCAxy[charge][species][ptbin][mult]);
+            
+            if(!fBuilDCAchi2) continue;
+            hDCAxyGoldenChi2[charge][species][ptbin][mult] = new TH1F(Form("hDCAxyGoldenChi2%s%s_pt%i_mult%i", pC[charge].Data(), pS[species].Data(), ptbin, mult), Form("DCAxy w Golden Chi2 Distribution of %s %s in pt %i [%.2f,%.2f] and mult %i;DCA_{xy} (cm);Counts", pCharge[charge].Data(), pSpecies[species].Data(), ptbin, fBinPt[ptbin], fBinPt[ptbin+1], mult), fDCAXYbins, -fDCAXYRange, fDCAXYRange);
+            hDCAxyGoldenChi2[charge][species][ptbin][mult]->Sumw2();
+            fListHist->AddLast(hDCAxyGoldenChi2[charge][species][ptbin][mult]);
+          }
         }
       }
-      
     }
     
     
@@ -1042,15 +1088,15 @@ void AliAnalysisTaskTOFSpectra::UserCreateOutputObjects(){
           //*****
           
           for(Int_t ptbin = 0; ptbin < kPtBins; ptbin++){//Pt loop
-            hDCAxyPrimMC[charge][species][ptbin] = new TH1F(Form("hDCAxyPrimMC%s%s_%i", pC[charge].Data(), pS[species].Data(), ptbin), Form("DCAxy Distribution of %s %s in pt %i [%.2f,%.2f];DCA_{xy} (cm);Counts", pCharge[charge].Data(), pSpecies[species].Data(), ptbin, fBinPt[ptbin], fBinPt[ptbin+1]), fDCAXYbins, DCAXYbin);
+            hDCAxyPrimMC[charge][species][ptbin] = new TH1F(Form("hDCAxyPrimMC%s%s_%i", pC[charge].Data(), pS[species].Data(), ptbin), Form("DCAxy Distribution of %s %s in pt %i [%.2f,%.2f];DCA_{xy} (cm);Counts", pCharge[charge].Data(), pSpecies[species].Data(), ptbin, fBinPt[ptbin], fBinPt[ptbin+1]), fDCAXYbins, -fDCAXYRange, fDCAXYRange);
             hDCAxyPrimMC[charge][species][ptbin]->Sumw2();
             fListHist->AddLast(hDCAxyPrimMC[charge][species][ptbin]);
             
-            hDCAxySecStMC[charge][species][ptbin] = new TH1F(Form("hDCAxySecStMC%s%s_%i", pC[charge].Data(), pS[species].Data(), ptbin), Form("DCAxy Distribution of %s %s in pt %i [%.2f,%.2f];DCA_{xy} (cm);Counts", pCharge[charge].Data(), pSpecies[species].Data(), ptbin, fBinPt[ptbin], fBinPt[ptbin+1]), fDCAXYbins, DCAXYbin);
+            hDCAxySecStMC[charge][species][ptbin] = new TH1F(Form("hDCAxySecStMC%s%s_%i", pC[charge].Data(), pS[species].Data(), ptbin), Form("DCAxy Distribution of %s %s in pt %i [%.2f,%.2f];DCA_{xy} (cm);Counts", pCharge[charge].Data(), pSpecies[species].Data(), ptbin, fBinPt[ptbin], fBinPt[ptbin+1]), fDCAXYbins, -fDCAXYRange, fDCAXYRange);
             hDCAxySecStMC[charge][species][ptbin]->Sumw2();
             fListHist->AddLast(hDCAxySecStMC[charge][species][ptbin]);
             
-            hDCAxySecMatMC[charge][species][ptbin] = new TH1F(Form("hDCAxySecMatMC%s%s_%i", pC[charge].Data(), pS[species].Data(), ptbin), Form("DCAxy Distribution of %s %s in pt %i [%.2f,%.2f];DCA_{xy} (cm);Counts", pCharge[charge].Data(), pSpecies[species].Data(), ptbin, fBinPt[ptbin], fBinPt[ptbin+1]), fDCAXYbins, DCAXYbin);
+            hDCAxySecMatMC[charge][species][ptbin] = new TH1F(Form("hDCAxySecMatMC%s%s_%i", pC[charge].Data(), pS[species].Data(), ptbin), Form("DCAxy Distribution of %s %s in pt %i [%.2f,%.2f];DCA_{xy} (cm);Counts", pCharge[charge].Data(), pSpecies[species].Data(), ptbin, fBinPt[ptbin], fBinPt[ptbin+1]), fDCAXYbins, -fDCAXYRange, fDCAXYRange);
             hDCAxySecMatMC[charge][species][ptbin]->Sumw2();
             fListHist->AddLast(hDCAxySecMatMC[charge][species][ptbin]);
           }
@@ -1135,6 +1181,10 @@ void AliAnalysisTaskTOFSpectra::UserCreateOutputObjects(){
             hNumPrimMCTrueMatchYCutTPC[charge][species][mult] = new TH1F(Form("hNumPrimMCTrueMatchYCutTPC_%s%s_%i", pC[charge].Data(), pS[species].Data(), mult), "", kPtBins, fBinPt);
             hNumPrimMCTrueMatchYCutTPC[charge][species][mult]->Sumw2();
             fListHist->AddLast(hNumPrimMCTrueMatchYCutTPC[charge][species][mult]);
+            
+            hNumPrimMCConsistentMatchYCut[charge][species][mult] = new TH1F(Form("hNumPrimMCConsistentMatchYCut_%s%s_%i", pC[charge].Data(), pS[species].Data(), mult), "", kPtBins, fBinPt);
+            hNumPrimMCConsistentMatchYCut[charge][species][mult]->Sumw2();
+            fListHist->AddLast(hNumPrimMCConsistentMatchYCut[charge][species][mult]);
           }
         }
       }
@@ -1379,11 +1429,11 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
     
   }
   StopTimePerformance(1);
-
+  
   StartTimePerformance(2);
   fEvtSelected = SelectEvents(EvtStart);
   StopTimePerformance(2);
-    
+  
   StartTimePerformance(3);
   ComputeEvtMultiplicityBin();//Calculate in the handy binning the Multiplicity bin of the event
   StopTimePerformance(3);
@@ -1431,6 +1481,12 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
   hEvtMultAftEvSel->Fill(fEvtMult);
   
   //
+  // TOF geometrical variables
+  //
+  Int_t det[5];
+  Float_t coord[3];
+  
+  //
   // track loop
   //
   StartTimePerformance(4);
@@ -1443,7 +1499,7 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
     else if(iTrack == 1) SetEvtMaskBit(kIsNewEvent, 0);
     
     
-    AliESDtrack *track = fESD->GetTrack(iTrack);
+    const AliESDtrack *track = fESD->GetTrack(iTrack);
     if (!track){continue;}
     hNTrk->Fill(0);// --> Tracks in Input
     
@@ -1453,7 +1509,7 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
     
     //
     // Get the information on the track variables
-    SetTrackValues(track);//Get the information on the track values
+    SetTrackValues(track, vertex);//Get the information on the track values
     
     //
     // Get the information on the track flags relative to the TOF but not only
@@ -1478,8 +1534,8 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
     if(track->GetSign() == 0) continue; //No neutral particles
     hNTrk->Fill(3);// --> Charged track
     
-    FindPtBin();                      // Find the corresponding Pt bin
-    if(fBinPtIndex < 0) continue;     //Track has higher momentum than actual binning this cut makes sense because if you don't have the DCA templates you cannot correct for primaries!!
+    FindPtBin();                                            // Find the corresponding Pt bin
+    if(fBinPtIndex < 0 || fBinPtIndex >= kPtBins) continue; //Track has higher momentum than actual binning this cut makes sense because if you don't have the DCA templates you cannot correct for primaries!!
     hNTrk->Fill(4);// --> Track in pt range
     
     //
@@ -1622,22 +1678,6 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
         //
         fCombinedSigma[species] = TMath::Sqrt(fTPCSigma[species + kpi]*fTPCSigma[species + kpi] + fTOFSigma[species + kpi]*fTOFSigma[species + kpi]);
         
-        //
-        //If requested
-        //Histograms with T-Texp-T0 with and without mismatch
-        //
-        #ifdef BUILDTOFDISTRIBUTIONS// Build TOF distributions only if requested
-        const Double_t Tdiff = fTOFTime-fT0TrkTime-fTOFExpTime[species + kpi];
-        const Double_t TdiffSigma = Tdiff/fTOFExpSigma[species + kpi];
-        hTOF[fBinPtIndex][fSign][species]->Fill(Tdiff);
-        hTOFSigma[fBinPtIndex][fSign][species]->Fill(TdiffSigma);
-        
-        //Skip if the TPC signal is not for pions/kaons or protons
-        if(fTPCSigma[kpi] > 5 && fTPCSigma[kK] > 5 && fTPCSigma[kp] > 5) continue;
-        
-        hTOFNoMismatch[fBinPtIndex][fSign][species]->Fill(Tdiff);
-        hTOFSigmaNoMismatch[fBinPtIndex][fSign][species]->Fill(TdiffSigma);
-        #endif
       }
       
       //
@@ -1648,7 +1688,13 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
         if(TMath::Abs(fRapidity[species]) >= fRapidityCut) continue;//Rapidity cut
         
         //Pure sample selected via TOF and TPC 2 sigma cut
-        hDCAxy[fSign][species][fBinPtIndex]->Fill(fDCAXY);
+        hDCAxy[fSign][species][fBinPtIndex][fEvtMultBin]->Fill(fDCAXY);
+        
+        //
+        //DCA - with golden chi2 cut
+        //
+        if(!fBuilDCAchi2 || !fPassGoldenChi2) continue;
+        hDCAxyGoldenChi2[fSign][species][fBinPtIndex][fEvtMultBin]->Fill(fDCAXY);
       }
       
       if(fPdgIndex != -999 && TMath::Abs(fRapidity[fPdgIndex]) < fRapidityCut){//MC info If the track is a Pion or a Kaon or a Proton
@@ -1726,16 +1772,17 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
     //
     //All Reconstructed tracks
     //
-    hDenMatch[fSign]->Fill(fPt);                  //-> transverse momentum
-    hDenMatchEta[fSign]->Fill(fEta);              //-> eta
-    hDenMatchphiOut[fSign]->Fill(fPhiout);        //-> Phi
+    hDenMatch[fSign]->Fill(fPt);                           //-> transverse momentum
+    hDenMatchEta[fSign]->Fill(fEta);                       //-> eta
+    hDenMatchphiOut[fSign]->Fill(fPhiout);                 //-> Phi
+    hDenMatchPtEtaPhiout[fSign]->Fill(fPt, fEta, fPhiout); //-> transverse momentum, eta and phi
     
-    if(fPt > 0.5){                                //Lower cut on the transver momentum
-      hDenMatchEtaPtMa[fSign]->Fill(fEta);        //-> eta
-      hDenMatchphiOutPtMa[fSign]->Fill(fPhiout);  //-> Phi
+    if(fPt > 0.5){                                         //Lower cut on the transver momentum
+      hDenMatchEtaPtMa[fSign]->Fill(fEta);                 //-> eta
+      hDenMatchphiOutPtMa[fSign]->Fill(fPhiout);           //-> Phi
     }
-    if(fTRDout) hDenMatchTRDOut[fSign]->Fill(fPt);//Tracks with TRDout
-    else hDenMatchNoTRDOut[fSign]->Fill(fPt);     //Tracks without TRDout
+    if(fTRDout) hDenMatchTRDOut[fSign]->Fill(fPt);         //Tracks with TRDout
+    else hDenMatchNoTRDOut[fSign]->Fill(fPt);              //Tracks without TRDout
     
     
     if(fMCmode){//start to take MC data
@@ -1793,27 +1840,28 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
     // "TOF.and.T0C" -> 5
     // "T0AC;        -> 6
     // "TOF.and.T0AC"-> 7
-
+    
     // cout<< "T0 used: ["<<fT0UsedMask<<"]"<<endl;
     if(fT0UsedMask == 1 || fT0UsedMask == 3 || fT0UsedMask == 5 || fT0UsedMask == 7){
       SetTrkMaskBit(kT0_0, 1);//Set the used T0
       // cout<<"Is one"<<endl;
-    } 
+    }
     if(fT0UsedMask == 2 || fT0UsedMask == 3 || fT0UsedMask == 6 || fT0UsedMask == 7){
       SetTrkMaskBit(kT0_1, 1);
       // cout<<"Is two"<<endl;
-    } 
+    }
     if(fT0UsedMask == 4 || fT0UsedMask == 5 || fT0UsedMask == 6 || fT0UsedMask == 7){
       SetTrkMaskBit(kT0_2, 1);
       // cout<<"Is three"<<endl;
     }
     
     
-    SetTrkMaskBit(kIsTOFout, fTOFout);//Set the TOFout
-    SetTrkMaskBit(kIsTOFTime, fTime);//Set the Time
-    SetTrkMaskBit(kIsTRDout, fTRDout);//Set the TRDout
+    SetTrkMaskBit(kIsTOFout, fTOFout);              //Set the flag for TOFout
+    SetTrkMaskBit(kIsTOFTime, fTime);               //Set the flag for Time
+    SetTrkMaskBit(kIsTRDout, fTRDout);              //Set the flag for TRDout
+    SetTrkMaskBit(kPassGoldenChi2, fPassGoldenChi2);//Set the flag for GoldenChi2
     
-    //Fill tree
+    //Fill tree or storing the information in the TClonesArray, depending on the Flags
     if(fTOFout && fTime && fTreemode){
       if(fCutmode) AnalyseCutVariation(track);
       #ifdef USETREECLASS
@@ -1848,6 +1896,29 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
       hNTrk->Fill(15);
       
       //
+      //If requested
+      //Histograms with T-Texp-T0 with and without mismatch
+      //
+      #ifdef BUILDTOFDISTRIBUTIONS// Build TOF distributions only if requested
+      for(Int_t species = 0; fTOFout && fTime && species < kSpecies; species++){
+        const Double_t Tdiff = fTOFTime-fT0TrkTime-fTOFExpTime[species + kpi];
+        const Double_t TdiffSigma = Tdiff/fTOFExpSigma[species + kpi];
+        hTOFNoYCut[fBinPtIndex][fSign][species]->Fill(Tdiff);
+        
+        //Rapidity cut
+        if(TMath::Abs(fRapidity[species]) >= fRapidityCut) continue;
+        hTOF[fBinPtIndex][fSign][species]->Fill(Tdiff);
+        hTOFSigma[fBinPtIndex][fSign][species]->Fill(TdiffSigma);
+        
+        //Skip if the TPC signal is not for pions/kaons or protons
+        if(fTPCSigma[kpi] > 5 && fTPCSigma[kK] > 5 && fTPCSigma[kp] > 5) continue;
+        
+        hTOFNoMismatch[fBinPtIndex][fSign][species]->Fill(Tdiff);
+        hTOFSigmaNoMismatch[fBinPtIndex][fSign][species]->Fill(TdiffSigma);
+      }
+      #endif
+      
+      //
       //Matching efficiency plots
       //Numerator
       for(Int_t i = 0; i < 3; i++){//Loop on pi/k/p
@@ -1855,7 +1926,7 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
         for(Int_t j = 0; j < 3; j++){
           if(i == j){
             if(TMath::Abs(fTPCSigma[kpi + j]) > 3) pass = kFALSE;
-          } 
+          }
           else if(TMath::Abs(fTPCSigma[kpi + j]) < 3) pass = kFALSE;
         }
         if(pass) hNumMatchTPC[fSign][i]->Fill(fPt);
@@ -1867,7 +1938,7 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
         if(fProdInfo == 0 ){//Primaries
           hNumMatchPrimMC[fSign][fPdgIndex]->Fill(fPt);
           if(TMath::Abs(fRapidityMC) < fRapidityCut) hNumMatchPrimMCYCut[fSign][fPdgIndex][fEvtMultBin]->Fill(fPt);
-          if(fMCTOFMatch == 0 || (fMCTOFMatch > 0 && fTOFSigma[kpi + fPdgIndex] < 2.)){//True match in TOF
+          if(fMCTOFMatch == 0){//True match in TOF
             hNumPrimMCTrueMatch[fSignMC][fPdgIndex][fEvtMultBin]->Fill(fPtMC);
             if(TMath::Abs(fRapidityMC) < fRapidityCut){
               hNumPrimMCTrueMatchYCut[fSign][fPdgIndex][fEvtMultBin]->Fill(fPt);
@@ -1875,22 +1946,28 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
             }
             
           }
+          else if(fMCTOFMatch > 0 && fTOFSigma[kpi + fPdgIndex] < 2.){//Consistent match in TOF
+            if(TMath::Abs(fRapidityMC) < fRapidityCut){
+              hNumPrimMCConsistentMatchYCut[fSign][fPdgIndex][fEvtMultBin]->Fill(fPt);
+            }
+          }
         }
       }
       
       //
       //All trakcs matched to TOF
       //
-      hNumMatch[fSign]->Fill(fPt);                  //-> transverse momentum
-      hNumMatchEta[fSign]->Fill(fEta);              //-> eta
-      hNumMatchphiOut[fSign]->Fill(fPhiout);        //-> Phi
+      hNumMatch[fSign]->Fill(fPt);                           //-> transverse momentum
+      hNumMatchEta[fSign]->Fill(fEta);                       //-> eta
+      hNumMatchphiOut[fSign]->Fill(fPhiout);                 //-> Phi
+      hNumMatchPtEtaPhiout[fSign]->Fill(fPt, fEta, fPhiout); //-> transverse momentum, eta and phi
       
-      if(fPt > 0.5){                                //Lower cut on the transver momentum
-        hNumMatchEtaPtMa[fSign]->Fill(fEta);        //-> eta
-        hNumMatchphiOutPtMa[fSign]->Fill(fPhiout);  //-> Phi
+      if(fPt > 0.5){                                         //Lower cut on the transver momentum
+        hNumMatchEtaPtMa[fSign]->Fill(fEta);                 //-> eta
+        hNumMatchphiOutPtMa[fSign]->Fill(fPhiout);           //-> Phi
       }
-      if(fTRDout) hNumMatchTRDOut[fSign]->Fill(fPt);//Tracks with TRDout
-      else hNumMatchNoTRDOut[fSign]->Fill(fPt);     //Tracks without TRDout
+      if(fTRDout) hNumMatchTRDOut[fSign]->Fill(fPt);         //Tracks with TRDout
+      else hNumMatchNoTRDOut[fSign]->Fill(fPt);              //Tracks without TRDout
       
       
       //Performance plots
@@ -1922,6 +1999,11 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
       
       //fine plot test matching efficiency
       hPadDist->Fill(fTOFImpactDX, fTOFImpactDZ);
+      AliTOFGeometry::GetVolumeIndices(fTOFchan, det);
+      coord[0] = AliTOFGeometry::GetX(det);
+      coord[1] = AliTOFGeometry::GetY(det);
+      coord[2] = AliTOFGeometry::GetZ(det);
+      hTOFDist->Fill(AliTOFGeometry::GetStrip(coord), AliTOFGeometry::GetSector(coord));
       hTOFResidualX->Fill(fTOFImpactDX);
       hTOFResidualZ->Fill(fTOFImpactDZ);
       hTOFChannel->Fill(fTOFchan);
@@ -1932,7 +2014,7 @@ void AliAnalysisTaskTOFSpectra::UserExec(Option_t *){
           if(TMath::Abs(fTPCSigma[kpi+i]) < 5 && TMath::Abs(fTOFSigma[kpi+i]) < 5){
             hTimeOfFlightResNoMismatch->Fill(fTOFTime-fT0TrkTime-fTOFExpTime[AliPID::kPion]);
             break;
-          } 
+          }
         }
         if(fT0TrkTime != 0){//No T0 Fill
           hTimeOfFlightTOFRes->Fill(deltat);
@@ -1990,6 +2072,7 @@ void AliAnalysisTaskTOFSpectra::InitializeTrackVar(){
   fTPCChi2PerNDF = -999;
   fITSChi2 = -999;
   fITSChi2PerNDF = -999;
+  fGoldenChi2 = -999;
   fLengthActiveZone = -999;
   fLength = -999;
   fLengthRatio = -999;
@@ -2024,6 +2107,7 @@ void AliAnalysisTaskTOFSpectra::InitializeTrackVar(){
   fZout = -999;
   fPhiout = -999;
   fMismatch = kFALSE;
+  fPassGoldenChi2 = kFALSE;
   fPassDCAxy = kFALSE;
   fPassDCAz = kFALSE;
   fITSTPCMatch = kFALSE;
@@ -2257,10 +2341,12 @@ Bool_t AliAnalysisTaskTOFSpectra::AnalyseMCTracks(){//Returns kTRUE if it reache
   
   if(fPdgIndex < 0) return kFALSE;//Pi/K/P only!
   hDenMatchMultTrk[fSign][fPdgIndex][fEvtMultBin]->Fill(fPt);
+  if(fTRDout == kTRUE) hDenMatchMultTrkTRDOut[fSign][fPdgIndex][fEvtMultBin]->Fill(fPt);
+  else hDenMatchMultTrkNoTRDOut[fSign][fPdgIndex][fEvtMultBin]->Fill(fPt);
   if((fTOFout == kTRUE) && (fTime == kTRUE)){
     hNumMatchMultTrk[fSign][fPdgIndex][fEvtMultBin]->Fill(fPt);
-    if(fTRDout == kTRUE) {hNumMatchMultTrkTRDOut[fSign][fPdgIndex][fEvtMultBin]->Fill(fPt);}
-    if(fTRDout == kFALSE) {hNumMatchMultTrkNoTRDOut[fSign][fPdgIndex][fEvtMultBin]->Fill(fPt);}
+    if(fTRDout == kTRUE) hNumMatchMultTrkTRDOut[fSign][fPdgIndex][fEvtMultBin]->Fill(fPt);
+    else hNumMatchMultTrkNoTRDOut[fSign][fPdgIndex][fEvtMultBin]->Fill(fPt);
   }
   
   
@@ -2280,7 +2366,7 @@ Bool_t AliAnalysisTaskTOFSpectra::AnalyseMCTracks(){//Returns kTRUE if it reache
 }
 
 //________________________________________________________________________
-Bool_t AliAnalysisTaskTOFSpectra::GatherTrackMCInfo(AliESDtrack * trk){
+Bool_t AliAnalysisTaskTOFSpectra::GatherTrackMCInfo(const AliESDtrack * trk){
   //       AliDebug(2, "Gathering the track MC Info");
   const Int_t TrkLabel = trk->GetLabel(); /*The Get*Label() getters return the label of the associated MC particle. The absolute value of this label is the index of the particle within the MC fMCStack. If the label is negative, this track was assigned a certain number of clusters that did not in fact belong to this track. */
   const Int_t AbsTrkLabel = TMath::Abs(TrkLabel);
@@ -2339,14 +2425,14 @@ Bool_t AliAnalysisTaskTOFSpectra::GatherTrackMCInfo(AliESDtrack * trk){
 
 //________________________________________________________________________
 Bool_t AliAnalysisTaskTOFSpectra::SelectEvents(Int_t &binstart){
-
+  
   if (!fEventCut.AcceptEvent(fESD)) {
     return kFALSE;
   }
   else return kTRUE;
-
-
-
+  
+  
+  
   if(fHImode){//Heavy Ion
     if(fEvtMult == -999){//Multiplicity estimator not initialized
       return kFALSE;
@@ -2469,7 +2555,7 @@ void AliAnalysisTaskTOFSpectra::RunTOFChannel(){
 }
 
 //________________________________________________________________________
-Bool_t AliAnalysisTaskTOFSpectra::AnalyseCutVariation(AliESDtrack *track){
+Bool_t AliAnalysisTaskTOFSpectra::AnalyseCutVariation(const AliESDtrack *track){
   AliInfo("Checking cut variation for track");
   if(fMCmode || !fTreemode) AliFatal("The cut variation should be called only for Tree analysis in data!");
   //Check on all the demanded cuts and fill the mask accordingly
@@ -2603,11 +2689,9 @@ void AliAnalysisTaskTOFSpectra::SetTrackCuts(){
   
   //THIS WILL BE USED TO CUT ON THE PRIMARIES
   //Taken directly from the GetStandardITSTPCTrackCuts2011
-  const Double_t primchi2 = 36;
   if(!fESDtrackCutsPrm){
     fESDtrackCutsPrm = new AliESDtrackCuts("fESDtrackCutsPrm", "Cut For Primaries");
     fESDtrackCutsPrm->SetMaxDCAToVertexXYPtDep(primfunct);
-    fESDtrackCutsPrm->SetMaxChi2TPCConstrainedGlobal(primchi2);
     fESDtrackCutsPrm->SetName("PrimaryCuts");
   }
   else AliWarning("fESDtrackCutsPrm already exists!");
@@ -2618,7 +2702,6 @@ void AliAnalysisTaskTOFSpectra::SetTrackCuts(){
   if(!primstring.IsNull()) AliFatal(Form("The track cuts inserted contains a DCAxy cut (%s)! Please set it via SetESDtrackCutsPrm!!!", primstring.Data()));
   
 }
-
 
 //________________________________________________________________________
 void AliAnalysisTaskTOFSpectra::SetSimpleCutVar(){
@@ -2743,7 +2826,7 @@ const AliESDVertex * AliAnalysisTaskTOFSpectra::ObtainVertex(){
 }
 
 //________________________________________________________________________
-void AliAnalysisTaskTOFSpectra::SetTrackFlags(AliESDtrack *track){
+void AliAnalysisTaskTOFSpectra::SetTrackFlags(const AliESDtrack *track){
   
   //
   //Track is both ITS and TPC refit
@@ -2771,10 +2854,18 @@ void AliAnalysisTaskTOFSpectra::SetTrackFlags(AliESDtrack *track){
     fTRDout = kTRUE;
   }
   else {fTRDout = kFALSE;}
+  
+  //
+  //Check the Golden Chi2 and set the flag
+  //
+  if (fGoldenChi2 < primchi2) {//Track passed the Golden Chi2 cut
+    fPassGoldenChi2 = kTRUE;
+  }
+  else {fPassGoldenChi2 = kFALSE;}
 }
 
 //________________________________________________________________________
-void AliAnalysisTaskTOFSpectra::SetTrackValues(AliESDtrack *track){
+void AliAnalysisTaskTOFSpectra::SetTrackValues(const AliESDtrack *track, const AliESDVertex *vertex){
   
   //
   //Track eta
@@ -2840,5 +2931,8 @@ void AliAnalysisTaskTOFSpectra::SetTrackValues(AliESDtrack *track){
   //ITS chi2 per NDF
   fITSChi2PerNDF = fITSChi2/static_cast<Float_t>(fITSClusters);
   
+  //
+  //Golden Chi2
+  fGoldenChi2 = track->GetChi2TPCConstrainedVsGlobal(vertex);
   
 }

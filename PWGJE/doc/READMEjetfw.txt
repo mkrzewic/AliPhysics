@@ -6,7 +6,7 @@ For users more familiar with the framework, see the [Jet Framework Topics](\ref 
 
 For those who are less familiar, please see the introduction [below](\ref jetFrameworkIntroduction).
 
-An example can be found at <your-path-to-AliPhysics>/PWGJE/EMCalJetTasks/macros/runEMCalJetSampleTask.C
+An example can be found at ``<your-path-to-AliPhysics>/PWGJE/EMCalJetTasks/macros/runEMCalJetSampleTask.C``
 
 # Introduction to the Jet Framework              {#jetFrameworkIntroduction}
 
@@ -167,7 +167,9 @@ For an introduction to containers, see [here](\ref READMEcontainers). The jet co
 
 ### Acceptance cut
 
-For example, you can set the geometrical jet acceptance selection you would like to consider -- the allowed options are listed in AliEmcalJet::JetAcceptanceType. The user can select a single type (e.g. kEMCAL), or a bitwise combination (e.g. kEMCAL | kDCAL). The container can be configured via AliJetContainer::SetJetAcceptanceType() or when adding a jet container via one of the AliAnalysisTaskEmcalJet::AddJetContainer functions. The cut is implemented in AliJetContainer by comparing jet's bits (set automatically in the jet finder) to the container's bits (set by user).
+For example, you can set the geometrical jet acceptance selection you would like to consider -- the allowed options are listed in AliEmcalJet::JetAcceptanceType. The user can select a single type (e.g. kEMCAL), or a bitwise combination (e.g. kEMCAL | kDCAL). The container can be configured via AliJetContainer::SetJetAcceptanceType() or when adding a jet container via one of the AliAnalysisTaskEmcalJet::AddJetContainer functions. The cut is implemented in AliJetContainer by comparing a jet's bits (set automatically in the jet finder) to the container's bits (set by user).
+
+Additionally, since the jet acceptance bits are stored in the jet, you can manipulate them in your analysis using the AliEmcalJet::GetJetAcceptanceType() function. This may be useful when studying jets in the DCal region, since there are several different partially overlapping bits.
 
 ## Utilities (e.g. FJ contribs)
 
@@ -176,9 +178,9 @@ For information on utilities such as ``fastjet`` contrib, see \subpage READMEjet
 ## Embedding
 Embedding here means to combine two events at the level of reconstructed tracks and EMCal cells or random tracks or clusters.
 
-Currently the embedding framework uses an older version of the framework that requires manual filtering of the tracks as explained in **find doc and add here link**.
+For more information, see the (new) [Embedding Framework](\ref READMEemcEmbedding).
 
-See \subpage READMEembedding for more information on the embedding classes.
+There is also an old embedding framework which uses an older version of the framework that requires manual filtering of the tracks. See \subpage READMEembedding for more information on the old embedding classes.
 
 ## Jet tagger
 The task AliAnalysisTaskEmcalJetTagger allows to tag a jets as "close" and/or sharing a minimun fraction of constituent p<sub>T</sub>. This is useful for:
@@ -193,8 +195,11 @@ See \subpage READMEtagging for more details.
 ## User tasks
 \subpage READMEJEtasks
 
+## Jet QA				{#jetQA}
+\subpage READMEjetQA
+
 ### Appendix
 
-For clarifications, corrections or improvements, please contact [Chiara Bianchin](mailto:chiara.bianchin@cern.ch) and [Raymond Ehlers](mailto:raymond.ehlers@cern.ch).
+For clarifications, corrections or improvements, please contact [Raymond Ehlers](mailto:raymond.ehlers@cern.ch).
 
 */

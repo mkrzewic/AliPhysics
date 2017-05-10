@@ -118,11 +118,12 @@ AliAnalysisTaskSE(),
   fUseTrackeff(kTRUE),
   fPtAssocLimit(1.),
   fMinDPt(2.),
-  fFillTrees(kFALSE),
+  fFillTrees(kNoTrees),
   fFractAccME(100),
   fAODProtection(1),
   fBranchD(),
   fBranchTr(),
+  fBranchDCutVars(),
   fTreeD(0x0),
   fTreeTr(0x0),
   fTrackArray(0x0),
@@ -189,11 +190,12 @@ AliAnalysisTaskSED0Correlations::AliAnalysisTaskSED0Correlations(const char *nam
   fUseTrackeff(kTRUE),
   fPtAssocLimit(1.),
   fMinDPt(2.),
-  fFillTrees(kFALSE),
+  fFillTrees(kNoTrees),
   fFractAccME(100),
   fAODProtection(1),
   fBranchD(),
   fBranchTr(),
+  fBranchDCutVars(),
   fTreeD(0x0),
   fTreeTr(0x0),
   fTrackArray(0x0),
@@ -287,8 +289,9 @@ AliAnalysisTaskSED0Correlations::AliAnalysisTaskSED0Correlations(const AliAnalys
   fAODProtection(source.fAODProtection),
   fBranchD(source.fBranchD),
   fBranchTr(source.fBranchTr),
+  fBranchDCutVars(source.fBranchDCutVars), 
   fTreeD(source.fTreeD),
-  fTreeTr(source.fTreeTr),   
+  fTreeTr(source.fTreeTr),  
   fTrackArray(source.fTrackArray),
   fTrackArrayFilled(source.fTrackArrayFilled)   
 {
@@ -402,6 +405,7 @@ AliAnalysisTaskSED0Correlations& AliAnalysisTaskSED0Correlations::operator=(cons
   fAODProtection = orig.fAODProtection;
   fBranchD = orig.fBranchD;
   fBranchTr = orig.fBranchTr;
+  fBranchDCutVars = orig.fBranchDCutVars;
   fTreeD = orig.fTreeD;
   fTreeTr = orig.fTreeTr;
   fTrackArray = orig.fTrackArray;      
@@ -436,7 +440,7 @@ void AliAnalysisTaskSED0Correlations::Init()
 void AliAnalysisTaskSED0Correlations::UserCreateOutputObjects()
 {
 
-  if(fFillTrees) {
+  if(fFillTrees==kFillTrees) {
 
     fBranchD = new AliHFCorrelationBranchD();
     fBranchTr = new AliHFCorrelationBranchTr();
@@ -450,6 +454,16 @@ void AliAnalysisTaskSED0Correlations::UserCreateOutputObjects()
     PostData(8,fTreeD);
     PostData(9,fTreeTr);
   }
+  
+  if(fFillTrees==kFillCutOptTree) {
+
+    fBranchDCutVars = new AliD0hCutOptim();
+
+    fTreeD = new TTree("fTreeD","TTree for D0 mesons - Vars for Cut Optimization");
+    fTreeD->Branch("branchD",&fBranchDCutVars);
+
+    PostData(8,fTreeD);
+  }  
 
   // Create the output container
   //
@@ -558,6 +572,19 @@ void AliAnalysisTaskSED0Correlations::UserCreateOutputObjects()
     TH1F* tmpMtwg = new TH1F(nameMassWg.Data(),"D^{0} invariant mass c - weight 1/D0eff; M [GeV]; Entries",150,1.5648,2.1648);
     tmpMtwg->Sumw2();
     fOutputMass->Add(tmpMtwg);
+    
+    if(fFillTrees>0) { //multi-histo for mass, pT, centrality for offline code (use in place of TH1F to select centrality and change pT bins offline)
+      nameMass="histMass2D_";  nameMass+=i;
+      TH2F* hMass2D = new TH2F(nameMass.Data(),"Mass histogram vs centrality; Entries",150,1.5648,2.1648,100,0.,100.);
+      hMass2D->Sumw2();
+      fOutputMass->Add(hMass2D);
+
+      nameMass="histMass2D_WeigD0Eff_";  nameMass+=i;      
+      TH2F* hMass2DW = new TH2F(nameMass.Data(),"Mass histogram vs centrality - weight 1/D0eff; Entries",150,1.5648,2.1648,100,0.,100.);
+      hMass2DW->Sumw2();
+      fOutputMass->Add(hMass2DW);      
+    }
+    
   }
 
 //for origin b case (no Bkg and Mass histos, here for weights you should use c+b efficiencies, while on data (on MC they're useless))
@@ -595,28 +622,29 @@ void AliAnalysisTaskSED0Correlations::UserCreateOutputObjects()
 
   const char* nameoutput=GetOutputSlot(2)->GetContainer()->GetName();
 
-  fNentries=new TH1F(nameoutput, "Integral(1,2) = number of AODs *** Integral(2,3) = number of candidates selected with cuts *** Integral(3,4) = number of D0 selected with cuts *** Integral(4,5) = events with good vertex ***  Integral(5,6) = pt out of bounds", 22,-0.5,21.5);
+  fNentries=new TH1F(nameoutput, "Control plot", 20,-0.5,19.5);
 
   fNentries->GetXaxis()->SetBinLabel(1,"nEventsAnal");
-  fNentries->GetXaxis()->SetBinLabel(2,"nCandSel(Cuts)");
-  fReadMC ? fNentries->GetXaxis()->SetBinLabel(3,"nD0Selected") : fNentries->GetXaxis()->SetBinLabel(3,"Dstar<-D0");
-  fNentries->GetXaxis()->SetBinLabel(4,"nEventsGoodVtxS");
-  fNentries->GetXaxis()->SetBinLabel(5,"ptbin = -1");
-  fNentries->GetXaxis()->SetBinLabel(6,"no daughter");
-  if(fSys==0) fNentries->GetXaxis()->SetBinLabel(7,"nCandSel(Tr)");
-  if(fReadMC && fSys==0){
-    fNentries->GetXaxis()->SetBinLabel(12,"K");
-    fNentries->GetXaxis()->SetBinLabel(13,"Lambda");
-  }
-  fNentries->GetXaxis()->SetBinLabel(14,"Pile-up Rej");
-  fNentries->GetXaxis()->SetBinLabel(15,"N. of 0SMH");
-  if(fSys==1) fNentries->GetXaxis()->SetBinLabel(16,"Nev in centr");
-  if(fIsRejectSDDClusters) fNentries->GetXaxis()->SetBinLabel(17,"SDD-Cls Rej");
-  fNentries->GetXaxis()->SetBinLabel(18,"Phys.Sel.Rej");
-  fNentries->GetXaxis()->SetBinLabel(19,"nEventsSelected");
-  fNentries->GetXaxis()->SetBinLabel(20,"D0 failed to be filled");
-  if(fReadMC) fNentries->GetXaxis()->SetBinLabel(21,"nEvsWithProdMech");
-  fNentries->GetXaxis()->SetBinLabel(22,"mismatch AOD/dAOD");
+  fNentries->GetXaxis()->SetBinLabel(2,"nEventsSelected");
+  fNentries->GetXaxis()->SetBinLabel(3,"nEventsGoodVtxPrim");
+  fNentries->GetXaxis()->SetBinLabel(4,"mismatch AOD/dAOD");
+  fNentries->GetXaxis()->SetBinLabel(5,"REJ: no prim vtx");
+  fNentries->GetXaxis()->SetBinLabel(6,"REJ: Pile-up");  
+  fNentries->GetXaxis()->SetBinLabel(7,"REJ: centrality");
+  fNentries->GetXaxis()->SetBinLabel(8,"REJ: cent wrong ext");
+  fNentries->GetXaxis()->SetBinLabel(9,"REJ: cent flatten");
+  fNentries->GetXaxis()->SetBinLabel(10,"REJ: trigger class");
+  fNentries->GetXaxis()->SetBinLabel(11,"REJ: trigger mask");
+  fNentries->GetXaxis()->SetBinLabel(12,"REJ: zVtx>10cm");
+  fNentries->GetXaxis()->SetBinLabel(13,"N. of 0SMH");    
+  if(fIsRejectSDDClusters) fNentries->GetXaxis()->SetBinLabel(14,"SDD-Cls Rej");
+  if(fReadMC) fNentries->GetXaxis()->SetBinLabel(15,"nEvsWithProdMech");
+  fNentries->GetXaxis()->SetBinLabel(16,"D0 failed to be filled");
+  fReadMC ? fNentries->GetXaxis()->SetBinLabel(17,"nTrueD0Selected(MC)") : fNentries->GetXaxis()->SetBinLabel(17,"Dstar<-D0");
+  fNentries->GetXaxis()->SetBinLabel(18,"ptbin = -1");
+  if(fSys==0) fNentries->GetXaxis()->SetBinLabel(19,"nCandSel(QualTr)");
+  fNentries->GetXaxis()->SetBinLabel(20,"nCandSel(Cuts)");
+
   fNentries->GetXaxis()->SetNdivisions(1,kFALSE);
 
   fCounter = new AliNormalizationCounter(Form("%s",GetOutputSlot(4)->GetContainer()->GetName()));
@@ -664,7 +692,7 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
     Int_t matchingAODdeltaAODlevel = AliRDHFCuts::CheckMatchingAODdeltaAODevents();
     if (matchingAODdeltaAODlevel<0 || (matchingAODdeltaAODlevel==0 && fAODProtection==1)) {
       // AOD/deltaAOD trees have different number of entries || TProcessID do not match while it was required
-      fNentries->Fill(21);
+      fNentries->Fill(3);
       return;
     }
   }
@@ -736,14 +764,18 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
 
   // trigger class for PbPb C0SMH-B-NOPF-ALLNOTRD, C0SMH-B-NOPF-ALL
   TString trigclass=aod->GetFiredTriggerClasses();
-  if(trigclass.Contains("C0SMH-B-NOPF-ALLNOTRD") || trigclass.Contains("C0SMH-B-NOPF-ALL")) fNentries->Fill(14);
+  if(trigclass.Contains("C0SMH-B-NOPF-ALLNOTRD") || trigclass.Contains("C0SMH-B-NOPF-ALL")) fNentries->Fill(12);
 
   //Call IsEventSelected only for Reco! (and Data of course)
   if(fRecoD0 && !fCutsD0->IsEventSelected(aod)) {
-    if(fCutsD0->GetWhyRejection()==1) // rejected for pileup
-      fNentries->Fill(13);
-    if(fSys==1 && (fCutsD0->GetWhyRejection()==2 || fCutsD0->GetWhyRejection()==3)) fNentries->Fill(15);
-    if(fCutsD0->GetWhyRejection()==7) fNentries->Fill(17);
+    if(fCutsD0->GetWhyRejection()==0) fNentries->Fill(4); // no prim vertex
+    if(fCutsD0->GetWhyRejection()==1) fNentries->Fill(5); // rejected for pileup
+    if(fCutsD0->GetWhyRejection()==2) fNentries->Fill(6); // rejected for centrality
+    if(fCutsD0->GetWhyRejection()==3) fNentries->Fill(7); // rejected for centrality wrong extim
+    if(fCutsD0->GetWhyRejection()==4) fNentries->Fill(8); // rejected for centrality flattening
+    if(fCutsD0->GetWhyRejection()==5) fNentries->Fill(9); // rejected for trigger class
+    if(fCutsD0->GetWhyRejection()==6) fNentries->Fill(11); // rejected for vtx outside 10
+    if(fCutsD0->GetWhyRejection()==7) fNentries->Fill(10); // rejected for trigger mask
     return;
   }
 
@@ -753,8 +785,8 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
     if(TMath::Abs(zVtxMC)>10) return;
     if(aod->GetTriggerMask()==0 && (aod->GetRunNumber()>=195344 && aod->GetRunNumber()<=195677)) return;
   }
-
-  fNentries->Fill(18); //event selected after selection
+  
+  fNentries->Fill(1); //event selected after selection
 
   //Setting PIDResponse for associated tracks
   fCorrelatorTr->SetPidAssociated();
@@ -780,7 +812,7 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
       if(fDebug > 2) std::cout << "The MC event " << eventType << " not interesting for this analysis: skipping" << std::endl;
       return; 
     }
-    fNentries->Fill(20); //event with particular production type                
+    fNentries->Fill(14); //event with particular production type                
   
   } //end of selection
 
@@ -799,7 +831,7 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
       }
       if(TESTBIT(track->GetITSClusterMap(),2) || TESTBIT(track->GetITSClusterMap(),3) ){
 	skipEvent=kTRUE;
-	fNentries->Fill(16);
+	fNentries->Fill(13);
 	break;
       }
     }
@@ -835,7 +867,7 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
   //vtx1->Print();
   TString primTitle = vtx1->GetTitle();
   if(primTitle.Contains("VertexerTracks") && vtx1->GetNContributors()>0) {
-    fNentries->Fill(3);
+    fNentries->Fill(2);
   }
 
   //Reset flag for tracks distributions fill and counter of D0 triggers and of Soft pions
@@ -889,6 +921,10 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
   //Fill Event Multiplicity (needed only in Reco)
   fMultEv = (Double_t)(AliVertexingHFUtils::GetNumberOfTrackletsInEtaRange(aod,-1.,1.));
 
+  //Fill control plots for event centrality and zVtx
+  if(fCutsD0->GetUseCentrality()) ((TH1F*)fOutputStudy->FindObject("hCentralEvts"))->Fill(fCutsD0->GetCentrality(aod));
+  ((TH1F*)fOutputStudy->FindObject("hZvtxEvts"))->Fill(vtx1->GetZ());
+
   //RecoD0 case ************************************************
   if(fRecoD0) {
 
@@ -896,14 +932,14 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
       AliAODRecoDecayHF2Prong *d = (AliAODRecoDecayHF2Prong*)inputArray->UncheckedAt(iD0toKpi);
 
       if(!(vHF->FillRecoCand(aod,d))) {//Fill the data members of the candidate only if they are empty.   
-        fNentries->Fill(19); //monitor how often this fails 
+        fNentries->Fill(15); //monitor how often this fails 
         continue;
       }
 
       if(d->Pt() < fMinDPt) continue; //to save time and merging memory...
 
       if(d->GetSelectionMap()) if(!d->HasSelectionBit(AliRDHFCuts::kD0toKpiCuts)){
-  	fNentries->Fill(2);
+  	fNentries->Fill(16);
   	continue; //skip the D0 from Dstar  
       }
     
@@ -911,10 +947,10 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
         nSelectedloose++;
         nSelectedtight++;      
         if(fSys==0){
-  	  if(fCutsD0->IsSelected(d,AliRDHFCuts::kTracks,aod))fNentries->Fill(6);       
+  	  if(fCutsD0->IsSelected(d,AliRDHFCuts::kTracks,aod)) fNentries->Fill(18);       
         }  
         Int_t ptbin=fCutsD0->PtBin(d->Pt());
-        if(ptbin==-1) {fNentries->Fill(4); continue;} //out of bounds
+        if(ptbin==-1) {fNentries->Fill(17); continue;} //out of bounds
 
         fIsSelectedCandidate=fCutsD0->IsSelected(d,AliRDHFCuts::kAll,aod); //D0 selected
         if(!fIsSelectedCandidate) continue;
@@ -932,20 +968,21 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
 
         if(!fReadMC) {
           if (TMath::Abs(d->Eta())<fEtaForCorrel) {
-	    if(!fAlreadyFilled) ((TH1F*)fOutputStudy->FindObject(Form("hEvtsPerPool_%d",ptbin)))->Fill(fPoolNum+0.5);			
+	    if(!fAlreadyFilled && !fFillTrees) ((TH1F*)fOutputStudy->FindObject(Form("hEvtsPerPool_%d",ptbin)))->Fill(fPoolNum+0.5);			
             if(!fMixing && !fAlreadyFilled) {
  	      ((TH1F*)fOutputStudy->FindObject("hZvtx"))->Fill(vtx1->GetZ());
 	      ((TH1F*)fOutputStudy->FindObject(Form("hMultiplEvt_Bin%d",ptbin)))->Fill(fMultEv);
             }
-	    if(fFillTrees) FillTreeD0(d,aod); //only for offline correlations
-	    else CalculateCorrelations(d); //correlations on real data
+	    if(fFillTrees==kNoTrees) CalculateCorrelations(d); //correlations on real data
+	    if(fFillTrees==kFillTrees) FillTreeD0(d,aod); //only for offline correlations
+	    if(fFillTrees==kFillCutOptTree) FillTreeD0ForCutOptim(d,aod); //only for offline correlations to optimize D0 cut variables
 	  }
         } else { //correlations on MC -> association of selected D0 to MCinfo with MCtruth
           if (TMath::Abs(d->Eta())<fEtaForCorrel) {
             Int_t pdgDgD0toKpi[2]={321,211};
     	    Int_t labD0 = d->MatchToMC(421,mcArray,2,pdgDgD0toKpi); //return MC particle label if the array corresponds to a D0, -1 if not
             if (labD0>-1) {
-  	      if(!fAlreadyFilled) ((TH1F*)fOutputStudy->FindObject(Form("hEvtsPerPool_%d",ptbin)))->Fill(fPoolNum+0.5);
+  	      if(!fAlreadyFilled && !fFillTrees) ((TH1F*)fOutputStudy->FindObject(Form("hEvtsPerPool_%d",ptbin)))->Fill(fPoolNum+0.5);
               if(!fMixing && !fAlreadyFilled) {
 		((TH1F*)fOutputStudy->FindObject("hZvtx"))->Fill(vtx1->GetZ());
                 ((TH1F*)fOutputStudy->FindObject(Form("hMultiplEvt_Bin%d",ptbin)))->Fill(fMultEv); //Fill multiplicity histo
@@ -955,7 +992,7 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
           }
         }
 
-        FillMassHists(d,mcArray,fCutsD0,fOutputMass);
+        FillMassHists(d,mcArray,fCutsD0,fOutputMass,aod);
       }
     }
   }
@@ -991,9 +1028,9 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
             Double_t pD0[3] = {mcPart->Px(),mcPart->Py(),mcPart->Pz()};
             if(TMath::Abs( (p1[0]+p2[0]-pD0[0])*(p1[0]+p2[0]-pD0[0]) + (p1[1]+p2[1]-pD0[1])*(p1[1]+p2[1]-pD0[1]) + (p1[2]+p2[2]-pD0[2])*(p1[2]+p2[2]-pD0[2]) )>0.1) continue;
 
-          if(fSys==0) fNentries->Fill(6);
+          if(fSys==0) fNentries->Fill(18);
           Int_t ptbin=fCutsD0->PtBin(mcPart->Pt());
-          if(ptbin==-1) {fNentries->Fill(4); continue;} //out of bounds  
+          if(ptbin==-1) {fNentries->Fill(17); continue;} //out of bounds  
   
           //D0 infos
           Double_t phiD0 = fCorrelatorTr->SetCorrectPhiRange(mcPart->Phi());
@@ -1033,13 +1070,13 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
   }
   //End MCKineD0 case ************************************************
 
-  if(fMixing && !fFillTrees /* && fAlreadyFilled*/) { // update the pool for Event Mixing, if: enabled,  event is ok, at least a SelD0 found! (fAlreadyFilled's role!)
+  if(fMixing && fFillTrees!=kFillTrees /* && fAlreadyFilled*/) { // update the pool for Event Mixing, if: enabled,  event is ok, at least a SelD0 found! (fAlreadyFilled's role!)
     Bool_t updatedTr = fCorrelatorTr->PoolUpdate();
     Bool_t updatedKc = fCorrelatorKc->PoolUpdate();
     Bool_t updatedK0 = fCorrelatorK0->PoolUpdate();
     if(!updatedTr || !updatedKc || !updatedK0) AliInfo("Pool was not updated");
   }
-  if(fFillTrees && fAlreadyFilled) FillTreeTracks(aod);
+  if(fFillTrees==kFillTrees && fAlreadyFilled) FillTreeTracks(aod);
   
   fCounter->StoreCandidates(aod,nSelectedloose,kTRUE);  
   fCounter->StoreCandidates(aod,nSelectedtight,kFALSE);  
@@ -1051,14 +1088,14 @@ void AliAnalysisTaskSED0Correlations::UserExec(Option_t */*option*/)
   PostData(4,fCounter);
   PostData(5,fOutputCorr);
   PostData(6,fOutputStudy);
-  if(fFillTrees) PostData(8,fTreeD);
-  if(fFillTrees) PostData(9,fTreeTr);
+  if(fFillTrees!=kNoTrees) PostData(8,fTreeD); //fill in case kFillTrees or kFillCutOptTree
+  if(fFillTrees==kFillTrees) PostData(9,fTreeTr); //fill only in case kFillTrees
   
   return;
 }
 
 //____________________________________________________________________________
-void AliAnalysisTaskSED0Correlations::FillMassHists(AliAODRecoDecayHF2Prong *part, TClonesArray *arrMC, AliRDHFCutsD0toKpi* cuts, TList *listout){
+void AliAnalysisTaskSED0Correlations::FillMassHists(AliAODRecoDecayHF2Prong *part, TClonesArray *arrMC, AliRDHFCutsD0toKpi* cuts, TList *listout, AliAODEvent *aod) {
   //
   // function used in UserExec to fill mass histograms:
   //
@@ -1075,13 +1112,13 @@ void AliAnalysisTaskSED0Correlations::FillMassHists(AliAODRecoDecayHF2Prong *par
   if (fReadMC) labD0 = part->MatchToMC(421,arrMC,2,pdgDgD0toKpi); //return MC particle label if the array corresponds to a D0, -1 if not (cf. AliAODRecoDecay.cxx)
 
   //count candidates selected by cuts
-  fNentries->Fill(1);
+  fNentries->Fill(19);
   //count true D0 selected by cuts
-  if (fReadMC && labD0>=0) fNentries->Fill(2);
+  if (fReadMC && labD0>=0) fNentries->Fill(16);
 
   if ((fIsSelectedCandidate==1 || fIsSelectedCandidate==3) && fFillOnlyD0D0bar<2) { //D0
 
-    if(fReadMC){
+    if(fReadMC){ //on MC
       if(labD0>=0 && CheckD0Origin(arrMC,(AliAODMCParticle*)arrMC->At(labD0))==4) {
   	AliAODMCParticle *partD0 = (AliAODMCParticle*)arrMC->At(labD0);
 	Int_t pdgD0 = partD0->GetPdgCode();
@@ -1136,7 +1173,7 @@ void AliAnalysisTaskSED0Correlations::FillMassHists(AliAODRecoDecayHF2Prong *par
         if(!fUseDeff) effD0=1.; 
         ((TH1F*)(listout->FindObject(fillthis)))->Fill(invmassD0,1./effD0);
       }
-    }else{
+    }else{ //on data
       fillthis="histMass_";
       fillthis+=ptbin;
       ((TH1F*)(listout->FindObject(fillthis)))->Fill(invmassD0);
@@ -1145,12 +1182,19 @@ void AliAnalysisTaskSED0Correlations::FillMassHists(AliAODRecoDecayHF2Prong *par
       Double_t effD0 = fCutsTracks->GetTrigWeight(part->Pt(),fMultEv);
       if(!fUseDeff) effD0=1.; 
       ((TH1F*)(listout->FindObject(fillthis)))->Fill(invmassD0,1./effD0);
+      if(fFillTrees>0) {
+	Double_t centFill = 0.;
+	if(fCutsD0->GetUseCentrality()) centFill = fCutsD0->GetCentrality(aod);
+        ((TH2F*)(listout->FindObject(Form("histMass2D_%d",ptbin))))->Fill(invmassD0,centFill);
+        ((TH2F*)(listout->FindObject(Form("histMass2D_WeigD0Eff_%d",ptbin))))->Fill(invmassD0,centFill,1./effD0);
+      }
+      
     }
      
   }
   if (fIsSelectedCandidate>1 && (fFillOnlyD0D0bar==0 || fFillOnlyD0D0bar==2)) { //D0bar
 
-    if(fReadMC){
+    if(fReadMC){ //on MC
       if(labD0>=0 && CheckD0Origin(arrMC,(AliAODMCParticle*)arrMC->At(labD0))==4) {
   	AliAODMCParticle *partD0 = (AliAODMCParticle*)arrMC->At(labD0);
 	Int_t pdgD0 = partD0->GetPdgCode();
@@ -1205,7 +1249,7 @@ void AliAnalysisTaskSED0Correlations::FillMassHists(AliAODRecoDecayHF2Prong *par
         if(!fUseDeff) effD0=1.; 
         ((TH1F*)(listout->FindObject(fillthis)))->Fill(invmassD0bar,1./effD0);
       }
-    }else{
+    }else{ //on data
       fillthis="histMass_";
       fillthis+=ptbin;
       ((TH1F*)(listout->FindObject(fillthis)))->Fill(invmassD0bar);
@@ -1214,6 +1258,12 @@ void AliAnalysisTaskSED0Correlations::FillMassHists(AliAODRecoDecayHF2Prong *par
       Double_t effD0 = fCutsTracks->GetTrigWeight(part->Pt(),fMultEv);
       if(!fUseDeff) effD0=1.; 
       ((TH1F*)(listout->FindObject(fillthis)))->Fill(invmassD0bar,1./effD0);
+      if(fFillTrees>0) {
+	Double_t centFill = 0.;
+	if(fCutsD0->GetUseCentrality()) centFill = fCutsD0->GetCentrality(aod);
+        ((TH2F*)(listout->FindObject(Form("histMass2D_%d",ptbin))))->Fill(invmassD0bar,centFill);
+        ((TH2F*)(listout->FindObject(Form("histMass2D_WeigD0Eff_%d",ptbin))))->Fill(invmassD0bar,centFill,1./effD0);
+      }      
     }
 
   }
@@ -1727,10 +1777,18 @@ void AliAnalysisTaskSED0Correlations::CreateCorrelationsObjs() {
   hCountK->SetMinimum(0);
   fOutputStudy->Add(hCountK);
 
-  TH1F *hZvtx = new TH1F("hZvtx", "z of Primary vtx; # Events",24,-12.,12.);
+  TH1F *hZvtx = new TH1F("hZvtx", "z of Primary vtx (for events with selected D); # Events",48,-12.,12.);
   hZvtx->SetMinimum(0);
   fOutputStudy->Add(hZvtx);
   
+  TH1F *hZvtxEvts = new TH1F("hZvtxEvts", "z of Primary vtx (for selected events); # Events",120,-30.,30.);
+  hZvtxEvts->SetMinimum(0);
+  fOutputStudy->Add(hZvtxEvts);
+  
+  TH1F *hCentralEvts = new TH1F("hCentralEvts","Centrality of events (for selected events); # Events",102,-1.,101.);
+  hCentralEvts->SetMinimum(0);
+  fOutputStudy->Add(hCentralEvts);  
+
   if (fReadMC) {
     TH1D *hEventTypeMC = new TH1D("EventTypeMC","EventTypeMC",100,-0.5,99.5);
     fOutputStudy->Add(hEventTypeMC); 
@@ -1742,11 +1800,11 @@ void AliAnalysisTaskSED0Correlations::CreateCorrelationsObjs() {
     hPtCAll->SetMinimum(0);
     fOutputStudy->Add(hPtCAll);
 
-    TH1F *hPtHAll = new TH1F("hist_Pt_Kcharg_AllEv", "Hadrons pT (All); p_{T} (GeV/c)",240,0.,12.);
+    TH1F *hPtHAll = new TH1F("hist_Pt_Kcharg_AllEv", "Kaons pT (All); p_{T} (GeV/c)",240,0.,12.);
     hPtHAll->SetMinimum(0);
     fOutputStudy->Add(hPtHAll);
 
-    TH1F *hPtKAll = new TH1F("hist_Pt_K0_AllEv", "Kaons pT (All); p_{T} (GeV/c)",240,0.,12.);
+    TH1F *hPtKAll = new TH1F("hist_Pt_K0_AllEv", "K0 pT (All); p_{T} (GeV/c)",240,0.,12.);
     hPtKAll->SetMinimum(0);
     fOutputStudy->Add(hPtKAll);
 
@@ -1762,17 +1820,51 @@ void AliAnalysisTaskSED0Correlations::CreateCorrelationsObjs() {
     hPhiDistCAll->SetMinimum(0);
     fOutputStudy->Add(hPhiDistCAll);
 
-    TH1F *hPhiDistHAll = new TH1F("hist_PhiDistr_Kcharg", "Hadrons phi distr. (All); p_{T} (GeV/c)",64,0,6.283);
+    TH1F *hPhiDistHAll = new TH1F("hist_PhiDistr_Kcharg", "Kaons phi distr. (All); p_{T} (GeV/c)",64,0,6.283);
     hPhiDistHAll->SetMinimum(0);
     fOutputStudy->Add(hPhiDistHAll);
 
-    TH1F *hPhiDistKAll = new TH1F("hist_PhiDistr_K0", "Kaons phi distr. (All); p_{T} (GeV/c)",64,0,6.283);
+    TH1F *hPhiDistKAll = new TH1F("hist_PhiDistr_K0", "K0 phi distr. (All); p_{T} (GeV/c)",64,0,6.283);
     hPhiDistKAll->SetMinimum(0);
     fOutputStudy->Add(hPhiDistKAll);
 
     TH1F *hPhiDistDAll = new TH1F("hist_PhiDistr_D0", "D^{0} phi distr. (All); p_{T} (GeV/c)",64,0,6.283);
     hPhiDistDAll->SetMinimum(0);
     fOutputStudy->Add(hPhiDistDAll);
+
+    //phi distributions
+    TH1F *hEtaDistCAll = new TH1F("hist_EtaDistr_Charg", "Charged track eta distr. (All); p_{T} (GeV/c)",40,-1,1);
+    hEtaDistCAll->SetMinimum(0);
+    fOutputStudy->Add(hEtaDistCAll);
+
+    TH1F *hEtaDistHAll = new TH1F("hist_EtaDistr_Kcharg", "Kaons eta distr. (All); p_{T} (GeV/c)",40,-1,1);
+    hEtaDistHAll->SetMinimum(0);
+    fOutputStudy->Add(hEtaDistHAll);
+
+    TH1F *hEtaDistKAll = new TH1F("hist_EtaDistr_K0", "K0 eta distr. (All); p_{T} (GeV/c)",40,-1,1);
+    hEtaDistKAll->SetMinimum(0);
+    fOutputStudy->Add(hEtaDistKAll);
+
+    TH1F *hEtaDistDAll = new TH1F("hist_EtaDistr_D0", "D^{0} eta distr. (All); p_{T} (GeV/c)",40,-1,1);
+    hEtaDistDAll->SetMinimum(0);
+    fOutputStudy->Add(hEtaDistDAll);
+    
+    //phivsEta
+    TH2F *hPhiVsEtaDistCAll = new TH2F("hist_PhiVsEtaDistr_Charg", "Phi vs Eta distribution - Charged tracks",64,0,6.283,40,-1,1);
+    hPhiVsEtaDistCAll->SetMinimum(0);
+    fOutputStudy->Add(hPhiVsEtaDistCAll);     
+    
+    TH2F *hPhiVsEtaDistHAll = new TH2F("hist_PhiVsEtaDistr_Kcharg", "Phi vs Eta distribution - Charged Kaons",64,0,6.283,40,-1,1);
+    hPhiVsEtaDistHAll->SetMinimum(0);
+    fOutputStudy->Add(hPhiVsEtaDistHAll);  
+    
+    TH2F *hPhiVsEtaDistKAll = new TH2F("hist_PhiVsEtaDistr_K0", "Phi vs Eta distribution - K^{0}",64,0,6.283,40,-1,1);
+    hPhiVsEtaDistKAll->SetMinimum(0);
+    fOutputStudy->Add(hPhiVsEtaDistKAll);  
+    
+    TH2F *hPhiVsEtaDistDAll = new TH2F("hist_PhiVsEtaDistr_D0", "Phi vs Eta distribution - D^{0}",64,0,6.283,40,-1,1);
+    hPhiVsEtaDistDAll->SetMinimum(0);
+    fOutputStudy->Add(hPhiVsEtaDistDAll);  
     }
 
   //for MC analysis only
@@ -1952,6 +2044,7 @@ void AliAnalysisTaskSED0Correlations::CalculateCorrelations(AliAODRecoDecayHF2Pr
 
   //Fill of D0 phi distribution
   if (!fMixing) ((TH1F*)fOutputStudy->FindObject("hist_PhiDistr_D0"))->Fill(d->Phi());  
+  if (!fMixing) ((TH1F*)fOutputStudy->FindObject("hist_EtaDistr_D0"))->Fill(d->Eta()); 
 
   //Origin of D0
   TString orig="";
@@ -2231,6 +2324,7 @@ void AliAnalysisTaskSED0Correlations::CalculateCorrelationsMCKine(AliAODMCPartic
 
   //Fill of D0 phi distribution
   if (!fMixing) ((TH1F*)fOutputStudy->FindObject("hist_PhiDistr_D0"))->Fill(d->Phi()); 
+  if (!fMixing) ((TH1F*)fOutputStudy->FindObject("hist_EtaDistr_D0"))->Fill(d->Phi()); 
   
   //Origin of D0
   TString orig="";
@@ -2432,6 +2526,7 @@ void AliAnalysisTaskSED0Correlations::FillSparsePlots(TClonesArray* mcArray, Dou
   Double_t ptTrack = track->Pt();
   Double_t d0Track = type!=kK0 ? track->GetImpPar() : 0.;
   Double_t phiTr = track->Phi();
+  Double_t etaTr = track->Eta();
   Double_t origTr = fReadMC ? CheckTrackOrigin(mcArray,(AliAODMCParticle*)mcArray->At(track->GetLabel())) : 0;
 
   TString part = "", orig = "";
@@ -2509,6 +2604,8 @@ void AliAnalysisTaskSED0Correlations::FillSparsePlots(TClonesArray* mcArray, Dou
       if(!fAlreadyFilled) {
  	   ((TH1F*)fOutputStudy->FindObject(Form("hist_Pt_%s_Bin%d",part.Data(),ptbin)))->Fill(pTorig);
  	   ((TH1F*)fOutputStudy->FindObject(Form("hist_PhiDistr_%s",part.Data())))->Fill(phiTr);
+ 	   ((TH1F*)fOutputStudy->FindObject(Form("hist_EtaDistr_%s",part.Data())))->Fill(etaTr);
+ 	   ((TH2F*)fOutputStudy->FindObject(Form("hist_PhiVsEtaDistr_%s",part.Data())))->Fill(phiTr,etaTr);
       }
     }
 
@@ -2546,13 +2643,16 @@ void AliAnalysisTaskSED0Correlations::FillSparsePlots(TClonesArray* mcArray, Dou
          }
       } 
       if(!fAlreadyFilled) {
-	    ((TH1F*)fOutputStudy->FindObject(Form("histDispl_%s_Bin%d",part.Data(),ptbin)))->Fill(d0orig); //Fills displacement histos
+	((TH1F*)fOutputStudy->FindObject(Form("histDispl_%s_Bin%d",part.Data(),ptbin)))->Fill(d0orig); //Fills displacement histos
         if (origTr>=1&&origTr<=8) ((TH1F*)fOutputStudy->FindObject(Form("histDispl_%s_HF_Bin%d",part.Data(),ptbin)))->Fill(d0orig);
         if (origTr>=1&&origTr<=8) ((TH1F*)fOutputStudy->FindObject(Form("histDispl_%s_HF%s_Bin%d",part.Data(),orig.Data(),ptbin)))->Fill(d0orig);
         ((TH1F*)fOutputStudy->FindObject(Form("histDispl_%s%s_Bin%d",part.Data(),orig.Data(),ptbin)))->Fill(d0orig); //Fills displacement histos
         ((TH1F*)fOutputStudy->FindObject(Form("hist_Pt_%s_Bin%d",part.Data(),ptbin)))->Fill(pTorig);
         ((TH1F*)fOutputStudy->FindObject(Form("histOrig_%s_Bin%d",part.Data(),ptbin)))->Fill(origTr);
- 	    ((TH1F*)fOutputStudy->FindObject(Form("hist_PhiDistr_%s",part.Data())))->Fill(phiTr);
+ 	((TH1F*)fOutputStudy->FindObject(Form("hist_PhiDistr_%s",part.Data())))->Fill(phiTr);
+ 	((TH1F*)fOutputStudy->FindObject(Form("hist_PhiDistr_%s",part.Data())))->Fill(phiTr);
+ 	((TH1F*)fOutputStudy->FindObject(Form("hist_EtaDistr_%s",part.Data())))->Fill(etaTr);
+ 	((TH2F*)fOutputStudy->FindObject(Form("hist_PhiVsEtaDistr_%s",part.Data())))->Fill(phiTr,etaTr);
       }
     }//end MC case
 
@@ -2813,6 +2913,9 @@ void AliAnalysisTaskSED0Correlations::FillTreeD0(AliAODRecoDecayHF2Prong* d, Ali
   d->InvMassD0(mD0,mD0bar);
   fBranchD->invMass_D = 0;
 
+  Float_t centEv = -9;
+  if(fCutsD0->GetUseCentrality()) centEv = fCutsD0->GetCentrality(aod); //get event centrality with current estimator
+
   if(fSpeed) { //filling of sidebands in speed mode: 1 bin for LSB, 1 for RSB, no filling outside signal region and SB
     if(ptbin<9) {	    
       if(mD0 > fSignLeft_LowPt && mD0 < fSignRight_LowPt) allowD0 = 1;
@@ -2840,17 +2943,27 @@ void AliAnalysisTaskSED0Correlations::FillTreeD0(AliAODRecoDecayHF2Prong* d, Ali
     fBranchD->pT_D = (Float_t)d->Pt();
     fBranchD->mult_D = (Float_t)fMultEv;
     fBranchD->zVtx_D = (Float_t)fzVtx;
+    fBranchD->cent_D = (Float_t)centEv;
     fBranchD->period_D = (UInt_t)aod->GetPeriodNumber();
     fBranchD->orbit_D = (UInt_t)aod->GetOrbitNumber();
     fBranchD->BC_D = (UShort_t)aod->GetBunchCrossNumber();
     fBranchD->IDtrig_D = (Short_t)fNtrigD;
     fBranchD->sel_D = (Short_t)1; //******DUMMY FOR THE MOMENT******* - To be used for multiple selection fills (2^n = 1 if selction n is ok)
+    fBranchD->pXdaug1_D = (Float_t)((AliVTrack*)d->GetDaughter(0))->Px();
+    fBranchD->pXdaug2_D = (Float_t)((AliVTrack*)d->GetDaughter(1))->Px();
+    fBranchD->pYdaug1_D = (Float_t)((AliVTrack*)d->GetDaughter(0))->Py();
+    fBranchD->pYdaug2_D = (Float_t)((AliVTrack*)d->GetDaughter(1))->Py();
+    fBranchD->pZdaug1_D = (Float_t)((AliVTrack*)d->GetDaughter(0))->Pz();
+    fBranchD->pZdaug2_D = (Float_t)((AliVTrack*)d->GetDaughter(1))->Pz();
+    fBranchD->hyp_D = (UShort_t)fIsSelectedCandidate;
     if((fIsSelectedCandidate == 1 || fIsSelectedCandidate == 3) && allowD0) {
       fBranchD->invMass_D = (Float_t)mD0;
+      fBranchD->hyp_D = (UShort_t)1;
       fTreeD->Fill();
     }
     if((fIsSelectedCandidate == 2 || fIsSelectedCandidate == 3) && allowD0bar) {
       fBranchD->invMass_D = (Float_t)mD0bar;
+      fBranchD->hyp_D = (UShort_t)2;
       fTreeD->Fill();
     }
 
@@ -2865,7 +2978,7 @@ void AliAnalysisTaskSED0Correlations::FillTreeD0(AliAODRecoDecayHF2Prong* d, Ali
       fTrackArrayFilled = kTRUE;
     }
  
-    //soft pion rejection
+    //soft pion rejection (for SE, in ME it's done in the AliHFOfflineCorrelator class
     for(Int_t iTrack = 0; iTrack<fTrackArray->GetEntriesFast(); iTrack++) { // looping on track candidates
       AliReducedParticle* track = (AliReducedParticle*)fTrackArray->At(iTrack);
       if(fSoftPiCut && !track->CheckSoftPi()) {  //identifies soft pions for the trigger under analysis and associate it to the track
@@ -2892,6 +3005,9 @@ void AliAnalysisTaskSED0Correlations::FillTreeTracks(AliAODEvent* aod) {
     fTrackArrayFilled = kTRUE;
   }
 
+  Float_t centEv = -9;
+  if(fCutsD0->GetUseCentrality()) centEv = fCutsD0->GetCentrality(aod); //get event centrality with current estimator
+  
   for(Int_t iTrack = 0; iTrack<fTrackArray->GetEntriesFast(); iTrack++){ // looping on track candidates
       
     AliReducedParticle* track = (AliReducedParticle*)fTrackArray->At(iTrack);
@@ -2907,16 +3023,53 @@ void AliAnalysisTaskSED0Correlations::FillTreeTracks(AliAODEvent* aod) {
 */
 
     //skip D-meson trigger daughters
-    Short_t trigID = -1;
+    Short_t trigID = -1, trigID2 = -1, trigID3 = -1, trigID4 = -1;
+    Int_t FoundTrig=0;
+    Bool_t trackIsTrig=kFALSE;
     for(Int_t iID=0; iID<(int)fDaughTrackID.size(); iID++) {
-      if(track->GetID() == fDaughTrackID.at(iID)) trigID = fDaughTrigNum.at(iID); //associates corresponding trigID to daughters
+      trackIsTrig=kFALSE; //reset flag to signal that the track is a trigger
+      if(FoundTrig==0 && track->GetID() == fDaughTrackID.at(iID)) {
+	trigID = fDaughTrigNum.at(iID); //associates corresponding trigID to daughters
+	trackIsTrig=kTRUE;
+      }
+      if(FoundTrig==1 && track->GetID() == fDaughTrackID.at(iID)) {
+	trigID2 = fDaughTrigNum.at(iID); //associates corresponding trigID to daughters
+	trackIsTrig=kTRUE;
+      }
+      if(FoundTrig==2 && track->GetID() == fDaughTrackID.at(iID)) {
+	trigID3 = fDaughTrigNum.at(iID); //associates corresponding trigID to daughters
+	trackIsTrig=kTRUE;
+      }	  
+      if(FoundTrig==3 && track->GetID() == fDaughTrackID.at(iID)) {
+	trigID4 = fDaughTrigNum.at(iID); //associates corresponding trigID to daughters
+	trackIsTrig=kTRUE;
+      }	
+      if(trackIsTrig==kTRUE) FoundTrig++; //if track is a trigger, next track has to be stored in another position, for IDTrig!
     }
-
+    
     //tags soft pions in the same way as daughter tracks (for the corresponding trigger)
+    Bool_t trackIssoftPi=kFALSE;
     for(Int_t iID=0; iID<(int)fSoftPiTrackID.size(); iID++) {
-      if(track->GetID() == fSoftPiTrackID.at(iID)) trigID = fSoftPiTrigNum.at(iID);
-    }    
-
+      trackIssoftPi=kFALSE; //reset flag to signal that the track is a soft pion
+      if(FoundTrig==0 && track->GetID() == fSoftPiTrackID.at(iID)) {
+	trigID = fSoftPiTrigNum.at(iID); //associates corresponding trigID to daughters
+	trackIssoftPi=kTRUE;
+      }
+      if(FoundTrig==1 && track->GetID() == fSoftPiTrackID.at(iID)) {
+	trigID2 = fSoftPiTrigNum.at(iID); //associates corresponding trigID to daughters
+	trackIssoftPi=kTRUE;
+      }
+      if(FoundTrig==2 && track->GetID() == fSoftPiTrackID.at(iID)) {
+	trigID3 = fSoftPiTrigNum.at(iID); //associates corresponding trigID to daughters
+	trackIssoftPi=kTRUE;
+      } 
+      if(FoundTrig==3 && track->GetID() == fSoftPiTrackID.at(iID)) {
+	trigID4 = fSoftPiTrigNum.at(iID); //associates corresponding trigID to daughters
+	trackIssoftPi=kTRUE;
+      }	 
+      if(trackIssoftPi==kTRUE) FoundTrig++;	//if track is a soft pion, next track has to be stored in another position, for IDTrig!
+    }
+    
     if(!AcceptTrackForMEOffline(track->Pt())) continue;
 
     //Fill TTree for accepted candidates
@@ -2926,14 +3079,99 @@ void AliAnalysisTaskSED0Correlations::FillTreeTracks(AliAODEvent* aod) {
     fBranchTr->pT_Tr = (Float_t)track->Pt();
     fBranchTr->mult_Tr = (Float_t)fMultEv;
     fBranchTr->zVtx_Tr = (Float_t)fzVtx;
+    fBranchTr->cent_Tr = (Float_t)centEv;
     fBranchTr->period_Tr = (UInt_t)aod->GetPeriodNumber();
     fBranchTr->orbit_Tr = (UInt_t)aod->GetOrbitNumber();
     fBranchTr->BC_Tr = (UShort_t)aod->GetBunchCrossNumber();
     fBranchTr->IDtrig_Tr = (Short_t)trigID;
+    fBranchTr->IDtrig2_Tr = (Short_t)trigID2;
+    fBranchTr->IDtrig3_Tr = (Short_t)trigID3;
+    fBranchTr->IDtrig4_Tr = (Short_t)trigID4;
     fBranchTr->sel_Tr = (Short_t)1; //******DUMMY FOR THE MOMENT******* - To be used for multiple selection fills (2^n = 1 if selction n is ok)
     fTreeTr->Fill();
 
   } //end of track loop
+
+  return;
+}
+
+//________________________________________________________________________
+void AliAnalysisTaskSED0Correlations::FillTreeD0ForCutOptim(AliAODRecoDecayHF2Prong* d, AliAODEvent* aod) {
+
+  Int_t ptbin = PtBinCorr(d->Pt());
+  if(ptbin < 0) return;
+
+  Float_t centEv = -9;
+  if(fCutsD0->GetUseCentrality()) centEv = fCutsD0->GetCentrality(aod); //get event centrality with current estimator
+
+  //recalculate vertex w/o daughters
+  AliAODVertex *origownvtx=0x0;
+  if(d->GetOwnPrimaryVtx()) origownvtx=new AliAODVertex(*d->GetOwnPrimaryVtx());
+  if(!fCutsD0->RecalcOwnPrimaryVtx(d,aod)) {
+     fCutsD0->CleanOwnPrimaryVtx(d,aod,origownvtx);
+     return;
+  }
+
+  //Preliminary vars
+  Double_t mD0, mD0bar;
+  d->InvMassD0(mD0,mD0bar);
+  fBranchDCutVars->invMass = 0;
+  Double_t ctsD0, ctsD0bar;
+  d->CosThetaStarD0(ctsD0,ctsD0bar);
+
+  //Topomatic
+  Double_t dd0max=0.;
+  for(Int_t ipr=0; ipr<2; ipr++) {
+    Double_t diffIP, errdiffIP;
+    d->Getd0MeasMinusExpProng(ipr,aod->GetMagneticField(),diffIP,errdiffIP);
+    Double_t normdd0=0.;
+    if(errdiffIP>0.) normdd0=diffIP/errdiffIP;
+    if(ipr==0) dd0max=normdd0;
+    else if(TMath::Abs(normdd0)>TMath::Abs(dd0max)) dd0max=normdd0;
+  }
+
+// printf("Centralità = %f, %f (ZNA), %f (V0M)\n",fCutsD0->GetCentrality(aod),fCutsD0->GetCentrality(aod,AliRDHFCuts::kCentZNA),fCutsD0->GetCentrality(aod,AliRDHFCuts::kCentV0M)); getchar();
+
+  //Fill TTree for accepted candidates
+  //if both hypotheses are ok, the TTree is filled 2 times, with the different cut values
+  if(fIsSelectedCandidate == 1 || fIsSelectedCandidate == 3) {
+    ResetBranchDForCutOptim();
+    fBranchDCutVars->invMass = (Float_t)mD0;
+    fBranchDCutVars->cent = (Float_t)centEv;
+    fBranchDCutVars->pt = (Float_t)d->Pt();
+    fBranchDCutVars->dca = (Float_t)d->GetDCA();
+    fBranchDCutVars->cosThSt = (Float_t)TMath::Abs(ctsD0);
+    fBranchDCutVars->pTk = (Float_t)d->Pt2Prong(1);
+    fBranchDCutVars->pTpi = (Float_t)d->Pt2Prong(0);
+    fBranchDCutVars->d0k = (Float_t)TMath::Abs(d->Getd0Prong(1)); 
+    fBranchDCutVars->d0pi = (Float_t)TMath::Abs(d->Getd0Prong(0));
+    fBranchDCutVars->d0xd0 = (Float_t)d->Prodd0d0();
+    fBranchDCutVars->cosThPt = (Float_t)d->CosPointingAngle();
+    fBranchDCutVars->normLxy = (Float_t)d->NormalizedDecayLengthXY();
+    fBranchDCutVars->topom = (Float_t)TMath::Abs(dd0max);
+    fTreeD->Fill();
+  } //end of if for tree filling
+
+  if(fIsSelectedCandidate == 2 || fIsSelectedCandidate == 3) {
+    ResetBranchDForCutOptim();
+    fBranchDCutVars->invMass = (Float_t)mD0bar;
+    fBranchDCutVars->cent = (Float_t)centEv;
+    fBranchDCutVars->pt = (Float_t)d->Pt();
+    fBranchDCutVars->dca = (Float_t)d->GetDCA();
+    fBranchDCutVars->cosThSt = (Float_t)TMath::Abs(ctsD0bar);
+    fBranchDCutVars->pTk = (Float_t)d->Pt2Prong(0);
+    fBranchDCutVars->pTpi = (Float_t)d->Pt2Prong(1);
+    fBranchDCutVars->d0k = (Float_t)TMath::Abs(d->Getd0Prong(0)); 
+    fBranchDCutVars->d0pi = (Float_t)TMath::Abs(d->Getd0Prong(1));
+    fBranchDCutVars->d0xd0 = (Float_t)d->Prodd0d0();
+    fBranchDCutVars->cosThPt = (Float_t)d->CosPointingAngle();
+    fBranchDCutVars->normLxy = (Float_t)d->NormalizedDecayLengthXY();
+    fBranchDCutVars->topom = (Float_t)TMath::Abs(dd0max);
+    fTreeD->Fill();
+  } //end of if for tree filling
+
+  // unset recalculated primary vertex when not needed any more
+  fCutsD0->CleanOwnPrimaryVtx(d,aod,origownvtx);
 
   return;
 }
@@ -2947,11 +3185,19 @@ void AliAnalysisTaskSED0Correlations::ResetBranchD() {
   fBranchD->invMass_D = 0.;
   fBranchD->mult_D = 0.;
   fBranchD->zVtx_D = 0.;
+  fBranchD->cent_D = 0.;
   fBranchD->period_D = 0;
   fBranchD->orbit_D = 0;
   fBranchD->BC_D = 0;
   fBranchD->IDtrig_D = 0;
   fBranchD->sel_D = 0;
+  fBranchD->pXdaug1_D = 0.;
+  fBranchD->pXdaug2_D = 0.;
+  fBranchD->pYdaug1_D = 0.;
+  fBranchD->pYdaug2_D = 0.;
+  fBranchD->pZdaug1_D = 0.;
+  fBranchD->pZdaug2_D = 0.;
+  fBranchD->hyp_D = 4;  //it can go from 0 to 2, so if you have a 4 in the TTree something's wrong in the filling...
 
   return;
 }
@@ -2964,12 +3210,36 @@ void AliAnalysisTaskSED0Correlations::ResetBranchTracks() {
   fBranchTr->pT_Tr = 0.;
   fBranchTr->mult_Tr = 0.;
   fBranchTr->zVtx_Tr = 0.;
+  fBranchTr->cent_Tr = 0.;
   fBranchTr->period_Tr = 0;
   fBranchTr->orbit_Tr = 0;
   fBranchTr->BC_Tr = 0;
   fBranchTr->IDtrig_Tr = 0;
+  fBranchTr->IDtrig2_Tr = 0;
+  fBranchTr->IDtrig3_Tr = 0;
+  fBranchTr->IDtrig4_Tr = 0; 
   fBranchTr->sel_Tr = 0;
 
+  return;
+}
+
+//________________________________________________________________________
+void AliAnalysisTaskSED0Correlations::ResetBranchDForCutOptim() {
+
+  fBranchDCutVars->invMass = 0.;
+  fBranchDCutVars->cent = 0.;
+  fBranchDCutVars->pt = 0.;
+  fBranchDCutVars->dca = 0.;
+  fBranchDCutVars->cosThSt = 0.;
+  fBranchDCutVars->pTk = 0.;
+  fBranchDCutVars->pTpi = 0.;
+  fBranchDCutVars->d0k = 0.;
+  fBranchDCutVars->d0pi = 0.;
+  fBranchDCutVars->d0xd0 = 0.;
+  fBranchDCutVars->cosThPt = 0.;
+  fBranchDCutVars->normLxy = 0;
+  fBranchDCutVars->topom = 0.;
+  
   return;
 }
 

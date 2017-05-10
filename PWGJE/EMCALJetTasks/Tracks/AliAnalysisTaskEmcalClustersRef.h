@@ -94,6 +94,12 @@ public:
   void SetUserCentralityEstimator(TString centest) { fCentralityEstimator = centest; }
 
   /**
+   * Select events only from certain bunch crossings
+   * @param[in] bunchCrossingIndex index of then bunch crossing selected
+   */
+  void SetBunchCrossingIndex(Int_t bunchCrossingIndex) { fBunchCrossingIndex = bunchCrossingIndex; };
+
+  /**
    * Preconfigure task so that it can be used in subwagons
    * @param[in] nClusters Name of the input cluster container
    * @param[in] suffix Suffix of the subwagon
@@ -151,7 +157,7 @@ protected:
    */
   void GetPatchBoundaries(TObject *o, Double_t *boundaries) const;
 
-  void FillClusterHistograms(const TString &triggerclass, double energy, double transversenergy, double eta, double phi, double clustertime, TList *triggerpatches);
+  void FillClusterHistograms(const TString &triggerclass, double energy, double transversenergy, double eta, double phi, double clustertime, int ncell, TList *triggerpatches);
 
   /**
    * Find all patches in an event which could have fired the trigger
@@ -177,6 +183,7 @@ protected:
   Bool_t                              fRequestCentrality;         ///< Switch on request for centrality range
   Double_t                            fEventCentrality;           //!<! Current event centrality
   TString                             fCentralityEstimator;       ///< Centrality estimator (default: V0M for PbPb)
+  Char_t                              fBunchCrossingIndex;        ///< Bunch Crossing index
 
   EnergyDefinition_t                  fEnergyDefinition;          ///< Energy definition used for a given cluster
   Bool_t                              fEnableSumw2;               ///< Enable sumw2 when creating histograms
@@ -189,6 +196,10 @@ private:
     EnergyBinning();
     virtual ~EnergyBinning() {}
   };
+
+  int CountTracklets(double etamin, double etamax, double phimin, double phimax);
+  int CountEmcalClusters(double ecut);
+  int GetEMCALCellOccupancy(double ecut);
 
   AliAnalysisTaskEmcalClustersRef(const AliAnalysisTaskEmcalClustersRef &);
   AliAnalysisTaskEmcalClustersRef &operator=(const AliAnalysisTaskEmcalClustersRef &);

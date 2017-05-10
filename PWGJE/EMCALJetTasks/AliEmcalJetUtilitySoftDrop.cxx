@@ -130,6 +130,14 @@ void AliEmcalJetUtilitySoftDrop::Init()
   fInit = kTRUE;
 }
 
+
+//______________________________________________________________________________
+void AliEmcalJetUtilitySoftDrop::InitEvent(AliFJWrapper& /*fjw*/)
+{
+  // Prepare the utility.
+
+}
+
 //______________________________________________________________________________
 void AliEmcalJetUtilitySoftDrop::Prepare(AliFJWrapper& fjw)
 {
@@ -182,6 +190,8 @@ void AliEmcalJetUtilitySoftDrop::ProcessJet(AliEmcalJet* jet, Int_t ij, AliFJWra
     //getting ungroomed pt
     unsigned k = jets_groomed[ij].user_index();
     if ( (k>0) && (k<ninc) ) jet->GetShapeProperties()->SetSoftDropPtfrac( jets_groomed[ij].perp() / jets_inclusive[k].perp() );
+
+    jet->GetShapeProperties()->SetSoftDropDropCount(jets_groomed[ij].structure_of<fastjet::contrib::SoftDrop>().dropped_count());
 
   }
 

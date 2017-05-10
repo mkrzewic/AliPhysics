@@ -24,6 +24,7 @@ class AliESDEvent;
 
 #include "AliESDtrackCuts.h"
 #include "AliAnalysisTaskSE.h"
+#include "AliPID.h"
 
 class AliAnalysisTaskCheckESDTracks : public AliAnalysisTaskSE {
 
@@ -76,8 +77,11 @@ class AliAnalysisTaskCheckESDTracks : public AliAnalysisTaskSE {
   
   TList*  fOutput;                   //!<!  list of output histos
 
-  TH1F* fHistNEvents;                //!<!  histo with N of events  
+  TH1F* fHistNEvents;                //!<!  histo with N of events
   TH1F* fHistNTracks;                //!<!  histo with N of tracks
+  TH1F* fHistNITSClu;             //!<!  histo with N of ITS clusters
+  TH1F* fHistCluInITSLay;        //!<!  histo with cluters in ITS layers
+  
   TH2F* fHistNtracksTPCselVsV0befEvSel;    //!<!  histo of tracks vs. centr.
   TH2F* fHistNtracksSPDanyVsV0befEvSel;    //!<!  histo of tracks vs. centr.
   TH2F* fHistNtracksTPCselVsV0aftEvSel;    //!<!  histo of tracks vs. centr.
@@ -140,23 +144,21 @@ class AliAnalysisTaskCheckESDTracks : public AliAnalysisTaskSE {
   TH3F* fHistImpParXYPtMulGoodHypProtTPCselSPDany;  //!<!  histo of impact parameter
   TH3F* fHistImpParXYPtMulBadHypProtTPCselSPDany;   //!<!  histo of impact parameter
 
-  TH2F* fHistPtResidVsPtTPCselAll;                   //!<!  histo for pt resolution (TPC cuts -all)
-  TH2F* fHistPtResidVsPtTPCselGoodHypPion;           //!<!  histo for pt resolution (TPC cuts -pions)
-  TH2F* fHistPtResidVsPtTPCselGoodHypProton;         //!<!  histo for pt resolution (TPC cuts -protons)
-  TH2F* fHistPtResidVsPtTPCselBadHypPion;            //!<!  histo for pt resolution (TPC cuts -pions)
-  TH2F* fHistPtResidVsPtTPCselBadHypProton;          //!<!  histo for pt resolution (TPC cuts -protons)
-  TH2F* fHistPtResidVsPtTPCselITSrefAll;             //!<!  histo for pt resolution (TPC cuts -all)
-  TH2F* fHistPtResidVsPtTPCselITSrefGoodHypPion;     //!<!  histo for pt resolution (TPC cuts -pions)
-  TH2F* fHistPtResidVsPtTPCselITSrefGoodHypProton;   //!<!  histo for pt resolution (TPC cuts -protons)
-  TH2F* fHistPtResidVsPtTPCselITSrefBadHypPion;      //!<!  histo for pt resolution (TPC cuts -pions)
-  TH2F* fHistPtResidVsPtTPCselITSrefBadHypProton;    //!<!  histo for pt resolution (TPC cuts -protons)
+  TH2F* fHistPtResidVsPtTPCselAll;                              //!<!  Pt residuals for TPC only tracks tracked with good mass hypothesis
+  TH2F* fHistPtResidVsPtTPCselITSrefAll;                        //!<!  Pt residuals for ITS+TPC tracks tracked with good mass hypothesis
+  TH2F* fHistPtResidVsPtTPCselGoodHyp[AliPID::kSPECIESC];       //!<!  Pt residuals for TPC only tracks tracked with good mass hypothesis (for each species)
+  TH2F* fHistPtResidVsPtTPCselBadHyp[AliPID::kSPECIESC];        //!<!  Pt residuals for TPC only tracks tracked with bad mass hypothesis (for each species)
+  TH2F* fHistPtResidVsPtTPCselITSrefGoodHyp[AliPID::kSPECIESC]; //!<!  Pt residuals for ITS+TPC tracks tracked with good mass hypothesis (for each species)
+  TH2F* fHistPtResidVsPtTPCselITSrefBadHyp[AliPID::kSPECIESC];  //!<!  Pt residuals for ITS+TPC tracks tracked with bad mass hypothesis (for each species)
 
   TH3F* fHistEtaPhiPtTPCselITSrefGood;        //!<!  histo of eta,phi,pt - good MC tracks
   TH3F* fHistEtaPhiPtTPCselITSrefFake;        //!<!  histo of eta,phi,pt - fake MC tracks
   TH3F* fHistImpParXYPtMulTPCselSPDanyGood;   //!<!  histo of impact parameter (pion)
   TH3F* fHistImpParXYPtMulTPCselSPDanyFake;   //!<!  histo of impact parameter (pion)
 
-  TH2F* fHistInvMassK0s;
+  TH3F* fHistInvMassK0s;
+  TH3F* fHistInvMassLambda;
+  TH3F* fHistInvMassAntiLambda;
   TH3F* fHistInvMassLambdaGoodHyp;     //!<!  histo of lambda inv mass
   TH3F* fHistInvMassAntiLambdaGoodHyp; //!<!  histo of lambdabar inv mass
   TH3F* fHistInvMassLambdaBadHyp;      //!<!  histo of lambda inv mass
@@ -172,6 +174,7 @@ class AliAnalysisTaskCheckESDTracks : public AliAnalysisTaskSE {
   Int_t   fMinNumOfTPCPIDclu;  // cut on min. of TPC clust for PID
   Bool_t  fUseTOFbcSelection;  // flag use/not use TOF for pileup rejection
   Bool_t  fUsePhysSel;         // flag use/not use phys sel
+  Bool_t  fUsePileupCut;       // flag use/not use phys pileup cut
   Int_t   fTriggerMask;        // mask used in physics selection
   Int_t fNPtBins;              // number of pt intervals in histos
   Double_t fMinPt;             // minimum pt for histos
@@ -179,7 +182,7 @@ class AliAnalysisTaskCheckESDTracks : public AliAnalysisTaskSE {
   Bool_t  fReadMC;             // flag read/not-read MC truth info
   Bool_t  fUseMCId;            // flag use/not-use MC identity for PID
 
-  ClassDef(AliAnalysisTaskCheckESDTracks,3);
+  ClassDef(AliAnalysisTaskCheckESDTracks,5);
 };
 
 

@@ -85,7 +85,6 @@ AliEmcalJetUtilityConstSubtractor& AliEmcalJetUtilityConstSubtractor::operator=(
 void AliEmcalJetUtilityConstSubtractor::Init()
 {
   // Initialize the utility.
-
   // Add constituent subtracted jets to event
   if (!fJetsSubName.IsNull()) {
     if (!(fJetTask->InputEvent()->FindListObject(fJetsSubName)) ) {
@@ -127,7 +126,20 @@ void AliEmcalJetUtilityConstSubtractor::Init()
     }
   }
 
+  // Create particle container in the main jet task so the indices of the constituents
+  // added later are properly mapped by the jet task.
+  // It is safe to create it before the actual jet finding because the underlying array
+  // will be empty until after jet finding.
+  fJetTask->AddParticleContainer(fParticlesSubName);
+
   fInit = kTRUE;
+}
+
+//______________________________________________________________________________
+void AliEmcalJetUtilityConstSubtractor::InitEvent(AliFJWrapper& /*fjw*/)
+{
+  // Prepare the utility.
+
 }
 
 //______________________________________________________________________________
@@ -192,7 +204,7 @@ void AliEmcalJetUtilityConstSubtractor::Terminate(AliFJWrapper& fjw)
       // Fill constituent info
       std::vector<fastjet::PseudoJet> constituents_unsub(fjw.GetJetConstituents(ijet));
       std::vector<fastjet::PseudoJet> constituents_sub = jets_sub[ijet].constituents();
-      fJetTask->FillJetConstituents(jet_sub, constituents_sub, constituents_unsub, 1, fParticlesSub);
+      fJetTask->FillJetConstituents(jet_sub, constituents_sub, constituents_unsub, 1, fParticlesSubName);
       jetCount++;
     }
   }

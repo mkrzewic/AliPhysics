@@ -7,8 +7,8 @@
 #include <algorithm>
 #include <utility>
 
-#include <Riosfwd.h>
-#include <TArrayS.h>
+#include <iosfwd>
+#include <TArrayI.h>
 #include <TMath.h>
 #include <TClonesArray.h>
 #include <TVector2.h>
@@ -50,6 +50,8 @@ class AliEmcalJet : public AliVParticle
    * @brief Bit definition for jet geometry acceptance. Cut implemented in AliJetContainer
    * by comparing jet's bits (set in jet finder) to container's bits (set by user).
    * If user doesn't set jet acceptance cut value, no cut is performed (equivalent to kUser).
+   * The boundaries defined for each bit should be taken as approximate (within a couple
+   * cells) -- the user should verify the definitions if precision is crucial.
    * If you create jets outside of the standard jet finder, you may have to manually set these
    * acceptance bits if you want to use the acceptance selection cut in the jet container
    * e.g. "jet->SetJetAcceptanceType(fJetTask->FindJetAcceptanceType(eta,phi,r));".
@@ -59,9 +61,13 @@ class AliEmcalJet : public AliVParticle
     kTPCfid           = 1<<1,     ///< TPC fiducial acceptance (each eta edge narrowed by jet R)
     kEMCAL            = 1<<2,     ///< EMCal acceptance
     kEMCALfid         = 1<<3,     ///< EMCal fiducial acceptance (each eta, phi edge narrowed by jet R)
-    kDCAL             = 1<<4,     ///< DCal acceptance
+    kDCAL             = 1<<4,     ///< DCal acceptance -- spans entire rectangular region in eta-phi (including most of PHOS)
     kDCALfid          = 1<<5,     ///< DCal fiducial acceptance (each eta, phi edge narrowed by jet R)
-    kUser             = 1<<6      ///< Full acceptance, i.e. no acceptance cut applied -- left to user
+    kDCALonly         = 1<<6,     ///< DCal acceptance -- spans ONLY DCal (no PHOS or gap)
+    kDCALonlyfid      = 1<<7,     ///< DCal fiducial acceptance (each eta, phi edge narrowed by jet R)
+    kPHOS             = 1<<8,     ///< PHOS acceptance
+    kPHOSfid          = 1<<9,     ///< PHOS fiducial acceptance (each eta, phi edge narrowed by jet R)
+    kUser             = 1<<10     ///< Full acceptance, i.e. no acceptance cut applied -- left to user
   };
   
   /**
@@ -121,7 +127,7 @@ class AliEmcalJet : public AliVParticle
   Double_t          AreaE()                      const { return fAreaE                   ; }
   Double_t          AreaEmc()                    const { return fAreaEmc                 ; }
   Bool_t            AxisInEmcal()                const { return fAxisInEmcal             ; }
-  Short_t           ClusterAt(Int_t idx)         const { return fClusterIDs.At(idx)      ; }
+  Int_t             ClusterAt(Int_t idx)         const { return fClusterIDs.At(idx)      ; }
   UShort_t          GetNumberOfClusters()        const { return fClusterIDs.GetSize()    ; }
   UShort_t          GetNumberOfTracks()          const { return fTrackIDs.GetSize()      ; }
   UShort_t          GetNumberOfConstituents()    const { return GetNumberOfClusters()+GetNumberOfTracks(); }
@@ -144,7 +150,7 @@ class AliEmcalJet : public AliVParticle
   Double_t          PtEmc()                      const { return fPtEmc                   ; }
   Double_t          PtSub()                      const { return fPtSub                   ; }
   Double_t          PtSubVect()                  const { return fPtSubVect               ; }
-  Short_t           TrackAt(Int_t idx)           const { return fTrackIDs.At(idx)        ; }
+  Int_t             TrackAt(Int_t idx)           const { return fTrackIDs.At(idx)        ; }
 
   // Background subtraction
   Double_t          PtSub(Double_t rho, Bool_t save = kFALSE)          ;
@@ -152,10 +158,12 @@ class AliEmcalJet : public AliVParticle
   TLorentzVector    SubtractRhoVect(Double_t rho, Bool_t save = kFALSE);
 
   // Jet constituents
+  AliVCluster      *Cluster(Int_t idx)                                             const;
   AliVCluster      *ClusterAt(Int_t idx, TClonesArray *ca)                         const;
   Int_t             ContainsCluster(AliVCluster* cluster, TClonesArray* clusters)  const;
   Int_t             ContainsCluster(Int_t ic)                                      const;
   AliVCluster      *GetLeadingCluster(TClonesArray *clusters)                      const;
+  AliVParticle     *Track(Int_t idx)                                               const;
   AliVParticle     *TrackAt(Int_t idx, TClonesArray *ta)                           const;
   Int_t             ContainsTrack(AliVParticle* track, TClonesArray* tracks)       const;
   Int_t             ContainsTrack(Int_t it)                                        const;
@@ -316,7 +324,7 @@ class AliEmcalJet : public AliVParticle
   };
 
   /// \cond CLASSIMP
-  ClassDef(AliEmcalJet,18);
+  ClassDef(AliEmcalJet,19);
   /// \endcond
 };
 

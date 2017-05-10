@@ -151,6 +151,7 @@ fUseDmesonEfficiencyCorrection(kFALSE),
 fUseCentrality(kFALSE),
 fUseHadronicChannelAtKineLevel(kFALSE),
 fRemoveMoreThanOneDmesonCandidate(kFALSE),
+fLimitAcceptanceForMC(kFALSE),
 fMultiplicityEstimator(kNtrk10),
 fDoVZER0ParamVertexCorr(1), 
 fPhiBins(32),
@@ -1267,6 +1268,14 @@ if(fmult){
                      weight = DmesonWeight * (1./efficiency);
                  }
                  
+                 if(fmult) {	 
+                   Double_t ptLim_Sparse = ((THnSparseF*)fCorrelationOutput->FindObject(Form("CorrelationsDStarHadron_%d_Multbin_%d",ptbin,Multbin)))->GetAxis(3)->GetXmax(); //all plots have same axes...
+		   if(ptHad > ptLim_Sparse) ptHad = ptLim_Sparse-0.01;
+	         } else {
+                   Double_t ptLim_Sparse = ((THnSparseF*)fCorrelationOutput->FindObject(Form("CorrelationsDStarHadron_%d",ptbin)))->GetAxis(3)->GetXmax(); //all plots have same axes...
+		   if(ptHad > ptLim_Sparse) ptHad = ptLim_Sparse-0.01;			 
+		 }
+	         
                  // cout << "crash correlation 5" << endl;
                  arraytofill[0] = DeltaPhi;
                  arraytofill[1] = deltainvMDStar;
@@ -2162,14 +2171,14 @@ void AliAnalysisTaskDStarCorrelations::EventMixingChecks(AliAODEvent* AOD){
 	
 	AliEventPool * pool = fCorrelator->GetPool();
 	
-    
-	
-	
+    	
+	/*
 	((TH2D*)fOutput->FindObject("NofPoolBinCalls"))->Fill(MultipOrCent,zvertex); // number of calls of pool
 	((TH2D*)fOutput->FindObject("EventProps"))->Fill(MultipOrCent,zvertex); // event properties
 	
 	((TH3D*)fOutput->FindObject("EventsPerPoolBin"))->Fill(MultipOrCent,zvertex,pool->GetCurrentNEvents()); // number of events in the pool
 	((TH3D*)fOutput->FindObject("NofTracksPerPoolBin"))->Fill(MultipOrCent,zvertex,pool->NTracksInPool()); // number of calls of pool
+	*/
 }
 
 TProfile* AliAnalysisTaskDStarCorrelations::GetEstimatorHistogram(const AliVEvent* event){

@@ -12,6 +12,7 @@ class TH1;
 class TH1F;
 class TH2F;
 class TH3F;
+class TH3I;
 class TList;
 class TObjArray;
 class AliESDEvent;
@@ -130,7 +131,7 @@ public:
   
   ///
   /// Method to get the information of the MC truth of the reconstructed tracks
-  Bool_t GatherTrackMCInfo(AliESDtrack * trk);
+  Bool_t GatherTrackMCInfo(const AliESDtrack * trk);
   
   ///
   /// Method to decide if the event selection is selected or not
@@ -202,6 +203,7 @@ public:
       break;
     }
     if(fBinPtIndex < 0) AliWarning(Form("Pt bin not assigned, fPt value: %f!", fPt));
+    //if(fBinPtIndex >= 0 && fBinPtIndex + 1 != hNumMatch[0]->GetXaxis()->FindBin(fPt)) AliFatal(Form("Pt bin is different than intendend: %i vs %i!", fBinPtIndex, hNumMatch[0]->GetXaxis()->FindBin(fPt)));
   };
   
   ///
@@ -221,7 +223,7 @@ public:
   ///
   /// Computes the Rapidity of the track in the 3 mass hypothesis: pions kaons and protons
   void ComputeRapidity(){
-    for(Int_t species = 0; species < 3; species++) fRapidity[species] = ComputeY(AliPID::ParticleMass(species+2));
+    for(Int_t species = 0; species < 3; species++) fRapidity[species] = ComputeY(AliPID::ParticleMass(species+AliPID::kPion));
   }
   
   ///
@@ -230,7 +232,7 @@ public:
   
   ///
   /// Method to check which are the track cuts of the cut variation parameters which are passed
-  Bool_t AnalyseCutVariation(AliESDtrack *track);
+  Bool_t AnalyseCutVariation(const AliESDtrack *track);
   
   ///
   /// Method to fill the histograms containing the values of the variables under cut, the flag is to fill the ones before and after the flag
@@ -486,6 +488,7 @@ private:
   Bool_t fCutmode;           ///<  Flag to set the cut variation mode, cuts are not the standard cuts but are modified accordingly to the requirements
   const Int_t fSimpleCutmode;///<  Index to set simple configuration of the track cuts
   const Bool_t fBuilTPCTOF;  ///<  Flag to build the TPC TOF separation
+  const Bool_t fBuilDCAchi2; ///<  Flag to build the DCAxy distributions with the cut on the Golden Chi2
   const Bool_t fUseTPCShift; ///<  Flag to use the Shift of the TPC nsigma
   const Bool_t fPerformance; ///<  Flag to fill the performance plots
   UInt_t fSelectBit;         ///<  Mask for Trigger selection
@@ -497,7 +500,7 @@ private:
   
   //Masks to store the event and track information in the Tree
   UChar_t fEvtMask;      ///< Event information mask
-  UChar_t fTrkMask;      ///< Track information mask
+  UShort_t fTrkMask;     ///< Track information mask
   UChar_t fTPCPIDMask;   ///< TPC PID information mask
   UShort_t fTrkCutMask;  ///< Mask with the information for the cut variation
   UChar_t fMCTrkMask;    ///< MC information mask
@@ -547,12 +550,13 @@ private:
   //Track flags
   ///
   ///Method to set the flags of the track
-  void SetTrackFlags(AliESDtrack * track);
+  void SetTrackFlags(const AliESDtrack * track);
   Bool_t fTOFout;        ///<  Track has the TOFout
   Bool_t fTRDout;        ///<  Track has the TRDout
   Bool_t fTime;          ///<  Track has the Time
   Bool_t fSign;          ///<  Track charge sign kTRUE (1) for negative and kFALSE (0) for positive
   Bool_t fMismatch;      ///<  Track is flagged as Mismatch (i.e. track in the TPC wrongly matched to TOF time)
+  Bool_t fPassGoldenChi2;///<  Track pass the Golden Chi2 cut
   Bool_t fPassDCAxy;     ///<  Track pass the DCAxy cut
   Bool_t fPassDCAz;      ///<  Track pass the DCAz cut
   Bool_t fITSTPCMatch;   ///<  Track is matched to the TPC
@@ -560,7 +564,7 @@ private:
   //Track values
   ///
   ///Method to set the values of the track
-  void SetTrackValues(AliESDtrack *track);
+  void SetTrackValues(const AliESDtrack *track, const AliESDVertex* vertex);
   UShort_t fTPCClusters;           ///<  Track clusters in the TPC
   UShort_t fTPCFindClusters;       ///<  Track findable clusters in the TPC
   UChar_t fITSClusters;            ///<  Track clusters in the ITS
@@ -569,6 +573,7 @@ private:
   Double_t fTPCChi2PerNDF;         ///<  Track chi2 per NDF in TPC
   Double_t fITSChi2;               ///<  Track chi2 in ITS
   Double_t fITSChi2PerNDF;         ///<  Track chi2 per NDF in ITS
+  Double_t fGoldenChi2;            ///<  Track chi2 constrained to the vertex
   Double_t fLengthActiveZone;      ///<  Track length in active zone
   Double_t fLength;                ///<  Track length
   Float_t fLengthRatio;            ///<  Track length ratio between the matched track length and the one coming from another cluster
@@ -661,8 +666,8 @@ private:
   TH1F* hTrkITSChi2NDF[2];                      ///<  Histogram with the reduced chi2 in ITS of all not accepted and accepted tracks
   TH1F* hTrkActiveLength[2];                    ///<  Histogram with the length of the track in the active region
   TH1F* hTrkITSTPCMatch[2];                     ///<  Histogram with the match between ITS and TPC
-  TH1F* hTrkDCAxy[2];                           ///<  Histogram with the DCA XY and Z of all not accepted and accepted tracks
-  TH1F* hTrkDCAz[2];                            ///<  Histogram with the DCA XY and Z of all not accepted and accepted tracks
+  TH1F* hTrkDCAxy[2];                           ///<  Histogram with the DCA XY of all not accepted and accepted tracks
+  TH1F* hTrkDCAz[2];                            ///<  Histogram with the DCA Z of all not accepted and accepted tracks
   #ifdef CHECKTRACKCUTS//Only if required
   TH2I* hTrkTPCClsCorr[2][3];                   ///<  Correlation between pt [0] - eta [1] - phi [2] and the number of TPC clusters before and after the cut
   TH2I* hTrkTPCRowsCorr[2][3];                  ///<  Correlation between pt [0] - eta [1] - phi [2] and the number of TPC crossed rows before and after the cut
@@ -685,15 +690,16 @@ private:
   TH1D* hTimeOfFlightGoodRes;                   ///<  Histogram with the Time Of Flight for tracks with good matching
   TH1D* hTimeOfFlightResNoMismatch;             ///<  Histogram with the Time Of Flight for PID consistent with TPC for Pi K P
   TH2F* hPadDist;                               ///<  Histogram with the Impact Residual X and Residual Z values
-  TH2F* hBeta;                                  ///<  Histogram with the track beta vs the track momentum
-  TH2F* hBetaNoMismatch;                        ///<  Histogram with the track beta vs the track momentum with a cut on the maximum number of clusters to reduce the mismatch
-  TH2F* hBetaNoMismatchEtaCut;                  ///<  Histogram with the track beta vs the track momentum with a cut on the maximum number of clusters to reduce the mismatch and a cut on the eta range
-  TH2F* hBetaNoMismatchEtaCutOut;               ///<  Histogram with the track beta vs the track momentum with a cut on the maximum number of clusters to reduce the mismatch and a lower cut on the eta range
-  TH2F* hBetaCentral;                           ///<  Histogram with the track beta vs the track momentum for central events
-  TH2F* hBetaNoMismatchCentral;                 ///<  Histogram with the track beta vs the track momentum for central events with a cut on the maximum number of clusters to reduce the mismatch
-  TH2F* hBetaNoMismatchCentralEtaCut;           ///<  Histogram with the track beta vs the track momentum for central events with a cut on the maximum number of clusters to reduce the mismatch and a cut on the eta range
-  TH2F* hBetaNoMismatchCentralEtaCutOut;        ///<  Histogram with the track beta vs the track momentum for central events with a cut on the maximum number of clusters to reduce the mismatch and a cut on the eta range
-  TH2F* hTPCdEdx;                               ///<  Histogram with the track energy loss in the TOC vs the track momentum
+  TH2F* hTOFDist;                               ///<  Histogram with the distributions of the TOF strips and sectors
+  TH2I* hBeta;                                  ///<  Histogram with the track beta vs the track momentum
+  TH2I* hBetaNoMismatch;                        ///<  Histogram with the track beta vs the track momentum with a cut on the maximum number of clusters to reduce the mismatch
+  TH2I* hBetaNoMismatchEtaCut;                  ///<  Histogram with the track beta vs the track momentum with a cut on the maximum number of clusters to reduce the mismatch and a cut on the eta range
+  TH2I* hBetaNoMismatchEtaCutOut;               ///<  Histogram with the track beta vs the track momentum with a cut on the maximum number of clusters to reduce the mismatch and a lower cut on the eta range
+  TH2I* hBetaCentral;                           ///<  Histogram with the track beta vs the track momentum for central events
+  TH2I* hBetaNoMismatchCentral;                 ///<  Histogram with the track beta vs the track momentum for central events with a cut on the maximum number of clusters to reduce the mismatch
+  TH2I* hBetaNoMismatchCentralEtaCut;           ///<  Histogram with the track beta vs the track momentum for central events with a cut on the maximum number of clusters to reduce the mismatch and a cut on the eta range
+  TH2I* hBetaNoMismatchCentralEtaCutOut;        ///<  Histogram with the track beta vs the track momentum for central events with a cut on the maximum number of clusters to reduce the mismatch and a cut on the eta range
+  TH2I* hTPCdEdx;                               ///<  Histogram with the track energy loss in the TOC vs the track momentum
   TH2I* hChannelTime;                           ///<  Histogram with the measured time at TOF divided into each channel (or strip) -> Used to get the mismatch
   TH1F* hTOFClusters;                           ///<  Histogram with the number of TOF clusters per track
   TH1F* hTOFClustersDCApass;                    ///<  Histogram with the number of TOF clusters per track, for tracks which passed the DCA cut for primaries
@@ -706,6 +712,7 @@ private:
   #endif
   #ifdef BUILDTOFDISTRIBUTIONS// Build TOF distributions only if requested
   TH1F * hTOF[kPtBins][kCharges][kSpecies];                    ///<  Distribution for T-Texp-T0
+  TH1F * hTOFNoYCut[kPtBins][kCharges][kSpecies];              ///<  Distribution for T-Texp-T0 without the cut on rapidity
   TH1F * hTOFSigma[kPtBins][kCharges][kSpecies];               ///<  Sigma distributions for T-Texp-T0
   TH1F * hTOFNoMismatch[kPtBins][kCharges][kSpecies];          ///<  Distribution for T-Texp-T0 without Mismatch, removed with the information on the TPC
   TH1F * hTOFSigmaNoMismatch[kPtBins][kCharges][kSpecies];     ///<  Distribution for T-Texp-T0 without Mismatch, removed with the information on the TPC
@@ -714,28 +721,29 @@ private:
   //
   //MC Info
   //
-  TH1F* hNumMatchMC[2][3];                               ///<  Matching efficiency numerator with MC information on PID
-  TH1F* hDenMatchMC[2][3];                               ///<  Matching efficiency denominator with MC information on PID
-  TH1F* hNumMatchPrimMC[2][3];                           ///<  Matching efficiency numerator with MC information on PID and on Primary production
-  TH1F* hDenMatchPrimMC[2][3];                           ///<  Matching efficiency denominator with MC information on PID and on Primary production
-  TH1F* hNumMatchPrimMCYCut[2][3][kEvtMultBins];         ///<  Matching efficiency numerator with MC information on PID and on Primary production with a cut on |y| < 0.5
-  TH1F* hDenMatchPrimMCYCut[2][3][kEvtMultBins];         ///<  Matching efficiency denominator with MC information on PID and on Primary production with a cut on |y| < 0.5
-  TH1F* hNumMatchMultTrkTRDOut[2][3][kEvtMultBins];      ///<  Matching efficiency numerator with kTRDOut flag and MC information on PID
-  TH1F* hDenMatchMultTrkTRDOut[2][3][kEvtMultBins];      ///<  Matching efficiency denominator with kTRDOut flag and MC information on PID
-  TH1F* hNumMatchMultTrkNoTRDOut[2][3][kEvtMultBins];    ///<  Matching efficiency numerator without kTRDOut flag and with MC information on PID
-  TH1F* hDenMatchMultTrkNoTRDOut[2][3][kEvtMultBins];    ///<  Matching efficiency denominator without kTRDOut flag and with MC information on PID
-  TH1F* hNumMatchMultTrk[2][3][kEvtMultBins];            ///<  Matching efficiency numerator with kTIME, kTRDOut flags and MC information on PID
-  TH1F* hDenMatchMultTrk[2][3][kEvtMultBins];            ///<  Matching efficiency denominator with kTIME, kTRDOut flags and MC information on PID
-  TH1F* hNumMatchMultTrkInc[2][kEvtMultBins];            ///<  Matching efficiency numerator with kTIME, kTRDOut flags
-  TH1F* hDenMatchMultTrkInc[2][kEvtMultBins];            ///<  Matching efficiency denominator with kTIME, kTRDOut flags
-  TH1F* hDenTrkVertMultTrk[2][3];                        ///<  Matching efficiency denominator with MC truth for events that passed Vertex Cuts
-  TH1F* hDenTrkTriggerMultTrk[2][3];                     ///<  Matching efficiency denominator with MC truth for events that passed Physics Selection
-  TH1F* hDenPrimMCYCut[2][3][kEvtMultBins];              ///<  Pt Distribution of Primary Particles with MC Truth on PID, that passed Physics Selection and Event Selection with a cut on the max y
-  TH1F* hDenPrimMCEtaCut[2][3][kEvtMultBins];            ///<  Pt Distribution of Primary Particles with MC Truth on PID, that passed Physics Selection and Event Selection with a cut on the max eta
-  TH1F* hDenPrimMCEtaYCut[2][3][kEvtMultBins];           ///<  Pt Distribution of Primary Particles with MC Truth on PID, that passed Physics Selection and Event Selection with a cut on the max eta and max y
-  TH1F* hNumPrimMCTrueMatch[2][3][kEvtMultBins];         ///<  Pt Distribution of Tracks from primary particles with MC Truth on PID, with true match in the TOF detector
-  TH1F* hNumPrimMCTrueMatchYCut[2][3][kEvtMultBins];     ///<  Pt Distribution of Tracks from primary particles with MC Truth on PID, with true match in the TOF detector with a Y cut
-  TH1F* hNumPrimMCTrueMatchYCutTPC[2][3][kEvtMultBins];  ///<  Pt Distribution of Tracks from primary particles with MC Truth on PID, with true match in the TOF detector with a Y cut and a TPC 5sigma cut on the signal for pi/k/p
+  TH1F* hNumMatchMC[2][3];                                     ///<  Matching efficiency numerator with MC information on PID
+  TH1F* hDenMatchMC[2][3];                                     ///<  Matching efficiency denominator with MC information on PID
+  TH1F* hNumMatchPrimMC[2][3];                                 ///<  Matching efficiency numerator with MC information on PID and on Primary production
+  TH1F* hDenMatchPrimMC[2][3];                                 ///<  Matching efficiency denominator with MC information on PID and on Primary production
+  TH1F* hNumMatchPrimMCYCut[2][3][kEvtMultBins];               ///<  Matching efficiency numerator with MC information on PID and on Primary production with a cut on |y| < 0.5
+  TH1F* hDenMatchPrimMCYCut[2][3][kEvtMultBins];               ///<  Matching efficiency denominator with MC information on PID and on Primary production with a cut on |y| < 0.5
+  TH1F* hNumMatchMultTrkTRDOut[2][3][kEvtMultBins];            ///<  Matching efficiency numerator with kTRDOut flag and MC information on PID
+  TH1F* hDenMatchMultTrkTRDOut[2][3][kEvtMultBins];            ///<  Matching efficiency denominator with kTRDOut flag and MC information on PID
+  TH1F* hNumMatchMultTrkNoTRDOut[2][3][kEvtMultBins];          ///<  Matching efficiency numerator without kTRDOut flag and with MC information on PID
+  TH1F* hDenMatchMultTrkNoTRDOut[2][3][kEvtMultBins];          ///<  Matching efficiency denominator without kTRDOut flag and with MC information on PID
+  TH1F* hNumMatchMultTrk[2][3][kEvtMultBins];                  ///<  Matching efficiency numerator with kTIME, kTRDOut flags and MC information on PID
+  TH1F* hDenMatchMultTrk[2][3][kEvtMultBins];                  ///<  Matching efficiency denominator with kTIME, kTRDOut flags and MC information on PID
+  TH1F* hNumMatchMultTrkInc[2][kEvtMultBins];                  ///<  Matching efficiency numerator with kTIME, kTRDOut flags
+  TH1F* hDenMatchMultTrkInc[2][kEvtMultBins];                  ///<  Matching efficiency denominator with kTIME, kTRDOut flags
+  TH1F* hDenTrkVertMultTrk[2][3];                              ///<  Matching efficiency denominator with MC truth for events that passed Vertex Cuts
+  TH1F* hDenTrkTriggerMultTrk[2][3];                           ///<  Matching efficiency denominator with MC truth for events that passed Physics Selection
+  TH1F* hDenPrimMCYCut[2][3][kEvtMultBins];                    ///<  Pt Distribution of Primary Particles with MC Truth on PID, that passed Physics Selection and Event Selection with a cut on the max y
+  TH1F* hDenPrimMCEtaCut[2][3][kEvtMultBins];                  ///<  Pt Distribution of Primary Particles with MC Truth on PID, that passed Physics Selection and Event Selection with a cut on the max eta
+  TH1F* hDenPrimMCEtaYCut[2][3][kEvtMultBins];                 ///<  Pt Distribution of Primary Particles with MC Truth on PID, that passed Physics Selection and Event Selection with a cut on the max eta and max y
+  TH1F* hNumPrimMCTrueMatch[2][3][kEvtMultBins];               ///<  Pt Distribution of Tracks from primary particles with MC Truth on PID, with true match in the TOF detector
+  TH1F* hNumPrimMCTrueMatchYCut[2][3][kEvtMultBins];           ///<  Pt Distribution of Tracks from primary particles with MC Truth on PID, with true match in the TOF detector with a Y cut
+  TH1F* hNumPrimMCTrueMatchYCutTPC[2][3][kEvtMultBins];        ///<  Pt Distribution of Tracks from primary particles with MC Truth on PID, with true match in the TOF detector with a Y cut and a TPC 5sigma cut on the signal for pi/k/p
+  TH1F* hNumPrimMCConsistentMatchYCut[2][3][kEvtMultBins];     ///<  Pt Distribution of Tracks from primary particles with MC Truth on PID, with true match in the TOF detector with a Y cut
   
   //histograms for matching efficiency calculation
   //Positive / Negative
@@ -753,6 +761,8 @@ private:
   TH1F* hDenMatchTRDOut[2];       ///<  Matching efficiency denominator Pt Distribution with TRD out
   TH1F* hNumMatchNoTRDOut[2];     ///<  Matching efficiency numerator Pt Distribution without TRD out
   TH1F* hDenMatchNoTRDOut[2];     ///<  Matching efficiency denominator Pt Distribution without TRD out
+  TH3I* hNumMatchPtEtaPhiout[2];  ///<  Matching efficiency numerator Pt, Eta and Phi out Distribution
+  TH3I* hDenMatchPtEtaPhiout[2];  ///<  Matching efficiency denominator Pt, Eta and Phi out Distribution
   
   //Positive / Negative
   //Pion / Kaon / Proton
@@ -761,7 +771,8 @@ private:
   
   //DCA Histograms
   //-> Data and MC
-  TH1F* hDCAxy[2][3][kPtBins];                ///< DCAxy Distribution in Pt bins for all the reconstructed tracks identified via a 2sigma TOF/TPC cut
+  TH1F* hDCAxy[2][3][kPtBins][kEvtMultBins];                ///< DCAxy Distribution in Pt bins for all the reconstructed tracks identified via a 2sigma TOF/TPC cut
+  TH1F* hDCAxyGoldenChi2[2][3][kPtBins][kEvtMultBins];      ///< DCAxy Distribution in Pt bins for all the reconstructed tracks but with the cut on the golden Chi2
   //-> MC only
   TH1F* hDCAxyPrimMC[2][3][kPtBins];          ///< DCAxy Distribution in Pt bins for Primary reconstructed tracks identified with MC Truth
   TH1F* hDCAxySecStMC[2][3][kPtBins];         ///< DCAxy Distribution in Pt bins for Secondary from Strangeness reconstructed tracks identified with MC Truth
@@ -771,7 +782,7 @@ private:
   AliAnalysisTaskTOFSpectra (const AliAnalysisTaskTOFSpectra&);              //! Not implemented
   AliAnalysisTaskTOFSpectra & operator=(const AliAnalysisTaskTOFSpectra&);   //! Not implemented
   
-  ClassDef(AliAnalysisTaskTOFSpectra, 4);
+  ClassDef(AliAnalysisTaskTOFSpectra, 6);
 };
 
 #endif

@@ -24,7 +24,7 @@ namespace EMCalTriggerPtAnalysis {
  * @date Oct.  6, 2016
  *
  * Base class for analyses using EMCAL-triggered events. This class provides several
- * extra funcitonalities shared among different tasks
+ * extra functionalities shared among different tasks
  * - Handling of downscale weights for downscaled triggers
  * - Handling of online trigger cleanup (requirement of recalc patch above threshold to select event)
  * - Trigger classification, also for exclusive classes (classes not containing lower classes)
@@ -44,8 +44,8 @@ namespace EMCalTriggerPtAnalysis {
  *
  * Two functions implement monitoring
  * ~~~{.cxx}
- * void UserFillHistosBeforeEventSelection();   // Filling distribuions before event selection
- * void UserFillHistosAfterEventSelection();    // Filling distribuions after event selection
+ * void UserFillHistosBeforeEventSelection();   // Filling distributions before event selection
+ * void UserFillHistosAfterEventSelection();    // Filling distributions after event selection
  * ~~~
  *
  * Otherwise the class uses functionality of the AliAnalysisTaskEmcal. This includes the main
@@ -59,112 +59,153 @@ class AliAnalysisTaskEmcalTriggerBase : public AliAnalysisTaskEmcal{
 public:
 
   /**
-   * Dummy I/O constructor
+   * @brief Dummy I/O constructor
    */
   AliAnalysisTaskEmcalTriggerBase();
 
   /**
-   * Main Constructor: Initializes the task and sets the name
+   * @brief Main Constructor
+   *
+   * Initializes the task and sets the name
+   *
    * @param[in] name Name of the task
    */
   AliAnalysisTaskEmcalTriggerBase(const char *name);
 
   /**
-   * Destructor
+   * @brief Destructor
    */
   virtual ~AliAnalysisTaskEmcalTriggerBase();
 
   /**
-   * Enable / Disable histograms for the DCAL triggers. If true, DCAL trigger
-   * classes are added to the list of supported triggers and the online/offline
-   * trigger decision for DCAL triggers is evaluated.
+   * @brief Enable / Disable histograms for the DCAL triggers.
+   *
+   * If true, DCAL trigger classes are added to the list of
+   * supported triggers and the online/offline trigger decision
+   * for DCAL triggers is evaluated.
+   *
    * @param[in] doEnable If true DCAL triggers are enabled
    */
   void EnableDCALTriggers(Bool_t doEnable) { fEnableDCALTriggers = doEnable; }
 
+  void EnableT0Triggers(Bool_t doEnable) { fEnableT0Triggers = doEnable; }
+
   /**
-   * Set the name of the OADB container with the downscale factors.
+   * @brief Set the name of the OADB container with the downscale factors.
+   *
    * Once it is available, downscale weights can be obtained via
    * ~~~{.cxx}
    * // Get the weight of the EG2 trigger for the given run
    * this->GetTriggerWeight("EG2");
    * ~~~
+   *
    * @param[in] oadbname Name of the OADB container with the trigger downscale factors
    */
   void SetDownscaleOADB(TString oadbname) { fNameDownscaleOADB = oadbname; }
 
   /**
-   * If true then noise events (events without recalc trigger patch above threshold) are
+   * @brief Load the downscale factors run-by-run from the OCDB
+   * @param[in] doApply If true downscale factors are loaded from the OCDB
+   */
+  void SetApplyDownscaleCorrectionFromOCDB(Bool_t doApply) { fUseDownscaleCorrectionFormOCDB = doApply; }
+
+  /**
+   * @brief If true then noise events (events without recalc trigger patch above threshold) are
    * excluded from the analysis.
    * @param[in] doExclude If true then noise events are excluded from the analysis
    */
   void SetExcludeNoiseEvents(Bool_t doExclude = true) { fRejectNoiseEvents = doExclude; }
 
   /**
-   * If true then noise events (events without recalc trigger patch above threshold) are
+   * @brief If true then noise events (events without recalc trigger patch above threshold) are
    * explicitly selected for the analysis.
    * @param[in] doSelect If true only noise events are used in the analysis
    */
   void SetSelectNoiseEvents(Bool_t doSelect = true) { fSelectNoiseEvents = doSelect; }
 
   /**
-   * Add absolute ID of a FastOR to be masked (excluded from trigger patches)
+   * @brief Specify whether L0 is needed for L1
+   * @param[in] doRequire if true L0 is required for L1
+   */
+  void SetRequireL0ForL1(Bool_t doRequire = true) { fRequireL0forL1 = doRequire; }
+
+  /**
+   * @brief Add absolute ID of a FastOR to be masked (excluded from trigger patches)
    * @param[in] fastorID Absolute ID of a fastor to be masked
    */
   void AddMaskedFastor(int fastorID) { fMaskedFastors.push_back(fastorID); }
 
   /**
-   * Set the name of the file with the OADB container containing the masked FastORs
+   * @brief Set the name of the file with the OADB container containing the masked FastORs
    * @param[in] oadbname Name of the OADB container file
    */
   void SetMaskedFastorOADB(TString oadbname) { fNameMaskedFastorOADB = oadbname; }
 
   /**
-   * Set an offline trigger selection (selection of trigger according to the presence
-   * of an trigger patch from cells above energy)
+   * @brief Set an offline trigger selection.
+   *
+   * The offline trigger selection will select events
+   * based on the presence of a trigger patch from
+   * cells above energy.
+   *
    * @param[in] sel Trigger offline selection
    */
   void SetOfflineTriggerSelection(AliEmcalTriggerOfflineSelection *sel) { fTriggerSelection = sel; }
 
   /**
-   * Set z-range of the primary vertex which is selected
+   * @brief Providing access to the offline trigger selection.
+   *
+   * Note that the trigger offline selection need to be
+   * defined from outside the task.
+   *
+   * @return Trigger offline selection
+   */
+  AliEmcalTriggerOfflineSelection *GetOfflineTriggerSelection() const { return fTriggerSelection; }
+
+  /**
+   * @brief Set z-range of the primary vertex which is selected
    * @param[in] zmin Min. allowed z-value
    * @param[in] zmax Max. allowed z-value
    */
   void SetVertexCut(double zmin, double zmax) { fVertexCut.SetLimits(zmin, zmax); }
 
   /**
-   * Specify whether the trigger decision should be done from trigger patches
+   * @brief Specify whether the trigger decision should be done from trigger patches
    * @param doUse If true the trigger string is rebuilt from recalc patches
    */
   void UseTriggerPatches(Bool_t doUse) { fTriggerStringFromPatches = doUse; }
 
   /**
-   * Setting trigger threshold for online trigger selection
+   * @brief Setting trigger threshold for online trigger selection
    * @param[in] triggerclass Name of the trigger class
    * @param[in] threshold Online trigger threshold
    */
   void SetOnlineTriggerThreshold(const TString &triggerclass, Int_t threshold);
 
   /**
-   * Defining whether to require trigger bits. Attention: Relies on the presence
-   * of the physics selection - to be switched off in case of new data. By default
-   * trigger bits are required.
+   * @brief Defining whether to require trigger bits.
+   *
+   * Attention: Relies on the presence of the physics selection - to be
+   * switched off in case of new data. By default trigger bits are required.
+   *
    * @param[in] doUse If true trigger bits are required, if false not
    */
   void SetUseTriggerBits(Bool_t doUse) { fUseTriggerBits = doUse; }
 
   /**
-   * Defining whether to require bunch crossing events. To be switch off in case of
-   * noise studies (i.e. beam-empty or empty-empty events). By default bunch crossing
-   * is required
+   * @brief Defining whether to require bunch crossing events.
+   *
+   * To be switch off in case of noise studies (i.e. beam-empty
+   * or empty-empty events). By default bunch crossing is required.
+   *
    * @param[in] doRequire If true bunch-bunch crossing is required.
    */
   void SetRequireBunchCrossing(Bool_t doRequire) { fRequireBunchCrossing = doRequire; }
 
   /**
-   * Define whether cuts in AliAnalysisUtils are used in the event selection. Not to be
-   * applied on new data or data from muon_calo_pass1
+   * @brief Define whether cuts in AliAnalysisUtils are used in the event selection.
+   *
+   * Not to be applied on new data or data from muon_calo_pass1
    * @param[in] doRequire If true AliAnalysisUtils are used in addition for the event selection
    */
   void SetRequireAnalysisUtils(Bool_t doRequire) { fRequireAnalysisUtils = doRequire; }
@@ -178,9 +219,20 @@ public:
    */
   void SetTriggerAcceptanceOADB(const TString &nameAcceptanceOADB) { fNameAcceptanceOADB = nameAcceptanceOADB; }
 
-protected:
   /**
-   * Steering of object creation. Handles general objects (histogram manager
+   * @brief Run event loop only on min. bias events.
+   *
+   * In this case EMCAL triggers are ignored, and the trigger selection code is not run.
+   * @param[in] exclusivemb If true only min. bias events are analyzed
+   */
+  void SetExclusiveMinBias(Bool_t exclusivemb) { fExclusiveMinBias = exclusivemb; }
+
+protected:
+
+  /**
+   * @brief Steering of object creation.
+   *
+   * Handles general objects (histogram manager
    * and analysis utils) and steers user objects
    * - CreateUserHistos
    * - CreateUserObjects
@@ -327,11 +379,17 @@ protected:
    */
   Bool_t SelectFiredPatch(const TString &triggerclass, Int_t adc) const;
 
+  /**
+   * @brief Read the downscale factors from the OCDB
+   */
+  void PrepareDownscaleFactorsFormOCDB();
+
 
   THistManager                    *fHistos;                   ///< Task Histogram container
 
   Bool_t                          fUseTriggerBits;            ///< Switch whether using trigger bits (relies on physics selection)
   Bool_t                          fRequireBunchCrossing;      ///< Require bunch-bunch events (tag -B- in trigger string)
+  Bool_t                          fUseDownscaleCorrectionFormOCDB; ///< Use downscale factors from OCDB
   AliEmcalTriggerOfflineSelection *fTriggerSelection;         ///< Offline trigger selection
   Bool_t                          fTriggerStringFromPatches;  ///< Do rebuild the trigger string from trigger patches
   std::vector<TString>            fSelectedTriggers;          //!<! Triggers selected for given event
@@ -352,6 +410,9 @@ protected:
   Bool_t                          fSelectNoiseEvents;         ///< Explicitly select events triggered only by noisy fastors
   Bool_t                          fRejectNoiseEvents;         ///< Reject events triggered by noisy fastors
   Bool_t                          fEnableDCALTriggers;        ///< Enable / Disable event selection for DCAL trigger classes
+  Bool_t                          fEnableT0Triggers;          ///< Enable triggers depending on T0 (INT8, EMC8, EMC8EGA, EMC8EJE)
+  Bool_t                          fRequireL0forL1;            ///< Require L0 for L1
+  Bool_t                          fExclusiveMinBias;          ///< Only look at Min. Bias trigger
 
 private:
   AliAnalysisTaskEmcalTriggerBase(const AliAnalysisTaskEmcalTriggerBase &);

@@ -77,6 +77,8 @@ Bool_t ConfigPhiPP13TeV_PID
   /* cos(theta) T     */ Int_t cttID  = task->CreateValue(AliRsnMiniValue::kCosThetaTransversity,kFALSE);
   /* cos(theta) T (MC)*/ Int_t cttmID  = task->CreateValue(AliRsnMiniValue::kCosThetaTransversity,kTRUE);
 
+  Int_t phiv = task->CreateValue(AliRsnMiniValue::kPhiV,kFALSE);
+
   
   // -- Create all needed outputs -----------------------------------------------------------------
   // use an array for more compact writing, which are different on mixing and charges

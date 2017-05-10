@@ -50,8 +50,14 @@ public:
     void SetCentralityMim(Int_t centMim) {fcentMim = centMim;};
     void SetCentralityMax(Int_t centMax) {fcentMax = centMax;};
 
+    void SetITSchi2(Int_t itschi2){fitschi2 = itschi2;};
+
     void SetInvMassCut0(Double_t InvmassCut) {fInvmassCut = InvmassCut;};
     void SetInvMassCut1(Double_t ptAssocut) {fptAssocut = ptAssocut;};
+
+    void SetEtaRange(Int_t etarange){fetarange = etarange;};
+
+    void SetPileUpCut(Bool_t EnablePileupRejVZEROTPCout){fEnablePileupRejVZEROTPCout = EnablePileupRejVZEROTPCout;};  
 
     Bool_t ProcessCutStep(Int_t cutStep, AliVParticle *track);
     //void SelectPhotonicElectron(Int_t itrack, AliVTrack *track, Bool_t &fFlagULSElec, Bool_t &fFlagLSElec);
@@ -107,15 +113,22 @@ private:
     
     Int_t fcentMim; // mim. centrality
     Int_t fcentMax; // max. centrality
+    Int_t fitschi2; // max. centrality
     Double_t fInvmassCut;  
     Double_t fptAssocut;  
-   
+    Int_t fetarange;  
+    Bool_t fEnablePileupRejVZEROTPCout;   
+
     Int_t NpureMCproc; // # of process in MC (no GEANT process)
     Int_t NembMCpi0; // # of process in MC (no GEANT process)
     Int_t NembMCeta; // # of process in MC (no GEANT process)
    
-    TF1 *fPi3040;
-    TF1 *fEta3040;
+    //TF1 *fPi3040;
+    //TF1 *fEta3040;
+    TF1 *fPi3040_0;
+    TF1 *fPi3040_1;
+    TF1 *fEta3040_0;
+    TF1 *fEta3040_1;
 
     TList       *fOutputList; //!Output list
     TH1F        *fNevents;//! no of events
@@ -160,8 +173,12 @@ private:
     TH2F        *fInvmassLSeta;//!Invmass of LS
     TH2F        *fInvmassHfULS;//!Invmass of ULS
     TH2F        *fInvmassHfLS;//!Invmass of LS
+    TH2D        *fHistMassULScount;
+    TH2D        *fHistMassLScount;
     TH1F        *fMCcheckMother;
-    
+    //TH1F        *fCheckEta;    
+    //TH1F        *fCheckEtaMC;    
+
     THnSparse  *fSparseElectron;//!Electron info
     Double_t *fvalueElectron;//!Electron info
     
@@ -205,6 +222,12 @@ private:
     TH1D        *fHistHFEpos;
     TH1D        *fHistHFEneg;
     TH1D        *fHistHFmcCheck;
+    //TH1D        *fHistEta;
+    //TH1D        *fHistEtaMC;
+    TH1F        *fCheckEta;    
+    TH1F        *fCheckEtaMC;    
+    TH2D        *fHistIncTPCchi2; 
+    TH2D        *fHistIncITSchi2; 
 
     AliHFEcuts  *fhfeCuts;
 

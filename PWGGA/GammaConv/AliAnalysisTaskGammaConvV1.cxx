@@ -257,12 +257,14 @@ AliAnalysisTaskGammaConvV1::AliAnalysisTaskGammaConvV1(): AliAnalysisTaskSE(),
   fDoPhotonQA(0),
   fDoChargedPrimary(kFALSE),
   fDoPlotVsCentrality(kFALSE),
-  fIsFromMBHeader(kTRUE),
+  fIsFromSelectedHeader(kTRUE),
   fIsMC(0),
   fDoTHnSparse(kTRUE),
   fWeightJetJetMC(1),
   fEnableClusterCutsForTrigger(kFALSE),
-  fDoMaterialBudgetWeightingOfGammasForTrueMesons(kFALSE)
+  fDoMaterialBudgetWeightingOfGammasForTrueMesons(kFALSE),
+  tBrokenFiles(NULL),
+  fFileNameBroken(NULL)
 {
 
 }
@@ -465,12 +467,14 @@ AliAnalysisTaskGammaConvV1::AliAnalysisTaskGammaConvV1(const char *name):
   fDoPhotonQA(0),
   fDoChargedPrimary(kFALSE),
   fDoPlotVsCentrality(kFALSE),
-  fIsFromMBHeader(kTRUE),
+  fIsFromSelectedHeader(kTRUE),
   fIsMC(0),
   fDoTHnSparse(kTRUE),
   fWeightJetJetMC(1),
   fEnableClusterCutsForTrigger(kFALSE),
-  fDoMaterialBudgetWeightingOfGammasForTrueMesons(kFALSE)
+  fDoMaterialBudgetWeightingOfGammasForTrueMesons(kFALSE),
+  tBrokenFiles(NULL),
+  fFileNameBroken(NULL)
 {
   // Define output slots here
   DefineOutput(1, TList::Class());
@@ -1556,6 +1560,11 @@ void AliAnalysisTaskGammaConvV1::UserCreateOutputObjects(){
     }  
     
   }
+  if (fIsMC > 0){
+    tBrokenFiles = new TTree("BrokenFiles","BrokenFiles");   
+    tBrokenFiles->Branch("fileName",&fFileNameBroken);
+    fOutputContainer->Add(tBrokenFiles);
+  }
   
   PostData(1, fOutputContainer);
 }
@@ -1594,18 +1603,13 @@ void AliAnalysisTaskGammaConvV1::UserExec(Option_t *)
   //
   // Called for each event
   //
-  
-  
-  if(fIsMC>0) fMCEvent = MCEvent();
-  if(fMCEvent == NULL) fIsMC = 0;
-  
   fInputEvent = InputEvent();
-
-  if(fIsMC>0 && fInputEvent->IsA()==AliESDEvent::Class()){
+  
+  // Set MC events
+  if(fIsMC>0) fMCEvent = MCEvent();
+  if(fIsMC>0 && fInputEvent->IsA()==AliESDEvent::Class() && fMCEvent){
     fMCStack = fMCEvent->Stack();
-    if(fMCStack == NULL) fIsMC = 0;
   }
-
   
   //calculating the weight for the centrality flattening
   for(Int_t iCut = 0; iCut<fnCuts; iCut++){
@@ -1617,7 +1621,19 @@ void AliAnalysisTaskGammaConvV1::UserExec(Option_t *)
   
   Int_t eventQuality = ((AliConvEventCuts*)fV0Reader->GetEventCuts())->GetEventQuality();
   if(fInputEvent->IsIncompleteDAQ()==kTRUE) eventQuality = 2;  // incomplete event
-  if(eventQuality == 2 || eventQuality == 3){// Event Not Accepted due to MC event missing or because it is incomplere or  wrong trigger for V0ReaderV1
+  // Event Not Accepted due to MC event missing or because it is incomplere or  wrong trigger for V0ReaderV1 => skip broken events/files
+  if(eventQuality == 2 || eventQuality == 3){
+    // write out name of broken file for first event
+    if (fIsMC > 0){
+      if (fInputEvent->IsA()==AliESDEvent::Class()){
+        if (((AliESDEvent*)fInputEvent)->GetEventNumberInFile() == 0){  
+          fFileNameBroken = new TObjString(Form("%s",((TString)fV0Reader->GetCurrentFileName()).Data()));
+          if (tBrokenFiles) tBrokenFiles->Fill();
+          delete fFileNameBroken;
+        } 
+      }  
+    }  
+      
     for(Int_t iCut = 0; iCut<fnCuts; iCut++){
       fHistoNEvents[iCut]->Fill(eventQuality);
       if( fIsMC > 1 ) fHistoNEventsWOWeight[iCut]->Fill(eventQuality);
@@ -1833,7 +1849,7 @@ void AliAnalysisTaskGammaConvV1::ProcessPhotonCandidates()
   for(Int_t i = 0; i < fReaderGammas->GetEntriesFast(); i++){
     AliAODConversionPhoton* PhotonCandidate = (AliAODConversionPhoton*) fReaderGammas->At(i);
     if(!PhotonCandidate) continue;
-    fIsFromMBHeader = kTRUE;
+    fIsFromSelectedHeader = kTRUE;
     if( fIsMC > 0 && ((AliConvEventCuts*)fEventCutArray->At(fiCut))->GetSignalRejection() != 0){
       Int_t isPosFromMBHeader
         = ((AliConvEventCuts*)fEventCutArray->At(fiCut))->IsParticleFromBGEvent(PhotonCandidate->GetMCLabelPositive(), fMCStack, fInputEvent);
@@ -1842,7 +1858,7 @@ void AliAnalysisTaskGammaConvV1::ProcessPhotonCandidates()
         = ((AliConvEventCuts*)fEventCutArray->At(fiCut))->IsParticleFromBGEvent(PhotonCandidate->GetMCLabelNegative(), fMCStack, fInputEvent);
       if(isNegFromMBHeader == 0 && ((AliConvEventCuts*)fEventCutArray->At(fiCut))->GetSignalRejection() != 3) continue;
 
-      if( (isNegFromMBHeader+isPosFromMBHeader) != 4) fIsFromMBHeader = kFALSE;
+      if( (isNegFromMBHeader+isPosFromMBHeader) != 4) fIsFromSelectedHeader = kFALSE;
     }
   
     if(!((AliConversionPhotonCuts*)fCutArray->At(fiCut))->PhotonIsSelected(PhotonCandidate,fInputEvent)) continue;
@@ -1851,7 +1867,7 @@ void AliAnalysisTaskGammaConvV1::ProcessPhotonCandidates()
       !((AliConversionPhotonCuts*)fCutArray->At(fiCut))->UseToCloseV0sCut()){
       fGammaCandidates->Add(PhotonCandidate); // if no second loop is required add to events good gammas
           
-      if(fIsFromMBHeader){
+      if(fIsFromSelectedHeader){
         if(fDoCentralityFlat > 0) fHistoConvGammaPt[fiCut]->Fill(PhotonCandidate->Pt(), fWeightCentrality[fiCut]*fWeightJetJetMC);
         else fHistoConvGammaPt[fiCut]->Fill(PhotonCandidate->Pt(), fWeightJetJetMC);
         if (fDoPhotonQA > 0 && fIsMC < 2){
@@ -1867,30 +1883,30 @@ void AliAnalysisTaskGammaConvV1::ProcessPhotonCandidates()
             fHistoConvGammaPhi[fiCut]->Fill(PhotonCandidate->Phi());
           }
         }   
+        if( fIsMC > 0 ){
+          if(fInputEvent->IsA()==AliESDEvent::Class())
+          ProcessTruePhotonCandidates(PhotonCandidate);
+          if(fInputEvent->IsA()==AliAODEvent::Class())
+          ProcessTruePhotonCandidatesAOD(PhotonCandidate);
+        }
+        if (fDoPhotonQA == 2){
+          if (fIsHeavyIon == 1 && PhotonCandidate->Pt() > 0.399 && PhotonCandidate->Pt() < 12.){
+            fPtGamma = PhotonCandidate->Pt();
+            fDCAzPhoton = PhotonCandidate->GetDCAzToPrimVtx();
+            fRConvPhoton = PhotonCandidate->GetConversionRadius();
+            fEtaPhoton = PhotonCandidate->GetPhotonEta();
+            iCatPhoton = PhotonCandidate->GetPhotonQuality();
+            tESDConvGammaPtDcazCat[fiCut]->Fill();
+          } else if ( PhotonCandidate->Pt() > 0.299 && PhotonCandidate->Pt() < 16.){
+            fPtGamma = PhotonCandidate->Pt();
+            fDCAzPhoton = PhotonCandidate->GetDCAzToPrimVtx();
+            fRConvPhoton = PhotonCandidate->GetConversionRadius();
+            fEtaPhoton = PhotonCandidate->GetPhotonEta();
+            iCatPhoton = PhotonCandidate->GetPhotonQuality();
+            tESDConvGammaPtDcazCat[fiCut]->Fill();
+          }
+        }  
       }
-      if( fIsMC > 0 ){
-        if(fInputEvent->IsA()==AliESDEvent::Class())
-        ProcessTruePhotonCandidates(PhotonCandidate);
-        if(fInputEvent->IsA()==AliAODEvent::Class())
-        ProcessTruePhotonCandidatesAOD(PhotonCandidate);
-      }
-      if (fIsFromMBHeader && fDoPhotonQA == 2){
-        if (fIsHeavyIon == 1 && PhotonCandidate->Pt() > 0.399 && PhotonCandidate->Pt() < 12.){
-          fPtGamma = PhotonCandidate->Pt();
-          fDCAzPhoton = PhotonCandidate->GetDCAzToPrimVtx();
-          fRConvPhoton = PhotonCandidate->GetConversionRadius();
-          fEtaPhoton = PhotonCandidate->GetPhotonEta();
-          iCatPhoton = PhotonCandidate->GetPhotonQuality();
-          tESDConvGammaPtDcazCat[fiCut]->Fill();
-        } else if ( PhotonCandidate->Pt() > 0.299 && PhotonCandidate->Pt() < 16.){
-          fPtGamma = PhotonCandidate->Pt();
-          fDCAzPhoton = PhotonCandidate->GetDCAzToPrimVtx();
-          fRConvPhoton = PhotonCandidate->GetConversionRadius();
-          fEtaPhoton = PhotonCandidate->GetPhotonEta();
-          iCatPhoton = PhotonCandidate->GetPhotonQuality();
-          tESDConvGammaPtDcazCat[fiCut]->Fill();
-        }   
-      }   
     } else if(((AliConversionPhotonCuts*)fCutArray->At(fiCut))->UseElecSharingCut()){ // if Shared Electron cut is enabled, Fill array, add to step one
       ((AliConversionPhotonCuts*)fCutArray->At(fiCut))->FillElectonLabelArray(PhotonCandidate,nV0);
       nV0++;
@@ -1904,19 +1920,19 @@ void AliAnalysisTaskGammaConvV1::ProcessPhotonCandidates()
     for(Int_t i = 0;i<GammaCandidatesStepOne->GetEntries();i++){
       AliAODConversionPhoton *PhotonCandidate= (AliAODConversionPhoton*) GammaCandidatesStepOne->At(i);
       if(!PhotonCandidate) continue;
-      fIsFromMBHeader = kTRUE;
+      fIsFromSelectedHeader = kTRUE;
       if(fMCStack && ((AliConvEventCuts*)fEventCutArray->At(fiCut))->GetSignalRejection() != 0){
         Int_t isPosFromMBHeader
         = ((AliConvEventCuts*)fEventCutArray->At(fiCut))->IsParticleFromBGEvent(PhotonCandidate->GetMCLabelPositive(), fMCStack, fInputEvent);
         Int_t isNegFromMBHeader
         = ((AliConvEventCuts*)fEventCutArray->At(fiCut))->IsParticleFromBGEvent(PhotonCandidate->GetMCLabelNegative(), fMCStack, fInputEvent);
-        if( (isNegFromMBHeader+isPosFromMBHeader) != 4) fIsFromMBHeader = kFALSE;
+        if( (isNegFromMBHeader+isPosFromMBHeader) != 4) fIsFromSelectedHeader = kFALSE;
       }
       if(!((AliConversionPhotonCuts*)fCutArray->At(fiCut))->RejectSharedElectronV0s(PhotonCandidate,i,GammaCandidatesStepOne->GetEntries())) continue;
       if(!((AliConversionPhotonCuts*)fCutArray->At(fiCut))->UseToCloseV0sCut()){ // To Colse v0s cut diabled, step two not needed
         fGammaCandidates->Add(PhotonCandidate);
         
-        if(fIsFromMBHeader){
+        if(fIsFromSelectedHeader){
           if(fDoCentralityFlat > 0) fHistoConvGammaPt[fiCut]->Fill(PhotonCandidate->Pt(), fWeightCentrality[fiCut]*fWeightJetJetMC);
           else fHistoConvGammaPt[fiCut]->Fill(PhotonCandidate->Pt(),fWeightJetJetMC);
           if (fDoPhotonQA > 0 && fIsMC < 2){
@@ -1932,28 +1948,28 @@ void AliAnalysisTaskGammaConvV1::ProcessPhotonCandidates()
               fHistoConvGammaPhi[fiCut]->Fill(PhotonCandidate->Phi());
             }
           }
-        }
-        if( fIsMC > 0 ){
-          if(fInputEvent->IsA()==AliESDEvent::Class())
-          ProcessTruePhotonCandidates(PhotonCandidate);
-          if(fInputEvent->IsA()==AliAODEvent::Class())
-          ProcessTruePhotonCandidatesAOD(PhotonCandidate);
-        }
-        if (fIsFromMBHeader && fDoPhotonQA == 2){
-          if (fIsHeavyIon ==1 && PhotonCandidate->Pt() > 0.399 && PhotonCandidate->Pt() < 12.){
-          fPtGamma = PhotonCandidate->Pt();
-          fDCAzPhoton = PhotonCandidate->GetDCAzToPrimVtx();
-          fRConvPhoton = PhotonCandidate->GetConversionRadius();
-          fEtaPhoton = PhotonCandidate->GetPhotonEta();
-          iCatPhoton = PhotonCandidate->GetPhotonQuality();
-          tESDConvGammaPtDcazCat[fiCut]->Fill();
-          } else if ( PhotonCandidate->Pt() > 0.299 && PhotonCandidate->Pt() < 16.){
-          fPtGamma = PhotonCandidate->Pt();
-          fDCAzPhoton = PhotonCandidate->GetDCAzToPrimVtx();
-          fRConvPhoton = PhotonCandidate->GetConversionRadius();
-          fEtaPhoton = PhotonCandidate->GetPhotonEta();
-          iCatPhoton = PhotonCandidate->GetPhotonQuality();
-          tESDConvGammaPtDcazCat[fiCut]->Fill();
+          if( fIsMC > 0 ){
+            if(fInputEvent->IsA()==AliESDEvent::Class())
+              ProcessTruePhotonCandidates(PhotonCandidate);
+            if(fInputEvent->IsA()==AliAODEvent::Class())
+              ProcessTruePhotonCandidatesAOD(PhotonCandidate);
+          }
+          if (fDoPhotonQA == 2){
+            if (fIsHeavyIon ==1 && PhotonCandidate->Pt() > 0.399 && PhotonCandidate->Pt() < 12.){
+              fPtGamma = PhotonCandidate->Pt();
+              fDCAzPhoton = PhotonCandidate->GetDCAzToPrimVtx();
+              fRConvPhoton = PhotonCandidate->GetConversionRadius();
+              fEtaPhoton = PhotonCandidate->GetPhotonEta();
+              iCatPhoton = PhotonCandidate->GetPhotonQuality();
+              tESDConvGammaPtDcazCat[fiCut]->Fill();
+            } else if ( PhotonCandidate->Pt() > 0.299 && PhotonCandidate->Pt() < 16.){
+              fPtGamma = PhotonCandidate->Pt();
+              fDCAzPhoton = PhotonCandidate->GetDCAzToPrimVtx();
+              fRConvPhoton = PhotonCandidate->GetConversionRadius();
+              fEtaPhoton = PhotonCandidate->GetPhotonEta();
+              iCatPhoton = PhotonCandidate->GetPhotonQuality();
+              tESDConvGammaPtDcazCat[fiCut]->Fill();
+            }
           }
         }
       } else GammaCandidatesStepTwo->Add(PhotonCandidate); // Close v0s cut enabled -> add to list two
@@ -1963,18 +1979,18 @@ void AliAnalysisTaskGammaConvV1::ProcessPhotonCandidates()
     for(Int_t i = 0;i<GammaCandidatesStepTwo->GetEntries();i++){
       AliAODConversionPhoton* PhotonCandidate = (AliAODConversionPhoton*) GammaCandidatesStepTwo->At(i);
       if(!PhotonCandidate) continue;
-      fIsFromMBHeader = kTRUE;
+      fIsFromSelectedHeader = kTRUE;
       if(fMCStack && ((AliConvEventCuts*)fEventCutArray->At(fiCut))->GetSignalRejection() != 0){
         Int_t isPosFromMBHeader
         = ((AliConvEventCuts*)fEventCutArray->At(fiCut))->IsParticleFromBGEvent(PhotonCandidate->GetMCLabelPositive(), fMCStack, fInputEvent);
         Int_t isNegFromMBHeader
         = ((AliConvEventCuts*)fEventCutArray->At(fiCut))->IsParticleFromBGEvent(PhotonCandidate->GetMCLabelNegative(), fMCStack, fInputEvent);
-        if( (isNegFromMBHeader+isPosFromMBHeader) != 4) fIsFromMBHeader = kFALSE;
+        if( (isNegFromMBHeader+isPosFromMBHeader) != 4) fIsFromSelectedHeader = kFALSE;
       }
       if(!((AliConversionPhotonCuts*)fCutArray->At(fiCut))->RejectToCloseV0s(PhotonCandidate,GammaCandidatesStepTwo,i)) continue;
       fGammaCandidates->Add(PhotonCandidate); // Add gamma to current cut TList
 
-      if(fIsFromMBHeader){
+      if(fIsFromSelectedHeader){
         if(fDoCentralityFlat > 0) fHistoConvGammaPt[fiCut]->Fill(PhotonCandidate->Pt(), fWeightCentrality[fiCut]*fWeightJetJetMC);
         else fHistoConvGammaPt[fiCut]->Fill(PhotonCandidate->Pt(),fWeightJetJetMC);
         if (fDoPhotonQA > 0 && fIsMC < 2){
@@ -1990,28 +2006,28 @@ void AliAnalysisTaskGammaConvV1::ProcessPhotonCandidates()
             fHistoConvGammaPhi[fiCut]->Fill(PhotonCandidate->Phi());
           }
         }
-      }
-      if( fIsMC > 0 ){
-        if(fInputEvent->IsA()==AliESDEvent::Class())
-        ProcessTruePhotonCandidates(PhotonCandidate);
-        if(fInputEvent->IsA()==AliAODEvent::Class())
-        ProcessTruePhotonCandidatesAOD(PhotonCandidate);
-      }
-      if (fIsFromMBHeader && fDoPhotonQA == 2){
-      if (fIsHeavyIon == 1 && PhotonCandidate->Pt() > 0.399 && PhotonCandidate->Pt() < 12.){
-        fPtGamma = PhotonCandidate->Pt();
-        fDCAzPhoton = PhotonCandidate->GetDCAzToPrimVtx();
-        fRConvPhoton = PhotonCandidate->GetConversionRadius();
-        fEtaPhoton = PhotonCandidate->GetPhotonEta();
-        iCatPhoton = PhotonCandidate->GetPhotonQuality();
-        tESDConvGammaPtDcazCat[fiCut]->Fill();
-        } else if ( PhotonCandidate->Pt() > 0.299 && PhotonCandidate->Pt() < 16.){
-        fPtGamma = PhotonCandidate->Pt();
-        fDCAzPhoton = PhotonCandidate->GetDCAzToPrimVtx();
-        fRConvPhoton = PhotonCandidate->GetConversionRadius();
-        fEtaPhoton = PhotonCandidate->GetPhotonEta();
-        iCatPhoton = PhotonCandidate->GetPhotonQuality();
-        tESDConvGammaPtDcazCat[fiCut]->Fill();
+        if( fIsMC > 0 ){
+          if(fInputEvent->IsA()==AliESDEvent::Class())
+            ProcessTruePhotonCandidates(PhotonCandidate);
+          if(fInputEvent->IsA()==AliAODEvent::Class())
+            ProcessTruePhotonCandidatesAOD(PhotonCandidate);
+        }
+        if (fDoPhotonQA == 2){
+          if (fIsHeavyIon == 1 && PhotonCandidate->Pt() > 0.399 && PhotonCandidate->Pt() < 12.){
+            fPtGamma = PhotonCandidate->Pt();
+            fDCAzPhoton = PhotonCandidate->GetDCAzToPrimVtx();
+            fRConvPhoton = PhotonCandidate->GetConversionRadius();
+            fEtaPhoton = PhotonCandidate->GetPhotonEta();
+            iCatPhoton = PhotonCandidate->GetPhotonQuality();
+            tESDConvGammaPtDcazCat[fiCut]->Fill();
+          } else if ( PhotonCandidate->Pt() > 0.299 && PhotonCandidate->Pt() < 16.){
+            fPtGamma = PhotonCandidate->Pt();
+            fDCAzPhoton = PhotonCandidate->GetDCAzToPrimVtx();
+            fRConvPhoton = PhotonCandidate->GetConversionRadius();
+            fEtaPhoton = PhotonCandidate->GetPhotonEta();
+            iCatPhoton = PhotonCandidate->GetPhotonQuality();
+            tESDConvGammaPtDcazCat[fiCut]->Fill();
+          }
         }
       }
     }
@@ -2130,64 +2146,55 @@ void AliAnalysisTaskGammaConvV1::ProcessTruePhotonCandidatesAOD(AliAODConversion
                 rConv = sqrt( (posDaughter->Xv()*posDaughter->Xv()) + (posDaughter->Yv()*posDaughter->Yv()) ); 
     
     // True Photon
-    if(fIsFromMBHeader){
-      fHistoTrueConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),fWeightJetJetMC);
-      if (CheckVectorForDoubleCount(vecDoubleCountTrueConvGammas,posDaughter->GetMother())){
-        fHistoDoubleCountTrueConvGammaRPt[fiCut]->Fill(TruePhotonCandidate->GetConversionRadius(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
-        FillMultipleCountMap(mapMultipleCountTrueConvGammas,posDaughter->GetMother());
-      }
-      if (fDoPhotonQA > 0 && fIsMC < 2){
-        fHistoTrueConvGammaPsiPairPt[fiCut]->Fill(TruePhotonCandidate->GetPsiPair(),TruePhotonCandidate->Pt());
+    fHistoTrueConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),fWeightJetJetMC);
+    if (CheckVectorForDoubleCount(vecDoubleCountTrueConvGammas,posDaughter->GetMother())){
+      fHistoDoubleCountTrueConvGammaRPt[fiCut]->Fill(TruePhotonCandidate->GetConversionRadius(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
+      FillMultipleCountMap(mapMultipleCountTrueConvGammas,posDaughter->GetMother());
+    }
+    if (fDoPhotonQA > 0 && fIsMC < 2){
+      fHistoTrueConvGammaPsiPairPt[fiCut]->Fill(TruePhotonCandidate->GetPsiPair(),TruePhotonCandidate->Pt());
 
-        fHistoTrueConvGammaEta[fiCut]->Fill(TruePhotonCandidate->Eta());
-        fHistoTrueConvGammaR[fiCut]->Fill(TruePhotonCandidate->GetConversionRadius());
-        fHistoTrueConvGammaRMC[fiCut]->Fill(rConv);
-        fHistoTrueConvGammaPtMC[fiCut]->Fill(Photon->Pt());
-      }
+      fHistoTrueConvGammaEta[fiCut]->Fill(TruePhotonCandidate->Eta());
+      fHistoTrueConvGammaR[fiCut]->Fill(TruePhotonCandidate->GetConversionRadius());
+      fHistoTrueConvGammaRMC[fiCut]->Fill(rConv);
+      fHistoTrueConvGammaPtMC[fiCut]->Fill(Photon->Pt());
     }
     fHistoTrueGammaPsiPairDeltaPhi[fiCut]->Fill(deltaPhi,TruePhotonCandidate->GetPsiPair(),fWeightJetJetMC);
 
     Bool_t isPrimary = ((AliConvEventCuts*)fEventCutArray->At(fiCut))->IsConversionPrimaryAOD(fInputEvent, Photon, mcProdVtxX, mcProdVtxY, mcProdVtxZ);
     if(isPrimary){
       // Count just primary MC Gammas as true --> For Ratio esdtruegamma / mcconvgamma
-      if(fIsFromMBHeader){
-        iPhotonMCInfo = 6;
-        fHistoTruePrimaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),fWeightJetJetMC);
-        fHistoTruePrimaryConvGammaESDPtMCPt[fiCut]->Fill(TruePhotonCandidate->Pt(),Photon->Pt(),fWeightJetJetMC); // Allways Filled
-      }
+      iPhotonMCInfo = 6;
+      fHistoTruePrimaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),fWeightJetJetMC);
+      fHistoTruePrimaryConvGammaESDPtMCPt[fiCut]->Fill(TruePhotonCandidate->Pt(),Photon->Pt(),fWeightJetJetMC); // Allways Filled
       // (Not Filled for i6, Extra Signal Gamma (parambox) are secondary)
-    }
-    else{
-      if(fIsFromMBHeader){
-        iPhotonMCInfo = 2;
-        if(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother() > -1 &&
-           ((AliAODMCParticle*)AODMCTrackArray->At(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother()))->GetPdgCode() == 310){
-          iPhotonMCInfo = 4;
-          fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),0.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),0.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaFromXFromK0sMCPtESDPt[fiCut]->Fill(Photon->Pt(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
-        } else if (((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother() > -1 &&
-                   ((AliAODMCParticle*)AODMCTrackArray->At(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother()))->GetPdgCode() == 130) {
-          iPhotonMCInfo = 7;
-          fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),1.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),1.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaFromXFromK0lMCPtESDPt[fiCut]->Fill(Photon->Pt(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
-        } else if (((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother() > -1 &&
-                   ((AliAODMCParticle*)AODMCTrackArray->At(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother()))->GetPdgCode() == 3122) {
-          iPhotonMCInfo = 5;
-          fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),2.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),2.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaFromXFromLambdaMCPtESDPt[fiCut]->Fill(Photon->Pt(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
-        } else if (((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother() > -1 &&
-                   ((AliAODMCParticle*)AODMCTrackArray->At(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother()))->GetPdgCode() == 221) {
-          iPhotonMCInfo = 3;
-          fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),3.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),3.,fWeightJetJetMC);
-        } else {
-          if ( !(TMath::Abs(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetPdgCode()) == 11 && ((AliAODMCParticle*)AODMCTrackArray->At(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother()))->GetPdgCode() == 22) ) {
+    } else {
+      iPhotonMCInfo = 2;
+      if(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother() > -1 && ((AliAODMCParticle*)AODMCTrackArray->At(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother()))->GetMother() > -1 ){
+        if (((AliAODMCParticle*)AODMCTrackArray->At(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother()))->GetPdgCode() == 310){
+            iPhotonMCInfo = 4;
+            fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),0.,fWeightJetJetMC);
+            fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),0.,fWeightJetJetMC);
+            fHistoTrueSecondaryConvGammaFromXFromK0sMCPtESDPt[fiCut]->Fill(Photon->Pt(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
+        } else if (((AliAODMCParticle*)AODMCTrackArray->At(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother()))->GetPdgCode() == 130) {
+            iPhotonMCInfo = 7;
+            fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),1.,fWeightJetJetMC);
+            fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),1.,fWeightJetJetMC);
+            fHistoTrueSecondaryConvGammaFromXFromK0lMCPtESDPt[fiCut]->Fill(Photon->Pt(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
+        } else if (((AliAODMCParticle*)AODMCTrackArray->At(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother()))->GetPdgCode() == 3122) {
+            iPhotonMCInfo = 5;
+            fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),2.,fWeightJetJetMC);
+            fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),2.,fWeightJetJetMC);
+            fHistoTrueSecondaryConvGammaFromXFromLambdaMCPtESDPt[fiCut]->Fill(Photon->Pt(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
+        } else if (((AliAODMCParticle*)AODMCTrackArray->At(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother()))->GetPdgCode() == 221) {
+            iPhotonMCInfo = 3;
             fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),3.,fWeightJetJetMC);
             fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),3.,fWeightJetJetMC);
-          }
+        } else {
+    //         if ( !(TMath::Abs(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetPdgCode()) == 11 && ((AliAODMCParticle*)AODMCTrackArray->At(((AliAODMCParticle*)AODMCTrackArray->At(Photon->GetMother()))->GetMother()))->GetPdgCode() == 22) ) {
+            fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),3.,fWeightJetJetMC);
+            fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),3.,fWeightJetJetMC);
+    //         }
         }
       }
     }
@@ -2286,66 +2293,60 @@ void AliAnalysisTaskGammaConvV1::ProcessTruePhotonCandidates(AliAODConversionPho
   if(posDaughter->GetUniqueID() != 5 || negDaughter->GetUniqueID() !=5) return;// check if the daughters come from a conversion
 
   // True Photon
-  if(fIsFromMBHeader){
-    fHistoTrueConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),fWeightJetJetMC);
-    if (CheckVectorForDoubleCount(vecDoubleCountTrueConvGammas,posDaughter->GetMother(0))){
-      fHistoDoubleCountTrueConvGammaRPt[fiCut]->Fill(TruePhotonCandidate->GetConversionRadius(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
-      FillMultipleCountMap(mapMultipleCountTrueConvGammas,posDaughter->GetMother(0));
-    }
-    if (fDoPhotonQA > 0){
-      fHistoTrueConvGammaPsiPairPt[fiCut]->Fill(TruePhotonCandidate->GetPsiPair(),TruePhotonCandidate->Pt());
-
-      fHistoTrueConvGammaEta[fiCut]->Fill(TruePhotonCandidate->Eta());
-      fHistoTrueConvGammaR[fiCut]->Fill(TruePhotonCandidate->GetConversionRadius());
-      fHistoTrueConvGammaRMC[fiCut]->Fill(posDaughter->R());
-      fHistoTrueConvGammaPtMC[fiCut]->Fill(Photon->Pt());
-    }
-
+  fHistoTrueConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),fWeightJetJetMC);
+  if (CheckVectorForDoubleCount(vecDoubleCountTrueConvGammas,posDaughter->GetMother(0))){
+    fHistoDoubleCountTrueConvGammaRPt[fiCut]->Fill(TruePhotonCandidate->GetConversionRadius(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
+    FillMultipleCountMap(mapMultipleCountTrueConvGammas,posDaughter->GetMother(0));
   }
+  if (fDoPhotonQA > 0){
+    fHistoTrueConvGammaPsiPairPt[fiCut]->Fill(TruePhotonCandidate->GetPsiPair(),TruePhotonCandidate->Pt());
+
+    fHistoTrueConvGammaEta[fiCut]->Fill(TruePhotonCandidate->Eta());
+    fHistoTrueConvGammaR[fiCut]->Fill(TruePhotonCandidate->GetConversionRadius());
+    fHistoTrueConvGammaRMC[fiCut]->Fill(posDaughter->R());
+    fHistoTrueConvGammaPtMC[fiCut]->Fill(Photon->Pt());
+  }
+
   fHistoTrueGammaPsiPairDeltaPhi[fiCut]->Fill(deltaPhi,TruePhotonCandidate->GetPsiPair(),fWeightJetJetMC);
   if (((AliConvEventCuts*)fEventCutArray->At(fiCut))->IsConversionPrimaryESD( fMCStack, posDaughter->GetMother(0), mcProdVtxX, mcProdVtxY, mcProdVtxZ)){
     // filling primary histograms
     // Count just primary MC Gammas as true --> For Ratio esdtruegamma / mcconvgamma
-    if(fIsFromMBHeader){
-      iPhotonMCInfo = 6;
-      fHistoTruePrimaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),fWeightJetJetMC);
-      fHistoTruePrimaryConvGammaESDPtMCPt[fiCut]->Fill(TruePhotonCandidate->Pt(),Photon->Pt(),fWeightJetJetMC); // Allways Filled
-    }
+    iPhotonMCInfo = 6;
+    fHistoTruePrimaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),fWeightJetJetMC);
+    fHistoTruePrimaryConvGammaESDPtMCPt[fiCut]->Fill(TruePhotonCandidate->Pt(),Photon->Pt(),fWeightJetJetMC); // Allways Filled
     // (Not Filled for i6, Extra Signal Gamma (parambox) are secondary)
   } else {
     // filling secondary photon histograms
-    if(fIsFromMBHeader){
-      iPhotonMCInfo = 2;
-      if( Photon->GetMother(0) > -1 && fMCStack->Particle(Photon->GetMother(0))->GetMother(0) > -1){
-        if (fMCStack->Particle(fMCStack->Particle(Photon->GetMother(0))->GetMother(0))->GetPdgCode() == 310){
-          iPhotonMCInfo = 4;
-          fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),0.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),0.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaFromXFromK0sMCPtESDPt[fiCut]->Fill(Photon->Pt(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
-        } else if (fMCStack->Particle(fMCStack->Particle(Photon->GetMother(0))->GetMother(0))->GetPdgCode() == 130) {
-          iPhotonMCInfo = 7;
-          fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),1.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),1.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaFromXFromK0lMCPtESDPt[fiCut]->Fill(Photon->Pt(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
-        } else if (fMCStack->Particle(fMCStack->Particle(Photon->GetMother(0))->GetMother(0))->GetPdgCode() == 3122) {
-          iPhotonMCInfo = 5;
-          fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),2.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),2.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaFromXFromLambdaMCPtESDPt[fiCut]->Fill(Photon->Pt(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
-        } else if (fMCStack->Particle(fMCStack->Particle(Photon->GetMother(0))->GetMother(0))->GetPdgCode() == 221) {
-          iPhotonMCInfo = 3;
-          fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(Photon->Pt(),3.,fWeightJetJetMC);
-          fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(TruePhotonCandidate->Pt(),3.,fWeightJetJetMC);
-        } else {
-          if ( !(TMath::Abs(fMCStack->Particle(Photon->GetMother(0))->GetPdgCode()) == 11 && fMCStack->Particle(fMCStack->Particle(Photon->GetMother(0))->GetMother(0))->GetPdgCode() == 22) ) {
-            fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),3.,fWeightJetJetMC);
-            fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),3.,fWeightJetJetMC);
-          }
-        }
+    iPhotonMCInfo = 2;
+    if( Photon->GetMother(0) > -1 && fMCStack->Particle(Photon->GetMother(0))->GetMother(0) > -1){
+      if (fMCStack->Particle(fMCStack->Particle(Photon->GetMother(0))->GetMother(0))->GetPdgCode() == 310){
+        iPhotonMCInfo = 4;
+        fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),0.,fWeightJetJetMC);
+        fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),0.,fWeightJetJetMC);
+        fHistoTrueSecondaryConvGammaFromXFromK0sMCPtESDPt[fiCut]->Fill(Photon->Pt(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
+      } else if (fMCStack->Particle(fMCStack->Particle(Photon->GetMother(0))->GetMother(0))->GetPdgCode() == 130) {
+        iPhotonMCInfo = 7;
+        fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),1.,fWeightJetJetMC);
+        fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),1.,fWeightJetJetMC);
+        fHistoTrueSecondaryConvGammaFromXFromK0lMCPtESDPt[fiCut]->Fill(Photon->Pt(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
+      } else if (fMCStack->Particle(fMCStack->Particle(Photon->GetMother(0))->GetMother(0))->GetPdgCode() == 3122) {
+        iPhotonMCInfo = 5;
+        fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),2.,fWeightJetJetMC);
+        fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),2.,fWeightJetJetMC);
+        fHistoTrueSecondaryConvGammaFromXFromLambdaMCPtESDPt[fiCut]->Fill(Photon->Pt(),TruePhotonCandidate->Pt(),fWeightJetJetMC);
+      } else if (fMCStack->Particle(fMCStack->Particle(Photon->GetMother(0))->GetMother(0))->GetPdgCode() == 221) {
+        iPhotonMCInfo = 3;
+        fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(Photon->Pt(),3.,fWeightJetJetMC);
+        fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(TruePhotonCandidate->Pt(),3.,fWeightJetJetMC);
       } else {
-        fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),3.,fWeightJetJetMC);
-        fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),3.,fWeightJetJetMC);
+//         if ( !(TMath::Abs(fMCStack->Particle(Photon->GetMother(0))->GetPdgCode()) == 11 && fMCStack->Particle(fMCStack->Particle(Photon->GetMother(0))->GetMother(0))->GetPdgCode() == 22) ) {
+          fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),3.,fWeightJetJetMC);
+          fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),3.,fWeightJetJetMC);
+//         }
       }
+    } else {
+      fHistoTrueSecondaryConvGammaPt[fiCut]->Fill(TruePhotonCandidate->Pt(),3.,fWeightJetJetMC);
+      fHistoTrueSecondaryConvGammaMCPt[fiCut]->Fill(Photon->Pt(),3.,fWeightJetJetMC);
     }
   }
 }
@@ -3662,53 +3663,60 @@ void AliAnalysisTaskGammaConvV1::UpdateEventByEventData(){
 void AliAnalysisTaskGammaConvV1::FillPhotonCombinatorialBackgroundHist(AliAODConversionPhoton *TruePhotonCandidate, Int_t pdgCode[], Double_t PhiParticle[])
 {
   // Combinatorial Bck = 0 ee, 1 epi, 2 ek, 3 ep, 4 emu, 5 pipi, 6 pik, 7 pip, 8 pimu, 9 kk, 10 kp, 11 kmu, 12 pp, 13 pmu, 14 mumu, 15 Rest
-  if(pdgCode[0]==11   && pdgCode[1]==11){if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),0.,fWeightJetJetMC);}
-  else if( (pdgCode[0]==11   && pdgCode[1]==211) || (pdgCode[0]==211  && pdgCode[1]==11) )
-    {if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),1.,fWeightJetJetMC);}
-  else if( (pdgCode[0]==11   && pdgCode[1]==321) || (pdgCode[0]==321  && pdgCode[1]==11) )
-    {if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),2.,fWeightJetJetMC);}
-  else if( (pdgCode[0]==11   && pdgCode[1]==2212) || (pdgCode[0]==2212 && pdgCode[1]==11) )
-    {if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),3.,fWeightJetJetMC);}
-  else if( (pdgCode[0]==11   && pdgCode[1]==13) || (pdgCode[0]==13   && pdgCode[1]==11) )
-    {if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),4.,fWeightJetJetMC);}
-  else if(  pdgCode[0]==211  && pdgCode[1]==211 ){if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),5.,fWeightJetJetMC);}
-  else if( (pdgCode[0]==211  && pdgCode[1]==321) || (pdgCode[0]==321  && pdgCode[1]==211) )
-    {if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),6.,fWeightJetJetMC);}
-  else if( (pdgCode[0]==211  && pdgCode[1]==2212) || (pdgCode[0]==2212 && pdgCode[1]==211) )
-    {if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),7.,fWeightJetJetMC);}
-  else if( (pdgCode[0]==211  && pdgCode[1]==13) || (pdgCode[0]==13   && pdgCode[1]==211) )
-    {if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),8.,fWeightJetJetMC);}
-  else if(  pdgCode[0]==321  && pdgCode[1]==321 ){if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),9.,fWeightJetJetMC);}
-  else if( (pdgCode[0]==321  && pdgCode[1]==2212) || (pdgCode[0]==2212 && pdgCode[1]==321) )
-    {if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),10.,fWeightJetJetMC);}
-  else if( (pdgCode[0]==321  && pdgCode[1]==13) || (pdgCode[0]==13   && pdgCode[1]==321) )
-    {if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),11.,fWeightJetJetMC);}
-  else if(  pdgCode[0]==2212   && pdgCode[1]==2212  ){if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),12.,fWeightJetJetMC);}
-  else if( (pdgCode[0]==2212  && pdgCode[1]==13) || (pdgCode[0]==13   && pdgCode[1]==2212) )
-    {if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),13.,fWeightJetJetMC);}
-  else if(  pdgCode[0]==13   && pdgCode[1]==13  ){if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),14.,fWeightJetJetMC);}
-  else {if(fIsFromMBHeader)fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),15.,fWeightJetJetMC);}
+  if(pdgCode[0]==11   && pdgCode[1]==11){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),0.,fWeightJetJetMC);
+  } else if( (pdgCode[0]==11   && pdgCode[1]==211) || (pdgCode[0]==211  && pdgCode[1]==11) ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),1.,fWeightJetJetMC);
+  } else if( (pdgCode[0]==11   && pdgCode[1]==321) || (pdgCode[0]==321  && pdgCode[1]==11) ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),2.,fWeightJetJetMC);
+  } else if( (pdgCode[0]==11   && pdgCode[1]==2212) || (pdgCode[0]==2212 && pdgCode[1]==11) ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),3.,fWeightJetJetMC);
+  } else if( (pdgCode[0]==11   && pdgCode[1]==13) || (pdgCode[0]==13   && pdgCode[1]==11) ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),4.,fWeightJetJetMC);
+  } else if(  pdgCode[0]==211  && pdgCode[1]==211 ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),5.,fWeightJetJetMC);
+  } else if( (pdgCode[0]==211  && pdgCode[1]==321) || (pdgCode[0]==321  && pdgCode[1]==211) ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),6.,fWeightJetJetMC);
+  } else if( (pdgCode[0]==211  && pdgCode[1]==2212) || (pdgCode[0]==2212 && pdgCode[1]==211) ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),7.,fWeightJetJetMC);
+  } else if( (pdgCode[0]==211  && pdgCode[1]==13) || (pdgCode[0]==13   && pdgCode[1]==211) ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),8.,fWeightJetJetMC);
+  } else if(  pdgCode[0]==321  && pdgCode[1]==321 ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),9.,fWeightJetJetMC);
+  } else if( (pdgCode[0]==321  && pdgCode[1]==2212) || (pdgCode[0]==2212 && pdgCode[1]==321) ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),10.,fWeightJetJetMC);
+  } else if( (pdgCode[0]==321  && pdgCode[1]==13) || (pdgCode[0]==13   && pdgCode[1]==321) ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),11.,fWeightJetJetMC);
+  } else if(  pdgCode[0]==2212   && pdgCode[1]==2212  ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),12.,fWeightJetJetMC);
+  } else if( (pdgCode[0]==2212  && pdgCode[1]==13) || (pdgCode[0]==13   && pdgCode[1]==2212) ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),13.,fWeightJetJetMC);
+  } else if(  pdgCode[0]==13   && pdgCode[1]==13  ){
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),14.,fWeightJetJetMC);
+  } else {
+    fHistoCombinatorialPt[fiCut]->Fill(TruePhotonCandidate->Pt(),15.,fWeightJetJetMC);
+  }
   
   if(fDoPhotonQA == 3 && fIsMC < 2){
     if( (pdgCode[0]==11   && pdgCode[1]==211) || (pdgCode[0]==211  && pdgCode[1]==11) ){
-      if(pdgCode[0]==11){if(fIsFromMBHeader)fHistoCombinatorialPtDeltaPhi_epi[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[1])));}
-      else if(pdgCode[0]==211){if(fIsFromMBHeader)fHistoCombinatorialPtDeltaPhi_epi[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[0])));}
+      if(pdgCode[0]==11){fHistoCombinatorialPtDeltaPhi_epi[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[1])));}
+      else if(pdgCode[0]==211){fHistoCombinatorialPtDeltaPhi_epi[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[0])));}
     }
     else if( (pdgCode[0]==11   && pdgCode[1]==321) || (pdgCode[0]==321  && pdgCode[1]==11) ){
-      if(pdgCode[0]==11){if(fIsFromMBHeader)fHistoCombinatorialPtDeltaPhi_ek[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[1])));}
-      else if(pdgCode[0]==321){if(fIsFromMBHeader)fHistoCombinatorialPtDeltaPhi_ek[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[0])));}
+      if(pdgCode[0]==11){fHistoCombinatorialPtDeltaPhi_ek[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[1])));}
+      else if(pdgCode[0]==321){fHistoCombinatorialPtDeltaPhi_ek[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[0])));}
     }
     else if( (pdgCode[0]==11   && pdgCode[1]==2212) || (pdgCode[0]==2212 && pdgCode[1]==11) ){
-      if(pdgCode[0]==11){if(fIsFromMBHeader)fHistoCombinatorialPtDeltaPhi_ep[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[1])));}
-      else if(pdgCode[0]==2212){if(fIsFromMBHeader)fHistoCombinatorialPtDeltaPhi_ep[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[0])));}
+      if(pdgCode[0]==11){fHistoCombinatorialPtDeltaPhi_ep[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[1])));}
+      else if(pdgCode[0]==2212){fHistoCombinatorialPtDeltaPhi_ep[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[0])));}
     }
     else if( (pdgCode[0]==211  && pdgCode[1]==321) || (pdgCode[0]==321  && pdgCode[1]==211) ){
-      if(pdgCode[0]==211){if(fIsFromMBHeader)fHistoCombinatorialPtDeltaPhi_pik[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[1])));}
-      else if(pdgCode[0]==321){if(fIsFromMBHeader)fHistoCombinatorialPtDeltaPhi_pik[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[0])));}
+      if(pdgCode[0]==211){fHistoCombinatorialPtDeltaPhi_pik[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[1])));}
+      else if(pdgCode[0]==321){fHistoCombinatorialPtDeltaPhi_pik[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[0])));}
     }
     else if( (pdgCode[0]==211  && pdgCode[1]==2212) || (pdgCode[0]==2212 && pdgCode[1]==211) ){
-      if(pdgCode[0]==211){if(fIsFromMBHeader)fHistoCombinatorialPtDeltaPhi_pip[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[1])));}
-      else if(pdgCode[0]==2212){if(fIsFromMBHeader)fHistoCombinatorialPtDeltaPhi_pip[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[0])));}
+      if(pdgCode[0]==211){fHistoCombinatorialPtDeltaPhi_pip[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[1])));}
+      else if(pdgCode[0]==2212){fHistoCombinatorialPtDeltaPhi_pip[fiCut]->Fill(TruePhotonCandidate->Pt(),TMath::Abs((TruePhotonCandidate->Phi() - PhiParticle[0])));}
     }
     
   }
@@ -3722,101 +3730,89 @@ void AliAnalysisTaskGammaConvV1::FillPhotonCombinatorialMothersHistESD(TParticle
 
   // Combinatorial Bck mothers: e, pi, k, p, pi0, eta, omega, phi, eta', K0s, Lambda, rhos, other, not prim
   if(pdgCombPart==11){ //comb particle is an electron
-    if(fIsFromMBHeader){
-      if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(0.,0.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,1.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,2.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(0.,3.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,4.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,5.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,6.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,7.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,8.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,9.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(0.,10.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(0.,11.,motherCombPart->Pt());
-      else fHistoCombinatorialMothersPt[fiCut]->Fill(0.,12.,motherCombPart->Pt());
-    }
+    if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(0.,0.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,1.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,2.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(0.,3.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,4.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,5.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,6.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,7.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,8.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,9.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(0.,10.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(0.,11.,motherCombPart->Pt());
+    else fHistoCombinatorialMothersPt[fiCut]->Fill(0.,12.,motherCombPart->Pt());
   } else if(pdgCombPart==211){ //comb particle is a pion
-    if(fIsFromMBHeader){
-      if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(1.,0.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,1.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,2.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(1.,3.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,4.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,5.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,6.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,7.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,8.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,9.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(1.,10.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(1.,11.,motherCombPart->Pt());
-      else fHistoCombinatorialMothersPt[fiCut]->Fill(1.,12.,motherCombPart->Pt());
-    }
+    if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(1.,0.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,1.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,2.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(1.,3.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,4.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,5.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,6.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,7.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,8.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,9.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(1.,10.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(1.,11.,motherCombPart->Pt());
+    else fHistoCombinatorialMothersPt[fiCut]->Fill(1.,12.,motherCombPart->Pt());
   } else if(pdgCombPart==321){ //comb particle is a kaon
-    if(fIsFromMBHeader){
-      if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(2.,0.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,1.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,2.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(2.,3.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,4.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,5.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,6.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,7.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,8.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,9.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(2.,10.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(2.,11.,motherCombPart->Pt());
-      else fHistoCombinatorialMothersPt[fiCut]->Fill(2.,12.,motherCombPart->Pt());
-    }
+    if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(2.,0.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,1.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,2.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(2.,3.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,4.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,5.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,6.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,7.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,8.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,9.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(2.,10.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(2.,11.,motherCombPart->Pt());
+    else fHistoCombinatorialMothersPt[fiCut]->Fill(2.,12.,motherCombPart->Pt());
   } else if(pdgCombPart==2212){ //comb particle is a proton
-    if(fIsFromMBHeader){
-      if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(3.,0.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,1.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,2.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(3.,3.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,4.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,5.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,6.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,7.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,8.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,9.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(3.,10.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(3.,11.,motherCombPart->Pt());
-      else fHistoCombinatorialMothersPt[fiCut]->Fill(3.,12.,motherCombPart->Pt());
-    }
+    if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(3.,0.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,1.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,2.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(3.,3.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,4.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,5.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,6.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,7.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,8.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,9.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(3.,10.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(3.,11.,motherCombPart->Pt());
+    else fHistoCombinatorialMothersPt[fiCut]->Fill(3.,12.,motherCombPart->Pt());
   } else if(motherCombPart->GetMother(0) >-1){
-    if(fIsFromMBHeader){
-      if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(5.,0.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,1.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,2.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(5.,3.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,4.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,5.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,6.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,7.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,8.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,9.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(5.,10.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(5.,11.,motherCombPart->Pt());
-      else fHistoCombinatorialMothersPt[fiCut]->Fill(5.,12.,motherCombPart->Pt());
-    }
+    if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(5.,0.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,1.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,2.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(5.,3.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,4.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,5.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,6.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,7.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,8.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,9.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(5.,10.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(5.,11.,motherCombPart->Pt());
+    else fHistoCombinatorialMothersPt[fiCut]->Fill(5.,12.,motherCombPart->Pt());
   } else {
-    if(fIsFromMBHeader){
-      if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(4.,0.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,1.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,2.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(4.,3.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,4.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,5.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,6.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,7.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,8.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,9.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(4.,10.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(4.,11.,motherCombPart->Pt());
-      else fHistoCombinatorialMothersPt[fiCut]->Fill(4.,12.,motherCombPart->Pt());
-    }
+    if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(4.,0.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,1.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,2.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(4.,3.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,4.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,5.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,6.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,7.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,8.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,9.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(4.,10.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(4.,11.,motherCombPart->Pt());
+    else fHistoCombinatorialMothersPt[fiCut]->Fill(4.,12.,motherCombPart->Pt());
   }
 }
 
@@ -3828,101 +3824,89 @@ void AliAnalysisTaskGammaConvV1::FillPhotonCombinatorialMothersHistAOD(AliAODMCP
 
   // Combinatorial Bck mothers: e, pi, k, p, pi0, eta, omega, phi, eta', K0s, Lambda, rhos, other, not prim
   if(pdgCombPart==11){ //comb particle is an electron
-    if(fIsFromMBHeader){
-      if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(0.,0.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,1.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,2.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(0.,3.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,4.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,5.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,6.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,7.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,8.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,9.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(0.,10.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(0.,11.,motherCombPart->Pt());
-      else fHistoCombinatorialMothersPt[fiCut]->Fill(0.,12.,motherCombPart->Pt());
-    }
+    if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(0.,0.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,1.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,2.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(0.,3.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,4.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,5.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,6.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,7.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,8.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(0.,9.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(0.,10.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(0.,11.,motherCombPart->Pt());
+    else fHistoCombinatorialMothersPt[fiCut]->Fill(0.,12.,motherCombPart->Pt());
   } else if(pdgCombPart==211){ //comb particle is a pion
-    if(fIsFromMBHeader){
-      if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(1.,0.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,1.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,2.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(1.,3.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,4.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,5.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,6.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,7.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,8.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,9.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(1.,10.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(1.,11.,motherCombPart->Pt());
-      else fHistoCombinatorialMothersPt[fiCut]->Fill(1.,12.,motherCombPart->Pt());
-    }
+    if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(1.,0.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,1.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,2.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(1.,3.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,4.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,5.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,6.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,7.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,8.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(1.,9.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(1.,10.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(1.,11.,motherCombPart->Pt());
+    else fHistoCombinatorialMothersPt[fiCut]->Fill(1.,12.,motherCombPart->Pt());
   } else if(pdgCombPart==321){ //comb particle is a kaon
-    if(fIsFromMBHeader){
-      if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(2.,0.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,1.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,2.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(2.,3.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,4.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,5.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,6.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,7.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,8.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,9.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(2.,10.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(2.,11.,motherCombPart->Pt());
-      else fHistoCombinatorialMothersPt[fiCut]->Fill(2.,12.,motherCombPart->Pt());
-    }
+    if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(2.,0.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,1.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,2.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(2.,3.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,4.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,5.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,6.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,7.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,8.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(2.,9.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(2.,10.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(2.,11.,motherCombPart->Pt());
+    else fHistoCombinatorialMothersPt[fiCut]->Fill(2.,12.,motherCombPart->Pt());
   } else if(pdgCombPart==2212){ //comb particle is a proton
-    if(fIsFromMBHeader){
-      if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(3.,0.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,1.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,2.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(3.,3.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,4.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,5.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,6.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,7.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,8.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,9.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(3.,10.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(3.,11.,motherCombPart->Pt());
-      else fHistoCombinatorialMothersPt[fiCut]->Fill(3.,12.,motherCombPart->Pt());
-    }
+    if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(3.,0.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,1.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,2.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(3.,3.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,4.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,5.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,6.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,7.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,8.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(3.,9.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(3.,10.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(3.,11.,motherCombPart->Pt());
+    else fHistoCombinatorialMothersPt[fiCut]->Fill(3.,12.,motherCombPart->Pt());
   } else if(motherCombPart->GetMother() >-1){
-    if(fIsFromMBHeader){
-      if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(5.,0.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,1.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,2.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(5.,3.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,4.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,5.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,6.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,7.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,8.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,9.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(5.,10.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(5.,11.,motherCombPart->Pt());
-      else fHistoCombinatorialMothersPt[fiCut]->Fill(5.,12.,motherCombPart->Pt());
-    }
+    if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(5.,0.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,1.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,2.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(5.,3.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,4.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,5.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,6.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,7.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,8.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(5.,9.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(5.,10.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(5.,11.,motherCombPart->Pt());
+    else fHistoCombinatorialMothersPt[fiCut]->Fill(5.,12.,motherCombPart->Pt());
   } else {
-    if(fIsFromMBHeader){
-      if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(4.,0.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,1.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,2.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(4.,3.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,4.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,5.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,6.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,7.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,8.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,9.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(4.,10.,motherCombPart->Pt());
-      else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(4.,11.,motherCombPart->Pt());
-      else fHistoCombinatorialMothersPt[fiCut]->Fill(4.,12.,motherCombPart->Pt());
-    }
+    if(pdgMotherCombPart==11)         fHistoCombinatorialMothersPt[fiCut]->Fill(4.,0.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==211)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,1.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==321)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,2.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==2212)  fHistoCombinatorialMothersPt[fiCut]->Fill(4.,3.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==111)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,4.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==221)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,5.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==223)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,6.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==333)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,7.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==331)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,8.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==310)   fHistoCombinatorialMothersPt[fiCut]->Fill(4.,9.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==3122)  fHistoCombinatorialMothersPt[fiCut]->Fill(4.,10.,motherCombPart->Pt());
+    else if(pdgMotherCombPart==113 || pdgMotherCombPart==213)fHistoCombinatorialMothersPt[fiCut]->Fill(4.,11.,motherCombPart->Pt());
+    else fHistoCombinatorialMothersPt[fiCut]->Fill(4.,12.,motherCombPart->Pt());
   }
 }
 

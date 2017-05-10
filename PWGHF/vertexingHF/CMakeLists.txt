@@ -23,7 +23,7 @@ include_directories(${AliPhysics_SOURCE_DIR}/PWGHF/vertexingHF)
 # Additional includes - alphabetical order except ROOT
 include_directories(${ROOT_INCLUDE_DIRS}
                     ${AliPhysics_SOURCE_DIR}/CORRFW
-		    ${AliPhysics_SOURCE_DIR}/OADB/COMMON/MULTIPLICITY	
+		    ${AliPhysics_SOURCE_DIR}/OADB/COMMON/MULTIPLICITY
                     ${AliPhysics_SOURCE_DIR}/PWGPP/EVCHAR/FlowVectorCorrections/QnCorrections
 		    ${AliPhysics_SOURCE_DIR}/PWGPP/EVCHAR/FlowVectorCorrections/QnCorrectionsInterface/
                     ${AliPhysics_SOURCE_DIR}/PWG/FLOW/Base
@@ -60,19 +60,20 @@ set(SRCS
   AliRDHFCutsOmegactoeleOmegafromAODtracks.cxx
   AliRDHFCutsXicPlustoXiPiPifromAODtracks.cxx
   AliRDHFCutsXictoeleXifromAODtracks.cxx
-  AliAnalysisVertexingHF.cxx 
-  AliAnalysisTaskSEVertexingHF.cxx 
-  AliAnalysisTaskMEVertexingHF.cxx 
-  AliAnalysisTaskSESelectHF.cxx 
+  AliAnalysisVertexingHF.cxx
+  AliAnalysisTaskSEVertexingHF.cxx
+  AliAnalysisTaskMEVertexingHF.cxx
+  AliAnalysisTaskSESelectHF.cxx
   AliAnalysisTaskSECleanupVertexingHF.cxx
-  AliAnalysisTaskSECompareHF.cxx 
-  AliAnalysisTaskSEDplus.cxx 
-  AliAnalysisTaskSEDs.cxx 
-  AliAnalysisTaskSELambdac.cxx 
+  AliAnalysisTaskSECompareHF.cxx
+  AliAnalysisTaskSEDplus.cxx
+  AliAnalysisTaskSEDs.cxx
+  AliAnalysisTaskSELambdac.cxx
   AliAnalysisTaskSED0Mass.cxx
   AliAnalysisTaskSELambdacTMVA.cxx
   AliAnalysisTaskSED0MassCutVarFDSub.cxx
   AliAnalysisTaskSECharmFraction.cxx
+  AliAnalysisTaskSED0MassNonPromptFraction.cxx
   AliAnalysisTaskSELc2V0bachelor.cxx
   AliAnalysisTaskSEDvsMultiplicity.cxx
   AliAnalysisTaskCheckHFMCProd.cxx
@@ -87,7 +88,7 @@ set(SRCS
   AliCFTaskVertexingHFCutVarFDSub.cxx
   AliCFTaskForDStarAnalysis.cxx
   AliAnalysisTaskSEDStarJets.cxx
-  AliAnalysisTaskSEDStarSpectra.cxx 
+  AliAnalysisTaskSEDStarSpectra.cxx
   AliAnalysisTaskSEDStarCharmFraction.cxx
   AliAnalysisTaskSESignificance.cxx
   AliAnalysisTaskSEHFQA.cxx
@@ -95,6 +96,7 @@ set(SRCS
   AliSignificanceCalculator.cxx
   AliHFMassFitter.cxx
   AliHFMassFitterVAR.cxx
+  AliHFInvMassFitter.cxx
   AliHFMultiTrials.cxx
   AliHFPtSpectrum.cxx
   AliHFsubtractBFDcuts.cxx
@@ -105,6 +107,7 @@ set(SRCS
   AliAnalysisTaskCombinHF.cxx
   charmFlow/AliEventPlaneResolutionHandler.cxx
   charmFlow/AliAnalysisTaskSEHFv2.cxx
+  charmFlow/AliAnalysisTaskSEHFvn.cxx
   charmFlow/AliHFAfterBurner.cxx
   charmFlow/AliAnalysisTaskFlowD2H.cxx
   cutVarFDsub/AliHFCutVarFDsubAnalysisManager.cxx
@@ -119,10 +122,12 @@ set(SRCS
   upgrade/AliAnalysisTaskSELambdacUp.cxx
   upgrade/AliAnalysisTaskCountLcEta.cxx
   AliAnalysisTaskSELc2eleLambdafromAODtracks.cxx
-  AliAnalysisTaskSELc2V0bachelorTMVA.cxx 
+  AliAnalysisTaskSELc2V0bachelorTMVA.cxx
   AliAnalysisTaskSEOmegac2eleOmegafromAODtracks.cxx
   AliAnalysisTaskSEXic2eleXifromAODtracks.cxx
   AliAnalysisTaskSEDvsEventShapes.cxx
+  AliAnalysisTaskSEB0toDminuspi.cxx
+  AliHFVnVsMassFitter.cxx
   )
 
 # Headers from sources

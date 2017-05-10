@@ -1,6 +1,5 @@
 configurationName: "Default configuration"          # Optional - Simply for user convenience
-period: ""                                          # This value in the user configuration must match the value given to the correction add task
-pass: ""                                            # Attempts to automatically retrieve the pass if not specified
+pass: ""                                            # Attempts to automatically retrieve the pass if not specified. Usually of the form "pass#".
 # Look at the documentation for a full explanation of the input objects!
 inputObjects:                                       # Define all of the input objects for the corrections
     cells:                                          # Configure cells
@@ -39,6 +38,11 @@ inputObjects:                                       # Define all of the input ob
             #    - 1
 sharedParameters:
     # You can define here any parameters that you would like to share between tasks. See the documentation for more information
+    enableFracEMCRecalc: false                      # Enables the recalculation of the MC labels including the fractional energy on cell level
+    removeNMCGenerators: 0                          # set number of accepted MC generators input (only for enableFracEMCRecalc=1)
+    enableMCGenRemovTrack: true                     # apply the MC generators rejection also for track matching
+    removeMCGen1: ""                                # name of generator input to be accepted
+    removeMCGen2: ""                                # name of generator input to be accepted
 # This defines the settings for the "AliEmcalCorrectionCellEnergy" correction.
 # Note how the "AliEmcalCorrection" part of the name is not required when defining the settings
 CellEnergy:                                         # Cell Energy correction component
@@ -56,6 +60,15 @@ CellTimeCalib:                                      # Cell Time Calibration comp
     createHistos: false                             # Whether the task should create output histograms
     cellsNames:                                     # Names of the cells input objects which should be attached to the correction
         - defaultCells                              # This object is defined above in the cells section of the input objects
+CellCombineCollections:                             # Utility task to combine two cells collections into a single collection.
+                                                    # It is useful for embedding, but little else.
+                                                    # The combined needs to be done here to enable different cell corrections for the different cell collections (for example, MC may need different corrections than data.)
+    enabled: false                                  # Whether to enable the task
+    createHistos: false                             # Whether the task should create output histograms
+    externalCellsBranchName: "usedefault"           # Name of the cells branch in the embedded (external) event.
+    combinedCellsBranchName: "emcalCellsCombined"   # Name of the cells branch to be created for the combined cells in the input event.
+    cellsNames:                                     # Names of the cells input objects which should be attached to the correction
+        - defaultCells                              # This object is defined above in the cells section of the input objects
 Clusterizer:                                        # Clusterizer component
     enabled: false                                  # Whether to enable the task
     createHistos: false                             # Whether the task should create output histograms
@@ -65,17 +78,19 @@ Clusterizer:                                        # Clusterizer component
     cellTimeMin: -1                                 # Min cell time (s)
     cellTimeMax: +1                                 # Max cell time (s)
     clusterTimeLength: 1                            # Maximum time difference between the digits inside EMC cluster (s)
-    w0: 4.5                                         # w0
+    w0: 4.5                                         # Weighting factor for determing the cluster position
     recalDistToBadChannels: false                   # True will recalculate the distance to bad channels
     recalShowerShape: false                         # True will recalculate the shower shape
     remapMcAod: false                               # Switch for the remaping for the MC labels in AOD productions
-    enableFracEMCRecalc: false                      # Enables the recalculation of the MC labels including the fractional energy on cell level
+    enableFracEMCRecalc: "sharedParameters:enableFracEMCRecalc"
+    removeNMCGenerators: "sharedParameters:removeNMCGenerators"
+    enableMCGenRemovTrack: "sharedParameters:enableMCGenRemovTrack"
+    removeMCGen1: "sharedParameters:removeMCGen1"
+    removeMCGen2: "sharedParameters:removeMCGen2"
     setCellMCLabelFromCluster: 0                    # Enables setting the cell MC label from the cluster. There are different modes depending on the value
-    removeNMCGenerators: 0                          # set number of accepted MC generators input (only for enableFracEMCRecalc=1)
-    enableMCGenRemovTrack: true                     # apply the MC generators rejection also for track matching
-    removeMCGen1: ""                                # name of generator input to be accepted
-    removeMCGen2: ""                                # name of generator input to be accepted
     diffEAggregation: 0.03                          # difference E in aggregation of cells (i.e. stop aggregation if E_{new} > E_{prev} + diffEAggregation)
+    useTestPatternForInput: false                   # Use test pattern for input instead of cells. Intended for testing and debugging.
+    embeddedCellEnergyType: kNonEmbedded            # Select which part of the embedded energy to use for clusterization. Disabled by default.
     cellsNames:                                     # Names of the cells input objects which should be attached to the correction
         - defaultCells                              # This object is defined above in the cells section of the input objects
     clusterContainersNames:                         # Names of the cluster input objects which should be attached to the correction
@@ -99,6 +114,13 @@ ClusterTrackMatcher:                                # Cluster-track matcher comp
     enabled: false                                  # Whether to enable the task
     createHistos: false                             # Whether the task should create output histograms
     maxDist: 0.1                                    # Max distance between a matched cluster and track
+    useDCA: true                                    # Use DCA as starting point for track propagation, rather than primary vertex
+    usePIDmass: true                                # Use PID-based mass hypothesis for track propagation, rather than pion mass hypothesis
+    enableFracEMCRecalc: "sharedParameters:enableFracEMCRecalc"
+    removeNMCGenerators: "sharedParameters:removeNMCGenerators"
+    enableMCGenRemovTrack: "sharedParameters:enableMCGenRemovTrack"
+    removeMCGen1: "sharedParameters:removeMCGen1"
+    removeMCGen2: "sharedParameters:removeMCGen2"
     updateClusters: true                            # Update the matching information in the cluster
     updateTracks: true                              # Update the matching information in the track
     cellsNames:                                     # Names of the cells input objects which should be attached to the correction
@@ -128,6 +150,7 @@ executionOrder:
     - CellEnergy
     - CellBadChannel
     - CellTimeCalib
+    - CellCombineCollections
     - Clusterizer
     - ClusterExotics
     - ClusterNonLinearity

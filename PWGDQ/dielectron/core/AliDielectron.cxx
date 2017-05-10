@@ -120,6 +120,7 @@ AliDielectron::AliDielectron() :
   fEventPlanePreFilter("EventPlanePreFilter"),
   fEventPlanePOIPreFilter("EventPlanePOIPreFilter"),
   fQnTPCACcuts(0x0),
+  fQnVectorNorm(""),
   fPdgMother(443),
   fPdgLeg1(11),
   fPdgLeg2(11),
@@ -154,6 +155,7 @@ AliDielectron::AliDielectron() :
   fStoreRotatedPairs(kFALSE),
   fDontClearArrays(kFALSE),
   fEventProcess(kTRUE),
+  fUseGammaTracks(kTRUE),
   fEstimatorFilename(""),
   fEstimatorObjArray(0x0),
   fTRDpidCorrectionFilename(""),
@@ -191,6 +193,7 @@ AliDielectron::AliDielectron(const char* name, const char* title) :
   fEventPlanePreFilter("EventPlanePreFilter"),
   fEventPlanePOIPreFilter("EventPlanePOIPreFilter"),
   fQnTPCACcuts(0x0),
+  fQnVectorNorm(""),
   fPdgMother(443),
   fPdgLeg1(11),
   fPdgLeg2(11),
@@ -225,6 +228,7 @@ AliDielectron::AliDielectron(const char* name, const char* title) :
   fStoreRotatedPairs(kFALSE),
   fDontClearArrays(kFALSE),
   fEventProcess(kTRUE),
+  fUseGammaTracks(kTRUE),
   fEstimatorFilename(""),
   fEstimatorObjArray(0x0),
   fTRDpidCorrectionFilename(""),
@@ -471,6 +475,7 @@ Bool_t AliDielectron::Process(AliVEvent *ev1, AliVEvent *ev2)
   if (ev1 && fPreFilterEventPlane && ( fEventPlanePreFilter.GetCuts()->GetEntries()>0 || fEventPlanePOIPreFilter.GetCuts()->GetEntries()>0))
     EventPlanePreFilter(0, 1, fTracks[0], fTracks[1], ev1);
   // QnFramework est. 2016 auto-correlation removal
+  AliDielectronVarManager::SetQnVectorNormalisation(fQnVectorNorm);
   if(fACremovalIsSetted){
     AliDielectronVarManager::SetTPCEventPlaneACremoval(fQnTPCACcuts);
   }
@@ -1406,7 +1411,7 @@ void AliDielectron::FillPairArrays(Int_t arr1, Int_t arr2, const AliVEvent *ev)
 
       // check for gamma kf particle
       label=AliDielectronMC::Instance()->GetLabelMotherWithPdg(candidate,22);
-      if (label>-1) {
+      if (label>-1 && fUseGammaTracks) {
         candidate->SetGammaTracks(static_cast<AliVTrack*>(arrTracks1.UncheckedAt(itrack1)), fPdgLeg1,
                                   static_cast<AliVTrack*>(arrTracks2.UncheckedAt(itrack2)), fPdgLeg2);
       // should we set the pdgmothercode and the label
@@ -1600,26 +1605,27 @@ void AliDielectron::FillMCHistograms(const AliVEvent *ev) {
 
     // fill pair and/or their leg variables
     if(pairClass || legClass) {
-      Int_t npairs=PairArray(AliDielectron::kEv1PM)->GetEntriesFast(); // only SE +-
-      for (Int_t ipair=0; ipair<npairs; ++ipair){
-        AliDielectronPair *pair=static_cast<AliDielectronPair*>(PairArray(AliDielectron::kEv1PM)->UncheckedAt(ipair));
-
-        Bool_t isMCtruth = AliDielectronMC::Instance()->IsMCTruth(pair, (AliDielectronSignalMC*)fSignalsMC->At(isig));
-        if(isMCtruth) {
-          //fill pair information
-          if (pairClass){
-            AliDielectronVarManager::Fill(pair, values);
-            fHistos->FillClass(className, AliDielectronVarManager::kNMaxValues, values);
-          }
-          //fill leg information, both + and - in the same histo
-          if (legClass){
-            AliDielectronVarManager::Fill(pair->GetFirstDaughterP(),values);
-            fHistos->FillClass(className2, AliDielectronVarManager::kNMaxValues, values);
-            AliDielectronVarManager::Fill(pair->GetSecondDaughterP(),values);
-            fHistos->FillClass(className2, AliDielectronVarManager::kNMaxValues, values);
-          }
-        } //is signal
-      } //loop: pairs
+      if(((AliDielectronSignalMC*)fSignalsMC->At(isig))->GetCheckUnlikeSign()){
+        Int_t npairs=PairArray(AliDielectron::kEv1PM)->GetEntriesFast(); // SE +-
+        for (Int_t ipair=0; ipair<npairs; ++ipair){
+          AliDielectronPair *pair=static_cast<AliDielectronPair*>(PairArray(AliDielectron::kEv1PM)->UncheckedAt(ipair));
+          Bool_t isMCtruth = AliDielectronMC::Instance()->IsMCTruth(pair, (AliDielectronSignalMC*)fSignalsMC->At(isig));
+          if(isMCtruth) {
+            //fill pair information
+            if (pairClass){
+              AliDielectronVarManager::Fill(pair, values);
+              fHistos->FillClass(className, AliDielectronVarManager::kNMaxValues, values);
+            }
+            //fill leg information, both + and - in the same histo
+            if (legClass){
+              AliDielectronVarManager::Fill(pair->GetFirstDaughterP(),values);
+              fHistos->FillClass(className2, AliDielectronVarManager::kNMaxValues, values);
+              AliDielectronVarManager::Fill(pair->GetSecondDaughterP(),values);
+              fHistos->FillClass(className2, AliDielectronVarManager::kNMaxValues, values);
+            }
+          } //is signal
+        } //loop: pairs
+      } // fill +- pairs
       if(((AliDielectronSignalMC*)fSignalsMC->At(isig))->GetCheckLikeSignPP()){
         Int_t npairsLS1=PairArray(AliDielectron::kEv1PP)->GetEntriesFast(); // SE ++
         for (Int_t ipair=0; ipair<npairsLS1; ++ipair){

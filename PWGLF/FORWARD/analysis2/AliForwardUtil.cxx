@@ -1107,6 +1107,7 @@ AliForwardUtil::RingHistos::GetOutputHist(const TList* d, const char* name) cons
   return static_cast<TH1*>(d->FindObject(name));
 }
 
+
 //====================================================================
 AliForwardUtil::DebugGuard::DebugGuard(Int_t lvl, Int_t msgLvl, 
 				       const char* format, ...)
@@ -1164,11 +1165,15 @@ AliForwardUtil::SuppressGuard::SuppressGuard(Int_t lvl)
   : save(gErrorIgnoreLevel)
 {
   gErrorIgnoreLevel = lvl;
+  AliLog::SetModuleDebugLevel("ROOT", lvl);
+  AliLog::SetGlobalDebugLevel(lvl);
 }
 //____________________________________________________________________
 AliForwardUtil::SuppressGuard::~SuppressGuard()
 {
   gErrorIgnoreLevel = save;
+  AliLog::SetModuleDebugLevel("ROOT", save);
+  AliLog::SetGlobalDebugLevel(save);
 }
 
 //

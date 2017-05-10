@@ -45,6 +45,7 @@
 
 #include "AliAnalysisTaskSE.h"
 
+#include "THnSparse.h"
 #include "THn.h"
 #include <vector>
 #include "AliAnalysisCuts.h"
@@ -86,6 +87,7 @@ class AliAnalysisTaskElectronEfficiency : public AliAnalysisTaskSE {
 
   void          SetDoPairing(Bool_t b=kTRUE)                        {fDoPairing=b;}
   void          SetCalcResolution(Bool_t b=kTRUE)                   {fCalcResolution=b;}
+  void          SetMakeResolutionSparse(Bool_t b=kTRUE)             {fMakeResolutionSparse=b;}
   void          SetResolutionCuts(AliAnalysisFilter *cuts)          {fResolutionCuts=cuts;}
   void          SetKineTrackCuts(AliAnalysisFilter *cuts)           { return; } //obsolete.
   //void        SetPairCuts(AliAnalysisFilter *cuts)                {fPairCuts=cuts;}
@@ -130,6 +132,7 @@ class AliAnalysisTaskElectronEfficiency : public AliAnalysisTaskSE {
   void          SetPairCutMee(Double_t cut)                   { fPairCutMee=cut; }
   void          SetPairCutTheta(Double_t cut)                 { fPairCutTheta=cut; }
   void          SetPairCutPhiV(Double_t cut)                  { fPairCutPhiV=cut; }
+  void          SetMomBinning(Int_t N, Double_t min, Double_t max)        {fMomNbins=N; fMomMin=min; fMomMax=max;}
   void          SetDeltaMomBinning(Int_t N, Double_t min, Double_t max)   {fDeltaMomNbins=N; fDeltaMomMin=min; fDeltaMomMax=max;}
   void          SetRelMomBinning(Int_t N, Double_t min, Double_t max)     {fRelMomNbins=N; fRelMomMin=min; fRelMomMax=max;}
   void          SetDeltaEtaBinning(Int_t N, Double_t min, Double_t max)   {fDeltaEtaNbins=N; fDeltaEtaMin=min; fDeltaEtaMax=max;}
@@ -283,6 +286,11 @@ class AliAnalysisTaskElectronEfficiency : public AliAnalysisTaskSE {
 
   // resolutions
   Bool_t                          fCalcResolution;
+  Bool_t                          fMakeResolutionSparse;
+  THnSparseD*                     fTHnResElectrons1;
+  THnSparseD*                     fTHnResPositrons1;
+  THnSparseD*                     fTHnResElectrons2;
+  THnSparseD*                     fTHnResPositrons2;
 
   TH1D*                           fDeltaPhiAll;
   TH1D*                           fDeltaPhi;
@@ -292,6 +300,9 @@ class AliAnalysisTaskElectronEfficiency : public AliAnalysisTaskSE {
   TH2D*                           fDeltaPhi_MCcharge;
   TH2D*                           fDeltaPhi_charge;
 
+  Int_t                           fMomNbins;
+  Double_t                        fMomMin;
+  Double_t                        fMomMax;
   Int_t                           fDeltaMomNbins;
   Double_t                        fDeltaMomMin;
   Double_t                        fDeltaMomMax;
@@ -326,14 +337,6 @@ class AliAnalysisTaskElectronEfficiency : public AliAnalysisTaskSE {
   TH2D*                           fPhiGen_DeltaPhi;
   TH2D*                           fOpeningAngleGen_DeltaOpeningAngleUS;
   TH2D*                           fOpeningAngleGen_DeltaOpeningAngleLS;
-
-  TH2D*                           fPGen_DeltaP_pions;
-  TH2D*                           fPtGen_DeltaPt_pions;
-  TH2D*                           fEtaGen_DeltaEta_pions;
-  TH2D*                           fThetaGen_DeltaTheta_pions;
-  TH2D*                           fPhiGen_DeltaPhi_pions;
-  TH2D*                           fOpeningAngleGen_DeltaOpeningAngleUS_pions;
-  TH2D*                           fOpeningAngleGen_DeltaOpeningAngleLS_pions;
 
   THnSparseF*                     fMgen_PtGen_mRes_ptRes;
 

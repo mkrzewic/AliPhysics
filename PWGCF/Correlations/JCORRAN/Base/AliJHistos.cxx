@@ -92,6 +92,8 @@ AliJHistos::AliJHistos(AliJCard* cardP) :
   fhChargedPt(),
   fhChargedPtNoCorr(),
   fhChargedPtJacek(),
+  fhChargedPtJacekPos(),
+  fhChargedPtJacekNeg(),
   fhChargedPtJacekEta(),
   fhChargedPtFiete(),
   fhVdelta2(),
@@ -135,7 +137,7 @@ AliJHistos::AliJHistos(AliJCard* cardP) :
   fhJetPt(),
   fhLeadingJetPt(),
   fhLeadingJetWLPPt(),
-  fhJetAssymPTt(),
+  fhDiJetAsym(),
   fhJetMassPTt(),
   fhJetUEPt(),
   fhJetDphi(),
@@ -289,6 +291,8 @@ AliJHistos::AliJHistos(const AliJHistos& obj) :
   fhChargedPt(obj.fhChargedPt),
   fhChargedPtNoCorr(obj.fhChargedPtNoCorr),
   fhChargedPtJacek(obj.fhChargedPtJacek),
+  fhChargedPtJacekPos(obj.fhChargedPtJacekPos),
+  fhChargedPtJacekNeg(obj.fhChargedPtJacekNeg),
   fhChargedPtJacekEta(obj.fhChargedPtJacekEta),
   fhChargedPtFiete(obj.fhChargedPtFiete),
   fhVdelta2(obj.fhVdelta2),
@@ -332,7 +336,7 @@ AliJHistos::AliJHistos(const AliJHistos& obj) :
   fhJetPt(obj.fhJetPt),
   fhLeadingJetPt(obj.fhLeadingJetPt),
   fhLeadingJetWLPPt(obj.fhLeadingJetWLPPt),
-  fhJetAssymPTt(obj.fhJetAssymPTt),
+  fhDiJetAsym(obj.fhDiJetAsym),
   fhJetMassPTt(obj.fhJetMassPTt),
   fhJetUEPt(obj.fhJetUEPt),
   fhJetDphi(obj.fhJetDphi),
@@ -732,6 +736,12 @@ void AliJHistos::CreateEventTrackHistos(){
     fhChargedPtJacek 
         << TH1D("hChargedPtJacek","", fNJacek, fPttJacek )
         << fCentBin << "END";
+    fhChargedPtJacekPos 
+        << TH1D("hChargedPtJacekPos","", fNJacek, fPttJacek )
+        << fCentBin << "END";
+    fhChargedPtJacekNeg 
+        << TH1D("hChargedPtJacekNeg","", fNJacek, fPttJacek )
+        << fCentBin << "END";
     fhChargedPtJacekEta
         << TH1D("hChargedPtJacekEta","", fNJacek, fPttJacek )
         << fCentBin << 3 << "END";
@@ -839,7 +849,10 @@ void AliJHistos::CreateJetHistos(){
         << fPTtBin <<"END";
     fhRecoDiJetM
         << TH1D("hRecoDiJetM", "Invariant Mass", 201,-0.5, 200 ) 
-        << "END";
+        << fCentBin << "END";
+    fhDiJetAsym
+        << TH1D( "fDiJetAsym", "",   40, 0., 1.0) 
+        <<  fCentBin << "END";
     fhJetUEPt
         << TH1D("hJetUEPt","UE particles p_{T} by Jet substract",nBINS,logBinsX) 
         << "END";

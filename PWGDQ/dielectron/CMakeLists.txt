@@ -83,6 +83,7 @@ set(SRCS
       LMEE/AliAnalysisTaskDielectronsPbPb_Data.cxx
       LMEE/AliAnalysisTaskDielectronsPbPb_Efficiency.cxx
       LMEE/AliAnalysisTaskMLTreeMaker.cxx
+      LMEE/AliAnalysisTaskMLTreeMakerEff.cxx
       LMEE/AliAnalysisTaskSimpleTreeMaker.cxx
       LMEE/AliDielectronReducedTrack.cxx
       LMEE/AliAnalysisTaskTGReducedTree.cxx
@@ -151,9 +152,12 @@ install(TARGETS ${MODULE}
 install(FILES ${HDRS} DESTINATION include)
 
 # install the macros
-install(DIRECTORY
-		files
-                macros
-                macrosJPSI
-                macrosLMEE
+install(DIRECTORY macros
+                  macrosJPSI
+                  macrosLMEE
         DESTINATION PWGDQ/dielectron)
+
+# Install data
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/files)
+  install(DIRECTORY files DESTINATION PWGDQ/dielectron)
+endif()

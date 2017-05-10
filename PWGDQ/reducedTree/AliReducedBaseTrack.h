@@ -47,7 +47,7 @@ class AliReducedBaseTrack : public TObject {
     Bool_t IsALambdaLeg()                 const {return fQualityFlags&(ULong_t(1)<<4);}
     Bool_t IsPureALambdaLeg()          const {return fQualityFlags&(ULong_t(1)<<11);}
     Bool_t IsKink(Int_t i=0)               const {return (i>=0 && i<3 ? ((fQualityFlags&(ULong_t(1)<<(5+i))) || 
-                                                                        (fFlags&(UShort_t(1)<<(12+i)))) : kFALSE);}
+                                                                        (fQualityFlags&(ULong_t(1)<<(12+i)))) : kFALSE);}
     Float_t GetBayesProb(Int_t specie)  const { return (fQualityFlags&(ULong_t(1)<<(15+specie)) ? (fQualityFlags&(ULong_t(1)<<21) ? 0.9 : (fQualityFlags&(ULong_t(1)<<20) ? 0.8 : (fQualityFlags&(ULong_t(1)<<19)           ? 0.7 : 0.5)))   : 0.0);}
     
     // setters
@@ -65,7 +65,7 @@ class AliReducedBaseTrack : public TObject {
     Bool_t SetFlag(UShort_t iflag)  {if(iflag>=8*sizeof(ULong_t)) return kFALSE; fFlags|=(ULong_t(1)<<iflag); return kTRUE;}
     Bool_t UnsetFlag(UShort_t iflag) {if(iflag>=8*sizeof(ULong_t)) return kFALSE; if(TestFlag(iflag)) fFlags^=(ULong_t(1)<<iflag); return kTRUE;}  
     Bool_t SetQualityFlag(UShort_t iflag)      {if (iflag>=8*sizeof(ULong_t)) return kFALSE; fQualityFlags|=(ULong_t(1)<<iflag); return kTRUE;}
-    Bool_t UnsetQualityFlag(UShort_t iflag)  {if (iflag>=8*sizeof(ULong_t)) return kFALSE; fQualityFlags|=(ULong_t(0)<<iflag); return kTRUE;}
+    Bool_t UnsetQualityFlag(UShort_t iflag)  {if (iflag>=8*sizeof(ULong_t)) return kFALSE; if(TestQualityFlag(iflag)) fQualityFlags^=(ULong_t(1)<<iflag); return kTRUE;}
         
   protected:
     Float_t fP[3];         // 3-momentum vector
@@ -87,6 +87,8 @@ class AliReducedBaseTrack : public TObject {
                                                    // BIT12 toggled if the track has kink0 index < 0
                                                    // BIT13 toggled if the track has kink1 index < 0
                                                    // BIT14 toggled if the track has kink2 index < 0
+                                                   // AOD
+                                                   // BIT(15+i) toggled if track has filter bit 0+i , 0 <= i <= 10
                                                    // BAYES TPC(||TOF)
                                                    // BIT15 toggled if electron (prob>0.5)
                                                    // BIT16 toggled if pion (prob>0.5)

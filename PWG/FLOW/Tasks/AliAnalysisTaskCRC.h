@@ -93,6 +93,8 @@ public:
   TList* GetWeightsList() const {return this->fWeightsList;};
   void SetWeightsListChDep(TList* const kList) {this->fWeightsListChDep = (TList*)kList->Clone();};
   TList* GetWeightsListChDep() const {return this->fWeightsListChDep;};
+  void SetWeightsListVtxDep(TList* const kList) {this->fWeightsListVtxDep = (TList*)kList->Clone();};
+  TList* GetWeightsListVtxDep() const {return this->fWeightsListVtxDep;};
   
   // Multiparticle correlations vs multiplicity:
   void SetnBinsMult(Int_t const nbm) {this->fnBinsMult = nbm;};
@@ -115,8 +117,8 @@ public:
   Bool_t GetUsePhiEtaWeights() const {return this->fUsePhiEtaWeights;};
   void SetUsePhiEtaWeightsChDep(Bool_t const uPhiEtaW) {this->fUsePhiEtaWeightsChDep = uPhiEtaW;};
   Bool_t GetUsePhiEtaWeightsChDep() const {return this->fUsePhiEtaWeightsChDep;};
-  void SetPhiEtaCutsList(TList* const wlist) {this->fPhiEtaCutsList = wlist;}
-  TList* GetPhiEtaCutsList() const {return this->fPhiEtaCutsList;}
+  void SetUsePhiEtaWeightsVtxDep(Bool_t const uPhiEtaW) {this->fUsePhiEtaWeightsVtxDep = uPhiEtaW;};
+  Bool_t GetUsePhiEtaWeightsVtxDep() const {return this->fUsePhiEtaWeightsVtxDep;};
   void SetUsePhiEtaCuts(Bool_t const uPhiEtaW) {this->fUsePhiEtaCuts = uPhiEtaW;};
   Bool_t GetUsePhiEtaCuts() const {return this->fUsePhiEtaCuts;};
   void SetUseZDCESEMulWeights(Bool_t const uPhiEtaW) {this->fUseZDCESEMulWeights = uPhiEtaW;};
@@ -172,6 +174,8 @@ public:
   Bool_t GetCalculateCRCZDC() const {return this->fCalculateCRCZDC;};
   void SetCalculateEbEFlow(Bool_t const cCRC) {this->fCalculateEbEFlow = cCRC;};
   Bool_t GetCalculateEbEFlow() const {return this->fCalculateEbEFlow;};
+  void SetStoreZDCQVecVtxPos(Bool_t const cCRC) {this->fStoreZDCQVecVtxPos = cCRC;};
+  Bool_t GetStoreZDCQVecVtxPos() const {return this->fStoreZDCQVecVtxPos;};
   void SetCRC2nEtaBins(Int_t NB) {this->fCRC2nEtaBins = NB;};
   Int_t GetCRC2nEtaBins() {return this->fCRC2nEtaBins;};
   void SetCalculateFlowQC(Bool_t const cCRC) {this->fCalculateFlowQC = cCRC;};
@@ -203,6 +207,8 @@ public:
   TList* GetZDCESEList() const {return this->fZDCESEList;};
   void SetCRCZDCCalibList(TList* const wlist) {this->fCRCZDCCalibList = (TList*)wlist->Clone();}
   TList* GetCRCZDCCalibList() const {return this->fCRCZDCCalibList;}
+  void SetCRCZDCResList(TList* const wlist) {this->fCRCZDCResList = (TList*)wlist->Clone();}
+  TList* GetCRCZDCResList() const {return this->fCRCZDCResList;}
   void SetnCenBin(Int_t const n) {this->fnCenBin = n;};
   Int_t GetnCenBin() const {return this->fnCenBin;};
   void SetFlowQCCenBin(Int_t const TL) {this->fFlowQCCenBin = TL;};
@@ -237,6 +243,7 @@ public:
   Int_t GetMinMulZN() const {return this->fMinMulZN;};
   void SetMaxDevZN(Float_t weights) {this->fMaxDevZN = weights;};
   Float_t GetMaxDevZN() const {return this->fMaxDevZN;};
+  void SetZDCGainAlpha( Float_t a ) { fZDCGainAlpha = a; }
   
 private:
   AliAnalysisTaskCRC(const AliAnalysisTaskCRC& aatqc);
@@ -281,11 +288,12 @@ private:
   Bool_t fUseTrackWeights;            // use track weights (e.g. VZERO sector weights)
   Bool_t fUsePhiEtaWeights;           // use phi,eta weights
   Bool_t fUsePhiEtaWeightsChDep;      // use phi,eta weights ch dep
+  Bool_t fUsePhiEtaWeightsVtxDep;      // use phi,eta weights vtx dep
   Bool_t fUseZDCESEMulWeights;        // use ZDC-ESE mult. weights
   Bool_t fUseZDCESESpecWeights;       // use ZDC-ESE mult. weights
   TList *fWeightsList;                // list with weights
   TList *fWeightsListChDep;           // list with weights ch dep
-  TList *fPhiEtaCutsList;             //
+  TList *fWeightsListVtxDep;          // list with weights vtx dep
   // Event weights:
   TString *fMultiplicityWeight;       // event-by-event weights for multiparticle correlations ("combinations","unit" or "multiplicity")
   AliFlowCommonConstants::ERefMultSource fMultiplicityIs;           // by default "#RPs", other supported options are "RefMultFromESD" = ref. mult. from ESD, and "#POIs"
@@ -309,6 +317,7 @@ private:
   Bool_t fCalculateCRCVZ;
   Bool_t fCalculateCRCZDC;
   Bool_t fCalculateEbEFlow;
+  Bool_t fStoreZDCQVecVtxPos;
   Int_t fCRC2nEtaBins; // CRC2 n eta bins
   Bool_t fCalculateFlowQC;
   Bool_t fCalculateFlowZDC;
@@ -333,6 +342,7 @@ private:
   TString fCorrWeight;
   TList *fQVecList;       // list with weights
   TList *fCRCZDCCalibList; // ZDC calibration
+  TList *fCRCZDCResList; // ZDC rescaling
   TList *fZDCESEList;       // list with weights
   TH1D* fCenWeightsHist;
   TH1D* fPtWeightsHist[10];
@@ -343,8 +353,9 @@ private:
   Bool_t fQAZDCCuts;
   Int_t fMinMulZN;
   Float_t fMaxDevZN;
+  Float_t fZDCGainAlpha;
   
-  ClassDef(AliAnalysisTaskCRC, 8);
+  ClassDef(AliAnalysisTaskCRC, 9);
 };
 
 //================================================================================================================

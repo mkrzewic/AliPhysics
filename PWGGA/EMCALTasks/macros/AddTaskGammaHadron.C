@@ -1,15 +1,16 @@
 // $Id$
 
 AliAnalysisTaskGammaHadron* AddTaskGammaHadron(
-  Bool_t      InputGammaOrPi0        = 0,      //gamma analysis=0, pi0 analyis=1
-  Bool_t      InputDoMixing          = 0,      //same event=0 mixed event =1 (currenlty used to init the pool=1, throw out events without clusters=0)
-  Double_t    trackEta               = 9,                //+- eta range for track acceptance
-  Double_t    clusterEta             = 7,                //+- eta range for cluster acceptance
-  UInt_t      evtTriggerType         = AliVEvent::kEMCEGA, //use this type of events to combine gammas(trigger) with hadrons
-  UInt_t      evtMixingType          = AliVEvent::kAnyINT, //use only this type of events to fill your mixed event pool with tracks
-  Double_t    trackptcut             = 0.15,
-  Double_t    clusptcut              = 0.30,
-  Bool_t      SavePool               = 0,                  //saves a mixed event pool to the output event
+  Bool_t      InputGammaOrPi0        = 0,                 //..gamma analysis=0, pi0 analyis=1
+  Bool_t      InputDoMixing          = 0,                 //..same event=0 mixed event =1 (currenlty used to init the pool=1, throw out events without clusters=0)
+  Bool_t      InputMCorData          = 0,                 // 0->MC, 1->Data
+  Double_t    trackEta               = 0.9,               //..+- eta range for track acceptance
+  Double_t    clusterEta             = 0.7,               //..+- eta range for cluster acceptance
+  UInt_t      evtTriggerType         = AliVEvent::kEMCEGA,//..use this type of events to combine gammas(trigger) with hadrons
+  UInt_t      evtMixingType          = AliVEvent::kAnyINT,//..use only this type of events to fill your mixed event pool with tracks
+  Double_t    trackptcut             = 0.15,              //..
+  Double_t    clusptcut              = 0.30,              //..
+  Bool_t      SavePool               = 0,                 //..saves a mixed event pool to the output event
   const char *trackName              = "usedefault",
   const char *clusName               = "usedefault",
   const char *taskname               = "AliAnalysisTask",
@@ -40,7 +41,7 @@ AliAnalysisTaskGammaHadron* AddTaskGammaHadron(
 	  return 0;
    }
 
-  //in case of AOD the default names are:
+  //..in case of AOD the default names are:
   if(trackName=="usedefault")trackName = "tracks";
   if(clusName =="usedefault")clusName  = "caloClusters";
 
@@ -67,21 +68,20 @@ AliAnalysisTaskGammaHadron* AddTaskGammaHadron(
   }
 
   TString combinedName;
-  combinedName.Form("%s_%s_%s_%s_%s_EtaTr%d_EtaCl%d",taskname,(const char*)GammaPi0Name,(const char*)SameMixName,trackName,clusName,trackEta,clusterEta);
+  combinedName.Form("%s_%s_%s_%s_%s",taskname,(const char*)GammaPi0Name,(const char*)SameMixName,trackName,clusName);
   if(suffix!="")
   {
 	  combinedName += "_";
 	  combinedName += suffix;
   }
   cout<<"combinedName: "<<combinedName<<endl;
+  TString contName(combinedName);
+  contName += "_histos";
 
-  //..before only used for name
-  trackEta*=0.1;
-  clusterEta*=0.1;
   //-------------------------------------------------------
   // Init the task and do settings
   //-------------------------------------------------------
-  AliAnalysisTaskGammaHadron* AnalysisTask = new AliAnalysisTaskGammaHadron(InputGammaOrPi0,InputDoMixing);
+  AliAnalysisTaskGammaHadron* AnalysisTask = new AliAnalysisTaskGammaHadron(InputGammaOrPi0,InputDoMixing, InputMCorData);
 
   //..Add the containers and set the names
   AnalysisTask->AddClusterContainer(clusName);
@@ -108,12 +108,19 @@ AliAnalysisTaskGammaHadron* AddTaskGammaHadron(
 	 return 0;
   }
 
-  //..Add some selection criteria
-  AnalysisTask->SetVzRange(-10,10);
-  //..for Run1
-  AnalysisTask->SetUseAliAnaUtils(kTRUE);  //brauch ich sowas? taskDiJet->SetTriggerClass(trigClass.Data());
-  //..new task for run2 (neue cut klasse, ask Markus)
+  //-------------------------------------------------------
+  // Add some selection criteria
+  //-------------------------------------------------------
+  AnalysisTask->SetOffTrigger(evtTriggerType|evtMixingType); //..select only evets of type evtTriggerType and evtMixingType
+  //..for Run1 pPb
+  //AnalysisTask->SetUseManualEvtCuts(kTRUE);
+  //AnalysisTask->SetUseAliAnaUtils(kTRUE);
+  //AnalysisTask->SetVzRange(-10,10);
+  //AnalysisTask->SetCentRange(0.0,100.0);
 
+  //..new task for run2
+  //AnalysisTask->SetNCentBins(5);
+  //AnalysisTask->SetUseNewCentralityEstimation(kTRUE);
 
   if(AnalysisTask->GetTrackContainer(trackName))
   {
@@ -127,13 +134,9 @@ AliAnalysisTaskGammaHadron* AddTaskGammaHadron(
 	  AnalysisTask->GetClusterContainer(clusName)->SetClusPtCut(clusptcut);        //by default set to 0.15
 	  AnalysisTask->GetClusterContainer(clusName)->SetClusUserDefEnergyCut(AliVCluster::kHadCorr,0);
 	  AnalysisTask->GetClusterContainer(clusName)->SetDefaultClusterEnergy(AliVCluster::kHadCorr);
-	  //AnalysisTask->GetClusterContainer(clusName)->SetClusTimeCut(,);
-	  AnalysisTask->GetClusterContainer(clusName)->SetEtaLimits(-clusterEta,clusterEta);
-	  AnalysisTask->GetClusterContainer(clusName)->SetPhiLimits(68*phiToR,174*phiToR);
-	 // cout<<"cut0: "<<AnalysisTask->GetClusterContainer(clusName)->GetClusUserDefEnergyCut(0)<<endl;
-	 // cout<<"cut1: "<<AnalysisTask->GetClusterContainer(clusName)->GetClusUserDefEnergyCut(1)<<endl;
-	 // cout<<"cut2: "<<AnalysisTask->GetClusterContainer(clusName)->GetClusUserDefEnergyCut(2)<<endl;
-	 // cout<<"cut3: "<<AnalysisTask->GetClusterContainer(clusName)->GetClusUserDefEnergyCut(3)<<endl;
+//    AnalysisTask->GetClusterContainer(clusName)->SetClusTimeCut(,);
+//	  AnalysisTask->GetClusterContainer(clusName)->SetEtaLimits(-clusterEta,clusterEta);
+//	  AnalysisTask->GetClusterContainer(clusName)->SetPhiLimits(68*phiToR,174*phiToR);
   }
 
   //..some additional input for the analysis
@@ -141,6 +144,13 @@ AliAnalysisTaskGammaHadron* AddTaskGammaHadron(
   AnalysisTask->SetSavePool(SavePool);
   AnalysisTask->SetEvtTriggerType(evtTriggerType);   //..Trigger to be used for filling same event histograms
   AnalysisTask->SetEvtMixType(evtMixingType);        //..Trigger to be used to fill tracks into the pool (no GA trigger!!)
+  AnalysisTask->SetNLM(1);                           //..Maximum of number of local maxima
+  if(InputGammaOrPi0==0)
+  {
+	  AnalysisTask->SetM02(0.1,0.4);                 //..Ranges of allowed cluster shapes in the analysis
+	  AnalysisTask->SetRmvMatchedTrack(1);           //..Removes all clusters that have a matched track
+  }
+
   //for later AnalysisTask->SetEffHistGamma(THnF *h);
   //for later AnalysisTask->SetEffHistHadron(THnF *h);
 
@@ -151,12 +161,9 @@ AliAnalysisTaskGammaHadron* AddTaskGammaHadron(
   
   // Create containers for input/output
   AliAnalysisDataContainer *cinput1  = mgr->GetCommonInputContainer()  ;
-
-  TString contName(combinedName);
-  contName += "_histos";
-  AliAnalysisDataContainer *coutput1 = mgr->CreateContainer(contName.Data(), 
-							    TList::Class(),AliAnalysisManager::kOutputContainer,
-							    Form("%s", AliAnalysisManager::GetCommonFileName()));
+  AliAnalysisDataContainer *coutput1 = mgr->CreateContainer(contName.Data(),TList::Class(),
+		  	  	  	  	  	  	  	  	  	  	  	  	   AliAnalysisManager::kOutputContainer,
+		  	  	  	  	  	  	  	  	  	  	  	  	   Form("%s", AliAnalysisManager::GetCommonFileName()));
   mgr->ConnectInput  (AnalysisTask, 0,  cinput1 );
   mgr->ConnectOutput (AnalysisTask, 1, coutput1 );
 

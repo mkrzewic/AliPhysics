@@ -26,6 +26,7 @@
 /// * NucleiPbPb
 #pragma link C++ class AliAnalysisTaskNucleiYield+;
 #pragma link C++ class AliAnalysisTaskNucleiYieldESD+;
+#pragma link C++ class AliAnalysisTaskNucleiPIDqa+;
 /// * EventCuts
 #pragma link C++ class AliNuclexEventCuts+;
 #pragma link C++ class AliNuclexEventCutsContainer+;
@@ -68,5 +69,10 @@
 #pragma link C++ class AliAODMCNuclExReplicator+;
 #pragma link C++ class AliAnalysisTaskESDNuclExFilterMC+;
 #pragma link C++ class AliAnalysisTaskReadNuclexAOD+;
+/// * CODEX
+#pragma link C++ class AliAnalysisCODEX::Header+;
+#pragma link C++ class AliAnalysisCODEX::Track+;
+#pragma link C++ class std::vector<AliAnalysisCODEX::Track>+;
+#pragma link C++ class AliAnalysisCODEXtask+;
 #endif
 

@@ -157,6 +157,8 @@ public:
   AliJTH1D fhLPpairPt; //! comment me
   AliJTH1D fhChargedPt, fhChargedPtNoCorr; //! comment me
   AliJTH1D fhChargedPtJacek; //! comment me
+  AliJTH1D fhChargedPtJacekPos; //! comment me
+  AliJTH1D fhChargedPtJacekNeg; //! comment me
   AliJTH1D fhChargedPtJacekEta; //! 3 bins in eta
   AliJTH1D fhChargedPtFiete; //! comment me
   AliJTH1D fhVdelta2,fhVdelta3, fhVN; //! comment me
@@ -208,7 +210,7 @@ public:
   AliJTH1D fhLeadingJetPt; //! comment me
   AliJTH1D fhLeadingJetWLPPt; //! comment me
   
-  AliJTH1D fhJetAssymPTt; //! comment me
+  AliJTH1D fhDiJetAsym; //! dijet asymmetry in cbin
   AliJTH1D fhJetMassPTt; //! comment me
   AliJTH1D fhJetUEPt; //! comment me
   

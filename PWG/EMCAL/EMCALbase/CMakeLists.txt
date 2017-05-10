@@ -35,11 +35,15 @@ set(SRCS
   AliAnalysisTaskEmcalLight.cxx
   AliClusterContainer.cxx
   AliEmcalContainer.cxx
+  AliEmcalContainerUtils.cxx
   AliEmcalDownscaleFactorsOCDB.cxx
+  AliEmcalAODFilterBitCuts.cxx
+  AliEmcalContainerUtils.cxx
   AliEmcalESDTrackCutsGenerator.cxx
   AliEmcalParticle.cxx
   AliEmcalPhysicsSelection.cxx
   AliEmcalPythiaInfo.cxx
+  AliEmcalTrackSelResultPtr.cxx
   AliEmcalTrackSelection.cxx
   AliEmcalTrackSelectionESD.cxx
   AliEmcalTrackSelectionAOD.cxx
@@ -48,6 +52,7 @@ set(SRCS
   AliMCParticleContainer.cxx
   AliTrackContainer.cxx
   AliEmcalList.cxx
+  AliAnalysisTaskEmcalEmbeddingHelper.cxx
   )
 
 # Headers from sources
@@ -55,6 +60,7 @@ string(REPLACE ".cxx" ".h" HDRS "${SRCS}")
 set(HDRS
   "${HDRS}"
   AliEmcalIterableContainer.h
+  AliEmcalContainerIndexMap.h
   )
 
 # Generate the dictionary

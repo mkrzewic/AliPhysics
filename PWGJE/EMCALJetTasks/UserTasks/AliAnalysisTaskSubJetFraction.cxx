@@ -98,6 +98,7 @@ AliAnalysisTaskSubJetFraction::AliAnalysisTaskSubJetFraction() :
   fFullTree(kFALSE),
   fBeta_SD(0),
   fZCut(0.1),
+  fReclusteringAlgorithm(0),
   fNsubMeasure(kFALSE),
   fhPtTriggerHadron(0x0),
   fhJetPt(0x0),
@@ -250,6 +251,7 @@ AliAnalysisTaskSubJetFraction::AliAnalysisTaskSubJetFraction(const char *name) :
   fFullTree(kFALSE),
   fBeta_SD(0),
   fZCut(0.1),
+  fReclusteringAlgorithm(0),
   fNsubMeasure(kFALSE),
   fhPtTriggerHadron(0x0),
   fhJetPt(0x0),
@@ -440,12 +442,12 @@ AliAnalysisTaskSubJetFraction::~AliAnalysisTaskSubJetFraction()
     fShapesVarNames[3] = "Tau1_Truth";
     fShapesVarNames[4] = "Tau2";
     fShapesVarNames[5] = "Tau2_Truth";
-    fShapesVarNames[6] = "OpeningAngleSubJets";
-    fShapesVarNames[7] = "OpeningAngleSubJets_Truth";
+    fShapesVarNames[6] = "SubJet1LeadingTrackPt";
+    fShapesVarNames[7] = "SubJet1LeadingTrackPt_Truth";
     fShapesVarNames[8] = "OpeningAngle";
     fShapesVarNames[9] = "OpeningAngle_Truth";
-    fShapesVarNames[10] = "JetMultiplicity";
-    fShapesVarNames[11] = "JetMultiplicity_Truth";
+    fShapesVarNames[10] = "SubJet2LeadingTrackPt";
+    fShapesVarNames[11] = "SubJet2LeadingTrackPt_Truth";
     fShapesVarNames[12] = "OpeningAngleSD";
     fShapesVarNames[13] = "OpeningAngleSD_Truth";
     fShapesVarNames[14] = "SubJet1Pt";
@@ -748,18 +750,29 @@ Bool_t AliAnalysisTaskSubJetFraction::FillHistograms()
     Int_t TriggerHadronLabel = SelectTriggerHadron(fPtMinTriggerHadron, fPtMaxTriggerHadron);    
     if (TriggerHadronLabel==-99999) return 0;  //Trigger Hadron Not Found
     AliTrackContainer *PartCont =NULL;
-    if (fJetShapeSub==kConstSub) PartCont = GetTrackContainer(1);
-    else PartCont = GetTrackContainer(0);
-    TClonesArray *TrackArray = PartCont->GetArray();
-    TriggerHadron = static_cast<AliAODTrack*>(TrackArray->At(TriggerHadronLabel));
+    AliParticleContainer *PartContMC=NULL;
+    if (fJetShapeSub==kConstSub){
+      if (fJetShapeType == AliAnalysisTaskSubJetFraction::kGenOnTheFly) PartContMC = GetParticleContainer(1);
+      else PartCont = GetTrackContainer(1);
+    }
+    else{
+      if (fJetShapeType == AliAnalysisTaskSubJetFraction::kGenOnTheFly) PartContMC = GetParticleContainer(0);
+      else PartCont = GetTrackContainer(0);
+    }
+    TClonesArray *TrackArray = NULL;
+    TClonesArray *TrackArrayMC = NULL;
+    if (fJetShapeType == AliAnalysisTaskSubJetFraction::kGenOnTheFly) TrackArrayMC = PartContMC->GetArray();
+    else TrackArray = PartCont->GetArray();    
+    if (fJetShapeType == AliAnalysisTaskSubJetFraction::kGenOnTheFly) TriggerHadron = static_cast<AliAODTrack*>(TrackArrayMC->At(TriggerHadronLabel));
+    else TriggerHadron = static_cast<AliAODTrack*>(TrackArray->At(TriggerHadronLabel));
     if (!TriggerHadron) return 0;//No trigger hadron with label found   
     if(fSemigoodCorrect){
       Double_t HoleDistance=RelativePhi(TriggerHadron->Phi(),fHolePos);
       if(TMath::Abs(HoleDistance)+fHoleWidth+fJetRadius>TMath::Pi()-fRecoilAngularWindow) return 0;
     }
     fhPtTriggerHadron->Fill(TriggerHadron->Pt()); //Needed for per trigger Normalisation
-    fhPhiTriggerHadronEventPlane->Fill(TMath::Abs(RelativePhiEventPlane(fEPV0,TriggerHadron->Phi()))); //fEPV0 is the event plane from AliAnalysisTaskEmcal
-    fhPhiTriggerHadronEventPlaneTPC->Fill(TMath::Abs(RelativePhiEventPlane(((AliVAODHeader*)(InputEvent()->GetHeader()))->GetEventplane(),TriggerHadron->Phi()))); //TPC event plane 
+    if (fJetShapeType != AliAnalysisTaskSubJetFraction::kGenOnTheFly) fhPhiTriggerHadronEventPlane->Fill(TMath::Abs(RelativePhiEventPlane(fEPV0,TriggerHadron->Phi()))); //fEPV0 is the event plane from AliAnalysisTaskEmcal
+    if (fJetShapeType != AliAnalysisTaskSubJetFraction::kGenOnTheFly) fhPhiTriggerHadronEventPlaneTPC->Fill(TMath::Abs(RelativePhiEventPlane(((AliVAODHeader*)(InputEvent()->GetHeader()))->GetEventplane(),TriggerHadron->Phi()))); //TPC event plane 
   }
 
   
@@ -817,7 +830,7 @@ Bool_t AliAnalysisTaskSubJetFraction::FillHistograms()
 	    Jet3=Jet2->ClosestJet();
 	  }
 	  if(!(fJetShapeSub==kConstSub)){
-	    if (!(JetCont1->AliJetContainer::GetFractionSharedPt(Jet1)<fSharedFractionPtMin)) continue;
+	    if (JetCont1->AliJetContainer::GetFractionSharedPt(Jet1)<fSharedFractionPtMin) continue;
 	    Jet3 = Jet1->ClosestJet();   //Note for NoSub and Deriv Sub cases you must fill both the Unsubtracted and Subtracted Hybrid jet containers with the same jet branch
 	  }
 	  if (!Jet3) continue;
@@ -829,9 +842,10 @@ Bool_t AliAnalysisTaskSubJetFraction::FillHistograms()
 	  else fShapesVar[0]=Jet1->Pt()-(GetRhoVal(0)*Jet1->Area());
 	  fShapesVar[2]=fjNSubJettiness(Jet1,0,1,0,1,0);
 	  fShapesVar[4]=fjNSubJettiness(Jet1,0,2,0,1,0);
-	  fShapesVar[6]=fjNSubJettiness(Jet1,0,2,0,1,7);
+	  fShapesVar[6]=fjNSubJettiness(Jet1,0,2,0,1,8);
 	  fShapesVar[8]=fjNSubJettiness(Jet1,0,2,0,1,1);
-	  fShapesVar[10]=Jet1->GetNumberOfTracks();
+	  // fShapesVar[10]=Jet1->GetNumberOfTracks();
+	  fShapesVar[10]=fjNSubJettiness(Jet1,0,2,0,1,9);
 	  fShapesVar[12]=fjNSubJettiness(Jet1,0,2,0,1,3,fBeta_SD,fZCut);
 	  fShapesVar[14]=fjNSubJettiness(Jet1,0,2,0,1,5,fBeta_SD,fZCut);
 	  fShapesVar[16]=Jet1->GetLeadingTrack(JetCont1->GetParticleContainer()->GetArray())->Pt();
@@ -848,9 +862,10 @@ Bool_t AliAnalysisTaskSubJetFraction::FillHistograms()
 	    fShapesVar[1]=Jet4->Pt();
 	    fShapesVar[3]=fjNSubJettiness(Jet4,3,1,0,1,0);
 	    fShapesVar[5]=fjNSubJettiness(Jet4,3,2,0,1,0);
-	    fShapesVar[7]=fjNSubJettiness(Jet4,3,2,0,1,7);
+	    fShapesVar[7]=fjNSubJettiness(Jet4,3,2,0,1,8);
 	    fShapesVar[9]=fjNSubJettiness(Jet4,3,2,0,1,1);
-	    fShapesVar[11]=Jet4->GetNumberOfTracks();
+	    //fShapesVar[11]=Jet4->GetNumberOfTracks();
+	    fShapesVar[11]=fjNSubJettiness(Jet4,3,2,0,1,9);
 	    fShapesVar[13]=fjNSubJettiness(Jet4,3,2,0,1,3,fBeta_SD,fZCut);
 	    fShapesVar[15]=fjNSubJettiness(Jet4,3,2,0,1,5,fBeta_SD,fZCut);
 	    fShapesVar[17]=Jet4->GetLeadingTrack(JetCont4->GetParticleContainer()->GetArray())->Pt();
@@ -977,9 +992,10 @@ Bool_t AliAnalysisTaskSubJetFraction::FillHistograms()
 	  fShapesVar[0]=Jet1->Pt();
 	  fShapesVar[2]=fjNSubJettiness(Jet1,0,1,0,1,0);
 	  fShapesVar[4]=fjNSubJettiness(Jet1,0,2,0,1,0);
-	  fShapesVar[6]=fjNSubJettiness(Jet1,0,2,0,1,7);
+	  fShapesVar[6]=fjNSubJettiness(Jet1,0,2,0,1,8);
 	  fShapesVar[8]=fjNSubJettiness(Jet1,0,2,0,1,1);
-	  fShapesVar[10]=Jet1->GetNumberOfTracks();
+	  // fShapesVar[10]=Jet1->GetNumberOfTracks();
+	  fShapesVar[10]=fjNSubJettiness(Jet1,0,2,0,1,9);
 	  fShapesVar[12]=fjNSubJettiness(Jet1,0,2,0,1,3,fBeta_SD,fZCut);
 	  fShapesVar[14]=fjNSubJettiness(Jet1,0,2,0,1,5,fBeta_SD,fZCut);
 	  fShapesVar[16]=Jet1->GetLeadingTrack(JetCont1->GetParticleContainer()->GetArray())->Pt();
@@ -995,9 +1011,10 @@ Bool_t AliAnalysisTaskSubJetFraction::FillHistograms()
 	    fShapesVar[1]=Jet2->Pt();
 	    fShapesVar[3]=fjNSubJettiness(Jet2,1,1,0,1,0);
 	    fShapesVar[5]=fjNSubJettiness(Jet2,1,2,0,1,0);
-	    fShapesVar[7]=fjNSubJettiness(Jet2,1,2,0,1,7);
+	    fShapesVar[7]=fjNSubJettiness(Jet2,1,2,0,1,8);
 	    fShapesVar[9]=fjNSubJettiness(Jet2,1,2,0,1,1);
-	    fShapesVar[11]=Jet2->GetNumberOfTracks();
+	    // fShapesVar[11]=Jet2->GetNumberOfTracks();
+	    fShapesVar[11]=fjNSubJettiness(Jet2,1,2,0,1,9);
 	    fShapesVar[13]=fjNSubJettiness(Jet2,1,2,0,1,3,fBeta_SD,fZCut);
 	    fShapesVar[15]=fjNSubJettiness(Jet2,1,2,0,1,5,fBeta_SD,fZCut);
 	    fShapesVar[17]=Jet2->GetLeadingTrack(JetCont2->GetParticleContainer()->GetArray())->Pt();
@@ -1115,9 +1132,10 @@ Bool_t AliAnalysisTaskSubJetFraction::FillHistograms()
 	  else fShapesVar[0]=Jet1->Pt();
 	  fShapesVar[2]=fjNSubJettiness(Jet1,0,1,0,1,0);
 	  fShapesVar[4]=fjNSubJettiness(Jet1,0,2,0,1,0);
-	  fShapesVar[6]=fjNSubJettiness(Jet1,0,2,0,1,7);
+	  fShapesVar[6]=fjNSubJettiness(Jet1,0,2,0,1,8);
 	  fShapesVar[8]=fjNSubJettiness(Jet1,0,2,0,1,1);
-	  fShapesVar[10]=Jet1->GetNumberOfTracks();
+	  //fShapesVar[10]=Jet1->GetNumberOfTracks();
+	  fShapesVar[10]=fjNSubJettiness(Jet1,0,2,0,1,9);
 	  fShapesVar[12]=fjNSubJettiness(Jet1,0,2,0,1,3,fBeta_SD,fZCut);
 	  fShapesVar[14]=fjNSubJettiness(Jet1,0,2,0,1,5,fBeta_SD,fZCut);
 	  fShapesVar[16]=Jet1->GetLeadingTrack(JetCont->GetParticleContainer()->GetArray())->Pt();
@@ -1294,9 +1312,10 @@ Bool_t AliAnalysisTaskSubJetFraction::FillHistograms()
 	  else fShapesVar[0]=Jet1->Pt(); 
 	  fShapesVar[2]=fjNSubJettiness(Jet1,0,1,0,1,0);
 	  fShapesVar[4]=fjNSubJettiness(Jet1,0,2,0,1,0);
-	  fShapesVar[6]=fjNSubJettiness(Jet1,0,2,0,1,7);
+	  fShapesVar[6]=fjNSubJettiness(Jet1,0,2,0,1,8);
 	  fShapesVar[8]=fjNSubJettiness(Jet1,0,2,0,1,1);
-	  fShapesVar[10]=Jet1->GetNumberOfTracks();
+	  // fShapesVar[10]=Jet1->GetNumberOfTracks();
+	  fShapesVar[10]=fjNSubJettiness(Jet1,0,2,0,1,9);
 	  fShapesVar[12]=fjNSubJettiness(Jet1,0,2,0,1,3,fBeta_SD,fZCut);
 	  fShapesVar[14]=fjNSubJettiness(Jet1,0,2,0,1,5,fBeta_SD,fZCut);
 	  fShapesVar[16]=Jet1->GetLeadingTrack(JetCont->GetParticleContainer()->GetArray())->Pt();
@@ -1370,24 +1389,60 @@ Double_t AliAnalysisTaskSubJetFraction::RelativePhi(Double_t Phi1, Double_t Phi2
 Int_t AliAnalysisTaskSubJetFraction::SelectTriggerHadron(Float_t PtMin, Float_t PtMax){
 
   AliTrackContainer *PartCont = NULL;
-  if (fJetShapeSub==kConstSub) PartCont = GetTrackContainer(1);
-  else PartCont = GetTrackContainer(0);
-  TClonesArray *TracksArray = PartCont->GetArray(); 
-  if(!PartCont || !TracksArray) return -99999;
+  AliParticleContainer *PartContMC = NULL;
+
+
+  if (fJetShapeSub==kConstSub){
+    if (fJetShapeType == AliAnalysisTaskSubJetFraction::kGenOnTheFly) PartContMC = GetParticleContainer(1);
+    else PartCont = GetTrackContainer(1);
+  }
+  else{
+    if (fJetShapeType == AliAnalysisTaskSubJetFraction::kGenOnTheFly) PartContMC = GetParticleContainer(0);
+    else PartCont = GetTrackContainer(0);
+  }
+  
+  TClonesArray *TracksArray = NULL;
+  TClonesArray *TracksArrayMC = NULL;
+  if (fJetShapeType == AliAnalysisTaskSubJetFraction::kGenOnTheFly) TracksArrayMC = PartContMC->GetArray();
+  else TracksArray = PartCont->GetArray();
+ 
+  if (fJetShapeType == AliAnalysisTaskSubJetFraction::kGenOnTheFly){
+    if(!PartContMC || !TracksArrayMC) return -99999;
+  }
+  else {
+    if(!PartCont || !TracksArray) return -99999;
+  }
+    
   AliAODTrack *Track = 0x0;
   Int_t Trigger_Index[100];
   for (Int_t i=0; i<100; i++) Trigger_Index[i] = 0;
   Int_t Trigger_Counter = 0;
-  for(Int_t i=0; i < TracksArray->GetEntriesFast(); i++){  
-    if((Track = static_cast<AliAODTrack*>(PartCont->GetAcceptTrack(i)))){
-      if (!Track) continue;
-      if(TMath::Abs(Track->Eta())>0.9) continue;
-      if (Track->Pt()<0.15) continue;
-      if ((Track->Pt() >= PtMin) && (Track->Pt()< PtMax)) {
-	Trigger_Index[Trigger_Counter] = i;
-	Trigger_Counter++;
+  Int_t NTracks=0;
+  if (fJetShapeType == AliAnalysisTaskSubJetFraction::kGenOnTheFly) NTracks = TracksArrayMC->GetEntriesFast();
+  else NTracks = TracksArray->GetEntriesFast();
+  for(Int_t i=0; i < NTracks; i++){
+    if (fJetShapeType == AliAnalysisTaskSubJetFraction::kGenOnTheFly){
+      if((Track = static_cast<AliAODTrack*>(PartContMC->GetAcceptParticle(i)))){
+	if (!Track) continue;
+	if(TMath::Abs(Track->Eta())>0.9) continue;
+	if (Track->Pt()<0.15) continue;
+	if ((Track->Pt() >= PtMin) && (Track->Pt()< PtMax)) {
+	  Trigger_Index[Trigger_Counter] = i;
+	  Trigger_Counter++;
+	}
       }
     }
+    else{ 
+      if((Track = static_cast<AliAODTrack*>(PartCont->GetAcceptTrack(i)))){
+	if (!Track) continue;
+	if(TMath::Abs(Track->Eta())>0.9) continue;
+	if (Track->Pt()<0.15) continue;
+	if ((Track->Pt() >= PtMin) && (Track->Pt()< PtMax)) {
+	  Trigger_Index[Trigger_Counter] = i;
+	  Trigger_Counter++;
+	}
+      }
+    } 
   }
   if (Trigger_Counter == 0) return -99999;
   Int_t RandomNumber = 0, Index = 0 ; 
@@ -1622,7 +1677,9 @@ Double_t AliAnalysisTaskSubJetFraction::fjNSubJettiness(AliEmcalJet *Jet, Int_t 
   //Option==4 returns Symmetry measure (Zg) for soft dropped jet
   //Option==5 returns Pt of Subjet1
   //Option==6 returns Pt of Subjet2
-  //Options==7 trutns deltaR of subjets...Is this different to before?? 
+  //Options==7 trutns deltaR of subjets...Is this different to before??
+  //Option==8 Subjet1 Leading track Pt
+  //Option==9 Subjet1 Leading track Pt
   if (Jet->GetNumberOfTracks()>=N){
     if((fJetShapeSub==kDerivSub) && (JetContNb==0) && (N==1) && (Algorithm==0) && (Beta==1.0) && (Option==0)){
       if (fDerivSubtrOrder == kFirstOrder) return Jet->GetShapeProperties()->GetFirstOrderSubtracted1subjettiness_kt();
@@ -1641,6 +1698,7 @@ Double_t AliAnalysisTaskSubJetFraction::fjNSubJettiness(AliEmcalJet *Jet, Int_t 
       else return Jet->GetShapeProperties()->GetSecondOrderSubtractedOpeningAngle_kt();
     }
     else{
+      if (fJetShapeType != AliAnalysisTaskSubJetFraction::kGenOnTheFly) Algorithm=fReclusteringAlgorithm;   //Lazy programming!! Change this later, just a quick fix for now...it stops you being able to fill tree with two different reclutering algorithms or change algortihm inside this .cxx  (can only be changed via the external setter).
       AliJetContainer *JetCont = GetJetContainer(JetContNb);
       AliEmcalJetFinder *JetFinder=new AliEmcalJetFinder("Nsubjettiness");
       JetFinder->SetJetMaxEta(0.9-fJetRadius);

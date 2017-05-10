@@ -5,7 +5,7 @@ your desired settings in less than an hour.
 
 # Transition your correction settings to the EMCal Corrections Framework
 
-If you plan to test and verify that everything works the same (which we strongly encourage!) be certain not to delete your previous corrections!
+If you plan to test and verify that everything works the same (which we **strongly encourage!**) be certain not to delete your previous corrections yet!
 
 # Configure your run macro or wagon
 
@@ -13,7 +13,7 @@ Follow the same procedure as described on \ref READMEemcCorrections.
 
 # Test and verify the changes                     {#emcalCorrectionsVerifyChanges}
 
-To test and verify the changes, we have a general procedure, as well as tools to help verify automatically. **NOTE: This procedure only works for analyses already using EMCal Containers! Older tasks must first update to at least use EMCal containers to use this tool!** See [here](\ref READMEchangefw) for instructions to update, if you need. Alternatively, you can test without EMCal containers, but these instructions **do not** apply.
+To test and verify the changes, we have a general procedure, as well as tools to help verify automatically. **NOTE: This procedure is oriented towards using EMCal Containers. If you do not use EMCal containers, this will only be a rough guide!**
 
 The general procedure is as follows:
 
@@ -30,13 +30,13 @@ First, you must add some additional options to your run macro. In particular, we
 
 ### Configure the EMCal Correction Framework AddTask for side-by-side testing
 
-To enable side-by-side testing, we will need to setup the copy of branches before setting up the EMCal Correction Framework AddTask. This is required to ensure that the two correction frameworks do not interfere with each other. To copy the proper input objects (we only need to copy cells and tracks - clusters will be created automatically), use something like the code below (assuming AOD branch naming):
+To enable side-by-side testing, we will need to setup the copy of branches before setting up the EMCal Correction Framework AddTask (ie. this code must be **executed before the Correction Framework AddTask** in your run macro or LEGO train). This is required to ensure that the two correction frameworks do not interfere with each other. To copy the proper input objects (we only need to copy cells and tracks - clusters will be created automatically), use something like the code below (assuming AOD branch naming):
 
 ~~~{.cxx}
 // Cells
-AliEmcalCorrectionTask::InputObject_t inputObject = AliEmcalCorrectionTask::kCaloCells;
+AliEmcalContainerUtils::InputObject_t inputObject = AliEmcalContainerUtils::kCaloCells;
 bool IsEsd = (iDataType == kEsd);
-TString inputObjectBranchName = AliEmcalCorrectionTask::DetermineUseDefaultName(inputObject, IsEsd);
+TString inputObjectBranchName = AliEmcalContainerUtils::DetermineUseDefaultName(inputObject, IsEsd);
 TString newBranchName = inputObjectBranchName;
 newBranchName += "New";
 AliEmcalCopyCollection * copyTaskCells = AddTaskEmcalCopyCollection(inputObject, inputObjectBranchName.Data(), newBranchName.Data());
@@ -44,8 +44,8 @@ AliEmcalCopyCollection * copyTaskCells = AddTaskEmcalCopyCollection(inputObject,
 // Clusters
 // We don't need to copy clusters since we are reclusterizing
 // Tracks
-inputObject = AliEmcalCorrectionTask::kTrack;
-inputObjectBranchName = AliEmcalCorrectionTask::DetermineUseDefaultName(inputObject, IsEsd);
+inputObject = AliEmcalContainerUtils::kTrack;
+inputObjectBranchName = AliEmcalContainerUtils::DetermineUseDefaultName(inputObject, IsEsd);
 newBranchName = inputObjectBranchName;
 newBranchName += "New";
 AliEmcalCopyCollection * copyTaskTracks = AddTaskEmcalCopyCollection(inputObject, inputObjectBranchName.Data(), newBranchName.Data());
@@ -124,7 +124,7 @@ If your analysis uses a track container, and you use the "usedefault" pattern in
 
 ## Verify the changes
 
-You are all set! Now run the run macro as normal. Once it is finished, we have a python script to compare the output histograms automatically. It is available <a href="https://gitlab.cern.ch/ALICEYale/alice-yale-dev/raw/master/analyses/utilities/compareHistos.py" download>here</a> (you may need to right click -> Save Link As..). To run it, you need to pass the path of the ``AnalysisResults.root`` file, as well as the name of the output list from your task that was generated with the new corrections. For example,
+You are all set! Now run the run macro as normal. Once it is finished, we have a python script to compare the output histograms automatically. It is available <a href="https://raw.githubusercontent.com/ALICEYale/alice-yale-dev/master/analyses/utilities/compareHistos.py" download>here</a> (you may need to right click -> Save Link As..). To run it, you need to pass the path of the ``AnalysisResults.root`` file, as well as the name of the output list from your task that was generated with the new corrections. For example,
 
 ~~~{.sh}
 python compareHistos.py -f ../exampleDir/AnalysisResults.root -n MyAnalysisOutputListFromNewCorrections
@@ -156,6 +156,17 @@ python compareHistos.py -f ../exampleDir/AnalysisResults.root -s -t 0.01
 
 After all that, if they still do not match, then please let us know!
 
-Help for the script is available with `python compareHistos.py --help`. (If you are using aliBuild, you'll need to set your ``$PYTHONPATH`` variable. In bash, you can do this by setting ``export PYTHONPATH=$ROOTSYS/lib:$PYTHONPATH``. Other shells may vary.)
+Help for the script is available with `python compareHistos.py --help`. (If you are using aliBuild, you'll may to set your ``$PYTHONPATH`` variable. In bash, you can do this by setting ``export PYTHONPATH=$ROOTSYS/lib:$PYTHONPATH``. Other shells may vary.)
+
+# Some suggestions and tips if the tests disagree
+
+Testing is very important, but it can take **a few iterations** to get all of your settings right! If they don't match the first time, check your settings again closely. Anecdotally, we have observed the time cuts, non-linearity function, and clusterizer type to cause many of the issues. In addition, a few defaults were updated in the EMCal and EMCal-Jet sample tasks that are work checking. Those values include:
+
+| Settings               | Previous value     | New default          | Reason for change                         |
+| ---------------------- | ------------------ | -------------------- | ----------------------------------------- |
+| cell time cuts         | +/- 50 us          | +/- 1                | Clarify they are off by default. This can make a difference in some periods! |
+| Non-linearity function | kBeamTestCorrected | kBeamTestCorrectedv3 | Update in EMCal %Analysis Recommendations |
+| Mass for track prop    | Pion mass          | PID mass hypothesis  | Experts decided this was the best setting |
+| Point for track prop   | Vertex             | DCA                  | Experts decided this was the best setting |
 
 */

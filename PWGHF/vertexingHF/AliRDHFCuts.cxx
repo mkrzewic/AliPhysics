@@ -46,6 +46,7 @@
 #include "AliPIDResponse.h"
 #include "AliAnalysisUtils.h"
 #include "AliMultSelection.h"
+#include "AliAODVZERO.h"
 #include "TRandom.h"
 #include <TF1.h>
 #include <TFile.h>
@@ -91,6 +92,7 @@ fUsePhysicsSelection(kTRUE),
 fOptPileup(0),
 fMinContrPileup(3),
 fMinDzPileup(0.6),
+fUseMultDepPileupCut(kFALSE),
 fUseCentrality(0),
 fMinCentrality(0.),
 fMaxCentrality(100.),
@@ -122,7 +124,8 @@ fDeadZoneWidth(3.),
 fCutGeoNcrNclLength(130.),
 fCutGeoNcrNclGeom1Pt(1.5),
 fCutGeoNcrNclFractionNcr(0.85),
-fCutGeoNcrNclFractionNcl(0.7)
+fCutGeoNcrNclFractionNcl(0.7),
+fUseV0ANDSelectionOffline(kFALSE)
 {
   //
   // Default Constructor
@@ -162,6 +165,7 @@ AliRDHFCuts::AliRDHFCuts(const AliRDHFCuts &source) :
   fOptPileup(source.fOptPileup),
   fMinContrPileup(source.fMinContrPileup),
   fMinDzPileup(source.fMinDzPileup),
+  fUseMultDepPileupCut(source.fUseMultDepPileupCut),
   fUseCentrality(source.fUseCentrality),
   fMinCentrality(source.fMinCentrality),
   fMaxCentrality(source.fMaxCentrality),
@@ -193,7 +197,8 @@ AliRDHFCuts::AliRDHFCuts(const AliRDHFCuts &source) :
   fCutGeoNcrNclLength(source.fCutGeoNcrNclLength),
   fCutGeoNcrNclGeom1Pt(source.fCutGeoNcrNclGeom1Pt),
   fCutGeoNcrNclFractionNcr(source.fCutGeoNcrNclFractionNcr),
-  fCutGeoNcrNclFractionNcl(source.fCutGeoNcrNclFractionNcl)
+  fCutGeoNcrNclFractionNcl(source.fCutGeoNcrNclFractionNcl),
+  fUseV0ANDSelectionOffline(source.fUseV0ANDSelectionOffline)
 {
   //
   // Copy constructor
@@ -249,6 +254,7 @@ AliRDHFCuts &AliRDHFCuts::operator=(const AliRDHFCuts &source)
   fOptPileup=source.fOptPileup;
   fMinContrPileup=source.fMinContrPileup;
   fMinDzPileup=source.fMinDzPileup;
+  fUseMultDepPileupCut=source.fUseMultDepPileupCut;
   fUseCentrality=source.fUseCentrality;
   fMinCentrality=source.fMinCentrality;
   fMaxCentrality=source.fMaxCentrality;
@@ -291,6 +297,7 @@ AliRDHFCuts &AliRDHFCuts::operator=(const AliRDHFCuts &source)
   fCutGeoNcrNclGeom1Pt=source.fCutGeoNcrNclGeom1Pt;
   fCutGeoNcrNclFractionNcr=source.fCutGeoNcrNclFractionNcr;
   fCutGeoNcrNclFractionNcl=source.fCutGeoNcrNclFractionNcl;
+  fUseV0ANDSelectionOffline=source.fUseV0ANDSelectionOffline;
 
   PrintAll();
 
@@ -541,6 +548,16 @@ Bool_t AliRDHFCuts::IsEventSelected(AliVEvent *event) {
 	  accept=kFALSE;
 	}
       }
+      if(fUseV0ANDSelectionOffline){
+	AliAODVZERO* v0data=(AliAODVZERO*)((AliAODEvent*)event)->GetVZEROData();
+	Int_t tv0a=v0data->GetV0ADecision();
+	Int_t tv0c=v0data->GetV0CDecision();
+	if(!(tv0a==1 && tv0c==1)){
+	  if(accept) fWhyRejection=7;
+	  fEvRejectionBits+=1<<kPhysicsSelection;
+	  accept=kFALSE;
+	}
+      }
     }
   }
 
@@ -595,9 +612,15 @@ Bool_t AliRDHFCuts::IsEventSelected(AliVEvent *event) {
 
   // pile-up rejection
   if(fOptPileup==kRejectPileupEvent){
-    Int_t cutc=(Int_t)fMinContrPileup;
-    Double_t cutz=(Double_t)fMinDzPileup;
-    if(event->IsPileupFromSPD(cutc,cutz,3.,2.,10.)) {
+    Bool_t isPileup=kFALSE;
+    if(fUseMultDepPileupCut){
+      isPileup=event->IsPileupFromSPDInMultBins();
+    }else{
+      Int_t cutc=(Int_t)fMinContrPileup;
+      Double_t cutz=(Double_t)fMinDzPileup;
+      isPileup=event->IsPileupFromSPD(cutc,cutz,3.,2.,10.);
+    }
+    if(isPileup){
       if(accept) fWhyRejection=1;
       fEvRejectionBits+=1<<kPileup;
       accept=kFALSE;
@@ -1284,16 +1307,20 @@ Float_t AliRDHFCuts::GetCentrality(AliAODEvent* aodEvent,AliRDHFCuts::ECentralit
   }
 
   if(estimator==kCentV0M){
-    cent=multSelection->GetMultiplicityPercentile("V0M"); 
-    Int_t qual = multSelection->GetEvSelCode();
-    if(qual == 199 ) cent=-999;
-    return cent;
-  }
-  else {
+    cent=multSelection->GetMultiplicityPercentile("V0M");
+  }else if(estimator==kCentV0A){
+    cent=multSelection->GetMultiplicityPercentile("V0A");
+  }else if(estimator==kCentZNA){
+    cent=multSelection->GetMultiplicityPercentile("ZNA");
+  }else if(estimator==kCentCL1){
+    cent=multSelection->GetMultiplicityPercentile("CL1");
+  }else {
     AliWarning(Form("CENTRALITY ESTIMATE WITH ESTIMATEOR %d NOT YET IMPLEMENTED FOR NEW FRAMEWORK",(Int_t)estimator));
     return cent;
   }
-
+  Int_t qual = multSelection->GetEvSelCode();
+  if(qual == 199 ) cent=-999;
+  return cent;
 }
 //-------------------------------------------------------------------
 Float_t AliRDHFCuts::GetCentralityOldFramework(AliAODEvent* aodEvent,AliRDHFCuts::ECentrality estimator) {

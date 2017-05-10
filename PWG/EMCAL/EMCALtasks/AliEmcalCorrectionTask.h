@@ -11,12 +11,16 @@ class AliEmcalCorrectionComponent;
 class AliEMCALGeometry;
 class AliVEvent;
 
-#include "AliAnalysisTaskSE.h"
+#include <iosfwd>
+
+#include <AliAnalysisTaskSE.h>
+#include <AliVCluster.h>
+
+#include "AliEmcalContainerUtils.h"
 #include "AliParticleContainer.h"
 #include "AliMCParticleContainer.h"
 #include "AliTrackContainer.h"
 #include "AliClusterContainer.h"
-#include "AliVCluster.h"
 #include "AliEmcalTrackSelection.h"
 
 /**
@@ -55,38 +59,19 @@ class AliEmcalCorrectionTask : public AliAnalysisTaskSE {
     kpA       = 2  //!<! Proton-Nucleus
   };
 
-  /** 
-   * @enum InputObject_t
-   * @brief %Type of input object to be created
-   */
-  enum InputObject_t {
-    kNoDefinedInputObject = -1,    //!< Not initialied type
-    kCaloCells = 0,                //!< Calo cells
-    kCluster = 1,                  //!< Cluster container
-    kTrack = 2,                    //!< Track container
-  };
-
-#if !(defined(__CINT__) || defined(__MAKECINT__))
-  // Hidden from CINT since it cannot handle these maps well
   /// Relates string to the cluster energy enumeration for YAML configuration
-  std::map <std::string, AliVCluster::VCluUserDefEnergy_t> clusterEnergyTypeMap = {
-    {"kNonLinCorr", AliVCluster::kNonLinCorr },
-    {"kHadCorr", AliVCluster::kHadCorr },
-    {"kUserDefEnergy1", AliVCluster::kUserDefEnergy1 },
-    {"kUserDefEnergy2", AliVCluster::kUserDefEnergy2 }
-  };
+  static const std::map <std::string, AliVCluster::VCluUserDefEnergy_t> fgkClusterEnergyTypeMap; //!<!
 
   /// Relates string to the track filter enumeration for YAML configuration
-  std::map <std::string, AliEmcalTrackSelection::ETrackFilterType_t> trackFilterTypeMap = {
-    {"kNoTrackFilter", AliEmcalTrackSelection::kNoTrackFilter },
-    {"kCustomTrackFilter", AliEmcalTrackSelection::kCustomTrackFilter },
-    {"kHybridTracks",  AliEmcalTrackSelection::kHybridTracks },
-    {"kTPCOnlyTracks", AliEmcalTrackSelection::kTPCOnlyTracks }
-  };
-#endif
+  static const std::map <std::string, AliEmcalTrackSelection::ETrackFilterType_t> fgkTrackFilterTypeMap; //!<!
 
   AliEmcalCorrectionTask();
   AliEmcalCorrectionTask(const char * name);
+  // Implemented using copy-and-swap mechanism
+  AliEmcalCorrectionTask(const AliEmcalCorrectionTask & task);
+  AliEmcalCorrectionTask &operator=(AliEmcalCorrectionTask other);
+  friend void swap(AliEmcalCorrectionTask & first, AliEmcalCorrectionTask & second);
+  AliEmcalCorrectionTask(AliEmcalCorrectionTask && other);
   virtual ~AliEmcalCorrectionTask();
 
   // YAML
@@ -96,15 +81,22 @@ class AliEmcalCorrectionTask : public AliAnalysisTaskSE {
   void SetUserConfigurationFilename(std::string name) { fUserConfigurationFilename = name; }
   /// Set the path to the default configuration filename (Expert use only! The user should set the user configuration!)
   void SetDefaultConfigurationFilename(std::string name) { fDefaultConfigurationFilename = name; }
+  // Print the actual configuration string
+  std::ostream & PrintConfigurationString(std::ostream & in, bool userConfig = false) const;
   // Write configuration to file
-  bool WriteConfigurationFile(std::string filename, bool userConfig = false);
+  bool WriteConfigurationFile(std::string filename, bool userConfig = false) const;
+  // Compare configurations
+  bool CompareToStoredConfiguration(std::string filename, bool userConfig = false) const;
 
   // Options
-  // Get
-  const TString &             GetRunPeriod()                                  const { return fRunPeriod; }
+  // Printing
+  friend std::ostream & operator<<(std::ostream &in, const AliEmcalCorrectionTask &myTask);
+  void Print(Option_t* opt = "") const;
+  std::ostream & Print(std::ostream &in) const;
+  std::string toString(bool includeYAMLConfigurationInfo = false) const;
   // Set
   void                        SetForceBeamType(BeamType f)                          { fForceBeamType     = f                              ; }
-  void                        SetRunPeriod(const char* runPeriod)                   { fRunPeriod = runPeriod; fRunPeriod.ToLower(); }
+  void                        SetNeedEmcalGeometry(Bool_t b)                        { fNeedEmcalGeom = b; }
   // Centrality options
   void                        SetUseNewCentralityEstimation(Bool_t b)               { fUseNewCentralityEstimation = b                     ; }
   virtual void                SetNCentBins(Int_t n)                                 { fNcentBins         = n                              ; }
@@ -120,30 +112,26 @@ class AliEmcalCorrectionTask : public AliAnalysisTaskSE {
   const std::vector<AliEmcalCorrectionComponent *> & CorrectionComponents() { return fCorrectionComponents; }
 
   // Containers and cells
-  AliParticleContainer       *AddParticleContainer(const char *n);
-  AliTrackContainer          *AddTrackContainer(const char *n);
-  AliMCParticleContainer     *AddMCParticleContainer(const char *n);
-  AliClusterContainer        *AddClusterContainer(const char *n);
+  AliParticleContainer       *AddParticleContainer(const char *n)                   { return AliEmcalContainerUtils::AddContainer<AliParticleContainer>(n, fParticleCollArray); }
+  AliTrackContainer          *AddTrackContainer(const char *n)                      { return AliEmcalContainerUtils::AddContainer<AliTrackContainer>(n, fParticleCollArray); }
+  AliMCParticleContainer     *AddMCParticleContainer(const char *n)                 { return AliEmcalContainerUtils::AddContainer<AliMCParticleContainer>(n, fParticleCollArray); }
+  AliClusterContainer        *AddClusterContainer(const char *n)                    { return AliEmcalContainerUtils::AddContainer<AliClusterContainer>(n, fClusterCollArray); }
   void                        AdoptParticleContainer(AliParticleContainer* cont)    { fParticleCollArray.Add(cont)                        ; }
   void                        AdoptTrackContainer(AliTrackContainer* cont)          { AdoptParticleContainer(cont)                        ; }
   void                        AdoptMCParticleContainer(AliMCParticleContainer* cont){ AdoptParticleContainer(cont)                        ; }
   void                        AdoptClusterContainer(AliClusterContainer* cont)      { fClusterCollArray.Add(cont)                         ; }
-  AliParticleContainer       *GetParticleContainer(Int_t i=0)         const;
-  AliParticleContainer       *GetParticleContainer(const char* name)  const;
-  AliClusterContainer        *GetClusterContainer(Int_t i=0)          const;
-  AliClusterContainer        *GetClusterContainer(const char* name)   const;
+  AliParticleContainer       *GetParticleContainer(Int_t i=0)         const         { return AliEmcalContainerUtils::GetContainer<AliParticleContainer>(i, fParticleCollArray); }
+  AliParticleContainer       *GetParticleContainer(const char* name)  const         { return AliEmcalContainerUtils::GetContainer<AliParticleContainer>(name, fParticleCollArray); }
+  AliClusterContainer        *GetClusterContainer(Int_t i=0)          const         { return AliEmcalContainerUtils::GetContainer<AliClusterContainer>(i, fClusterCollArray); }
+  AliClusterContainer        *GetClusterContainer(const char* name)   const         { return AliEmcalContainerUtils::GetContainer<AliClusterContainer>(name, fClusterCollArray); }
   AliMCParticleContainer     *GetMCParticleContainer(Int_t i=0)               const { return dynamic_cast<AliMCParticleContainer*>(GetParticleContainer(i))   ; }
   AliMCParticleContainer     *GetMCParticleContainer(const char* name)        const { return dynamic_cast<AliMCParticleContainer*>(GetParticleContainer(name)); }
   AliTrackContainer          *GetTrackContainer(Int_t i=0)                    const { return dynamic_cast<AliTrackContainer*>(GetParticleContainer(i))        ; }
   AliTrackContainer          *GetTrackContainer(const char* name)             const { return dynamic_cast<AliTrackContainer*>(GetParticleContainer(name))     ; }
-  void                        RemoveParticleContainer(Int_t i=0)                    { fParticleCollArray.RemoveAt(i)                      ; } 
-  void                        RemoveClusterContainer(Int_t i=0)                     { fClusterCollArray.RemoveAt(i)                       ; } 
+  void                        RemoveParticleContainer(Int_t i=0)                    { fParticleCollArray.RemoveAt(i)                      ; }
+  void                        RemoveClusterContainer(Int_t i=0)                     { fClusterCollArray.RemoveAt(i)                       ; }
   // Cells
   AliEmcalCorrectionCellContainer *GetCellContainer(const std::string & cellsContainerName) const;
-
-  // Utility functions
-  static std::string DetermineUseDefaultName(InputObject_t contType, bool esdMode, bool returnObjectType = false);
-  static AliVEvent * GetEvent(AliVEvent * inputEvent, bool isEmbedding = false);
 
   // Methods from AliAnalysisTaskSE
   void UserCreateOutputObjects();
@@ -158,9 +146,6 @@ class AliEmcalCorrectionTask : public AliAnalysisTaskSE {
   static AliEmcalCorrectionTask* AddTaskEmcalCorrectionTask(TString suffix = "");
 
  private:
-  AliEmcalCorrectionTask(const AliEmcalCorrectionTask &);             // Not implemented
-  AliEmcalCorrectionTask &operator=(const AliEmcalCorrectionTask &);  // Not implemented
-
   // Utility functions
   // File utilities
   static inline bool DoesFileExist(const std::string & filename);
@@ -168,13 +153,13 @@ class AliEmcalCorrectionTask : public AliAnalysisTaskSE {
   // Cell utilities
   void SetCellsObjectInCellContainerBasedOnProperties(AliEmcalCorrectionCellContainer * cellContainer);
   // Container utilities
-  void CheckForContainerArray(AliEmcalContainer * cont, InputObject_t objectType);
+  void CheckForContainerArray(AliEmcalContainer * cont, AliEmcalContainerUtils::InputObject_t objectType);
   // YAML configuration utilities
-  std::string GetInputFieldNameFromInputObjectType(InputObject_t inputObjectType);
+  std::string GetInputFieldNameFromInputObjectType(AliEmcalContainerUtils::InputObject_t inputObjectType);
   bool CheckPossibleNamesForComponentName(std::string & name, std::set <std::string> & possibleComponents);
   // General utilities
-  BeamType GetBeamType();
-  void PrintRequestedContainersInformation(InputObject_t inputObjectType);
+  BeamType GetBeamType() const;
+  void PrintRequestedContainersInformation(AliEmcalContainerUtils::InputObject_t inputObjectType, std::ostream & stream) const;
 
   // Retrieve objects in event
   Bool_t RetrieveEventObjects();
@@ -190,18 +175,18 @@ class AliEmcalCorrectionTask : public AliAnalysisTaskSE {
   void InitializeComponents();
 
   // Input objects (Cells, Clusters, Tracks) functions
-  void CreateInputObjects(InputObject_t inputObjectType);
-  void AddContainersToComponent(AliEmcalCorrectionComponent * component, InputObject_t inputObjectType);
+  void CreateInputObjects(AliEmcalContainerUtils::InputObject_t inputObjectType);
+  void AddContainersToComponent(AliEmcalCorrectionComponent * component, AliEmcalContainerUtils::InputObject_t inputObjectType, bool checkObjectExists = false);
   
 #if !(defined(__CINT__) || defined(__MAKECINT__))
   // Hidden from CINT since it cannot handle YAML objects well
   // Input objects 
-  void SetupContainersFromInputNodes(InputObject_t inputObjectType, YAML::Node & userInputObjectNode, YAML::Node & defaultInputObjectNode, std::set <std::string> & requestedContainers);
+  void SetupContainersFromInputNodes(AliEmcalContainerUtils::InputObject_t inputObjectType, YAML::Node & userInputObjectNode, YAML::Node & defaultInputObjectNode, std::set <std::string> & requestedContainers);
   // Cells
   void SetupCellsInfo(std::string containerName, YAML::Node & userNode, YAML::Node & defaultNode);
   // Containers
-  void SetupContainer(InputObject_t inputObjectType, std::string containerName, YAML::Node & userNode, YAML::Node & defaultNode);
-  AliEmcalContainer * AddContainer(InputObject_t contType, std::string & containerName, YAML::Node & userNode, YAML::Node & defaultNode);
+  void SetupContainer(AliEmcalContainerUtils::InputObject_t inputObjectType, std::string containerName, YAML::Node & userNode, YAML::Node & defaultNode);
+  AliEmcalContainer * AddContainer(AliEmcalContainerUtils::InputObject_t contType, std::string & containerName, YAML::Node & userNode, YAML::Node & defaultNode);
 
   // Utilities
   // YAML node dependent input objects utilties
@@ -228,7 +213,6 @@ class AliEmcalCorrectionTask : public AliAnalysisTaskSE {
   bool                        fConfigurationInitialized;   ///< True if the YAML configuration files are initialized
 
   bool                        fIsEsd;                      ///< File type
-  TString                     fRunPeriod;                  ///< Run period (passed by user)
   bool                        fEventInitialized;           ///< If the event is initialized properly
   Double_t                    fCent;                       //!<! Event centrality
   Int_t                       fCentBin;                    //!<! Event centrality bin
@@ -251,7 +235,7 @@ class AliEmcalCorrectionTask : public AliAnalysisTaskSE {
   TList *                     fOutput;                     //!<! Output for histograms
 
   /// \cond CLASSIMP
-  ClassDef(AliEmcalCorrectionTask, 3); // EMCal correction task
+  ClassDef(AliEmcalCorrectionTask, 4); // EMCal correction task
   /// \endcond
 };
 

@@ -98,6 +98,7 @@ class AliCaloPhotonCuts : public AliAnalysisCuts {
       k15h2,
       k14j4,
       k16c2,
+      k16c2_plus,
       k16c3a,
       k16c3b,
       k16c3c,
@@ -105,6 +106,10 @@ class AliCaloPhotonCuts : public AliAnalysisCuts {
       k16h3b,
       k16h8a,
       k16h8b,
+      k16k3a,
+      k16k3b,
+      k16k5a,
+      k16k5b,
       // Data starts here
       k10pp7TeV,
       k10pp900GeV,
@@ -279,6 +284,8 @@ class AliCaloPhotonCuts : public AliAnalysisCuts {
     Int_t      fNMaxEMCalModules;                       // max number of EMCal Modules
     Int_t      fNMaxPHOSModules;                        // max number of PHOS Modules
     TH1S*      fHistoModifyAcc;                         // hisogram for modified acceptance, if leadCellID->1 accept cluster, if leadCellID->0 reject cluster
+    Int_t      fNMaxDCalModules;                        // max number of DCal Modules
+    Int_t      fgkDCALCols;                // Number of columns in DCal
 
     Bool_t    fDoLightOutput;                           // switch for running light output, kFALSE -> normal mode, kTRUE -> light mode
     Int_t     fIsMC;                                    // Flag for usage of JetJet MC
@@ -445,7 +452,7 @@ class AliCaloPhotonCuts : public AliAnalysisCuts {
     
   private:
 
-    ClassDef(AliCaloPhotonCuts,37)
+    ClassDef(AliCaloPhotonCuts,41)
 };
 
 #endif

@@ -17,6 +17,8 @@
 #include <vector>
 #include <TClonesArray.h>
 
+#include "AliAODEvent.h"
+#include "AliESDEvent.h"
 #include "AliVEvent.h"
 #include "AliLog.h"
 #include "AliTLorentzVector.h"
@@ -27,6 +29,9 @@
 ClassImp(AliClusterContainer);
 /// \endcond
 
+// Properly instantiate the object
+AliEmcalContainerIndexMap <TClonesArray, AliVCluster> AliClusterContainer::fgEmcalContainerIndexMap;
+
 /**
  * Default constructor.
  */
@@ -36,7 +41,9 @@ AliClusterContainer::AliClusterContainer():
   fClusTimeCutUp(10),
   fExoticCut(kTRUE),
   fDefaultClusterEnergy(-1),
-  fIncludePHOS(kFALSE)
+  fIncludePHOS(kFALSE),
+  fPhosMinNcells(0),
+  fPhosMinM02(0)
 {
   fBaseClassName = "AliVCluster";
   SetClassName("AliVCluster");
@@ -56,7 +63,9 @@ AliClusterContainer::AliClusterContainer(const char *name):
   fClusTimeCutUp(10),
   fExoticCut(kTRUE),
   fDefaultClusterEnergy(-1),
-  fIncludePHOS(kFALSE)
+  fIncludePHOS(kFALSE),
+  fPhosMinNcells(0),
+  fPhosMinM02(0)
 {
   fBaseClassName = "AliVCluster";
   SetClassName("AliVCluster");
@@ -319,7 +328,7 @@ Bool_t AliClusterContainer::ApplyClusterCuts(const AliVCluster* clus, UInt_t &re
   }
   
   Bool_t bInAcceptance = clus->IsEMCAL();
-  if (fIncludePHOS) bInAcceptance = clus->IsEMCAL() || clus->IsPHOS();
+  if (fIncludePHOS) bInAcceptance = clus->IsEMCAL() || (clus->GetType() == AliVCluster::kPHOSNeutral);
   if (!bInAcceptance) {
       rejectionReason |= kIsEMCalCut;
       return kFALSE;
@@ -353,6 +362,18 @@ Bool_t AliClusterContainer::ApplyClusterCuts(const AliVCluster* clus, UInt_t &re
   for (Int_t i = 0; i <= AliVCluster::kLastUserDefEnergy; i++) {
     if (clus->GetUserDefEnergy((VCluUserDefEnergy_t)i) < fUserDefEnergyCut[i]) {
       rejectionReason |= kEnergyCut;
+      return kFALSE;
+    }
+  }
+  
+  if (fIncludePHOS && clus->GetType() == AliVCluster::kPHOSNeutral) {
+    if (clus->GetNCells() < fPhosMinNcells) {
+      rejectionReason |= kExoticCut;
+      return kFALSE;
+    }
+    
+    if (clus->GetM02() < fPhosMinM02) {
+      rejectionReason |= kExoticCut;
       return kFALSE;
     }
   }
@@ -403,6 +424,22 @@ void AliClusterContainer::SetClusUserDefEnergyCut(Int_t t, Double_t cut)
   else {
     fMinE = cut;
   }
+}
+
+/**
+ * Connect the container to the array with content stored inside the virtual event.
+ * The object name in the event must match the name given in the constructor.
+ *
+ * Additionally register the array into the index map.
+ *
+ * @param event Input event containing the array with content.
+ */
+void AliClusterContainer::SetArray(const AliVEvent * event)
+{
+  AliEmcalContainer::SetArray(event);
+
+  // Register TClonesArray in index map
+  fgEmcalContainerIndexMap.RegisterArray(GetArray());
 }
 
 /**
@@ -458,6 +495,12 @@ const char* AliClusterContainer::GetTitle() const
   }
 
   return clusterString.Data();
+}
+
+TString AliClusterContainer::GetDefaultArrayName(const AliVEvent * const ev) const {
+  if(ev->IsA() == AliAODEvent::Class()) return "caloClusters";
+  else if(ev->IsA() == AliESDEvent::Class()) return "CaloClusters";
+  else return "";
 }
 
 

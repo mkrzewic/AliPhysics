@@ -62,7 +62,10 @@ class AliCFSingleTrackEfficiencyTask : public AliAnalysisTaskSE {
   void SetFilterType (Int_t fbittype) { fbit=fbittype; }
   // setter for removal of fake tracks from the calculaltion (negative label at reconstructed level)
   void SetRemoveNegativeLabelTracks(Bool_t flag) { fRemoveNegativeLabelTracks=flag; }
-    
+  // flag to match or skip the matching of reconstructed to kinematic tracks
+  void SetMatchToKinematicTrack(Bool_t flag) { fMatchToKinematicTrack=flag; }
+  void SetUseGeneratedKine(Bool_t flag) {fUseGeneratedKine=flag;}
+
   // select trigger event mask
   void SetTriggerMask(ULong64_t mask=0) { fTriggerMask=mask; }
   // set whether to evaluate centrality
@@ -85,6 +88,8 @@ class AliCFSingleTrackEfficiencyTask : public AliAnalysisTaskSE {
   AliSingleTrackEffCuts *GetSingleTrackEffCuts() { return (AliSingleTrackEffCuts*)fMCCuts; }
   // fake tracks removal flag
   Bool_t GetRemoveNegativeLabelTracks() { return fRemoveNegativeLabelTracks; }
+  // flag to match or skip the matching of reconstructed to kinematic tracks
+  Bool_t GetMatchToKinematicTrack() { return fMatchToKinematicTrack; }
 
 
 
@@ -102,6 +107,7 @@ class AliCFSingleTrackEfficiencyTask : public AliAnalysisTaskSE {
   Int_t GetNumberOfTrackletsInEtaRange(Double_t mineta, Double_t maxeta);
   // Evaluate the event centrality
   Double_t GetCentrality();
+  Double_t GetCentralityOldFramework();
 
   Bool_t fReadAODData;       // flag for AOD/ESD input files
   AliCFManager *fCFManager;  // pointer to the CF manager slot 2
@@ -114,6 +120,8 @@ class AliCFSingleTrackEfficiencyTask : public AliAnalysisTaskSE {
   Bool_t fSetFilterBit; // flag to decide if applying filter-bit selection to tracks
   Int_t  fbit;          // filter-bit selection to tracks
   Bool_t fRemoveNegativeLabelTracks; // flag to remove fake tracks (reconstructed tracks with negative label)
+  Bool_t fMatchToKinematicTrack;  // flag to check if the reconstructed track matches to a kinematic one in the good acceptance
+  Bool_t fUseGeneratedKine;      // flag to use the generated pt, eta phi
 
   Bool_t fEvalCentrality;        // flag to enable centrality determination
   TString fCentralityEstimator;  // centrality estimator
@@ -122,7 +130,7 @@ class AliCFSingleTrackEfficiencyTask : public AliAnalysisTaskSE {
 
   TH1I  *fHistEventsProcessed;   //! histo for monitoring the number of events processed slot 1
 
-  ClassDef(AliCFSingleTrackEfficiencyTask,4)
+  ClassDef(AliCFSingleTrackEfficiencyTask,6)
 };
 
 #endif

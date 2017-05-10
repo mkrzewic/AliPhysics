@@ -115,6 +115,7 @@ public:
     kY,                      // rapidity
     kE,                      // energy
     kM,                      // mass
+    kMCorr,                  // mass, corrected (for photons)
     kMMC,                    // MC mass
     kCharge,                 // charge
     kNclsITS,                // number of clusters assigned in the ITS
@@ -257,6 +258,7 @@ public:
     kDecayLength,            // decay length
     kR,                      // distance to the origin
     kOpeningAngle,           // opening angle
+    kOpeningAngleCorr,        // opening angle, corrected (for photons)
     kOpeningAngleXY,           // opening angle at in XY direction
     kOpeningAngleRZ,           // opening angle at in RZ direction
     kTriangularConversionCut, // triangular cut on opening angle and kPhivPair
@@ -356,9 +358,9 @@ public:
     kXvPrim=kPairMax,        // prim vertex
     kYvPrim,                 // prim vertex
     kZvPrim,                 // prim vertex
-    kXvPrimMCtruth,
-    kYvPrimMCtruth,
-    kZvPrimMCtruth,
+    kXvPrimMCtruth,          // MC true prim vertex, so that it is available also for reco tracks
+    kYvPrimMCtruth,          // MC true prim vertex, so that it is available also for reco tracks
+    kZvPrimMCtruth,          // MC true prim vertex, so that it is available also for reco tracks
     kXRes,                   // primary vertex x-resolution
     kYRes,                   // primary vertex y-resolution
     kZRes,                   // primary vertex z-resolution
@@ -464,12 +466,23 @@ public:
     kQnTPCrpH2,                // TPC eventplane from QnCorrections framework
     kQnTPCxH2,
     kQnTPCyH2,
+    kQnTPCaSiderpH2,                // TPC A-Side eventplane from QnCorrections framework
+    kQnTPCaSidexH2,
+    kQnTPCaSideyH2,
+    kQnTPCcSiderpH2,                // TPC C-Side eventplane from QnCorrections framework
+    kQnTPCcSidexH2,
+    kQnTPCcSideyH2,
+
     kQnV0ArpH2,                // V0A eventplane from QnCorrections framework
     kQnV0AxH2,
     kQnV0AyH2,
     kQnV0CrpH2,                // V0C eventplane from QnCorrections framework
     kQnV0CxH2,
     kQnV0CyH2,
+    kQnV0rpH2,                // V0 combined eventplane from QnCorrections framework
+    kQnV0xH2,
+    kQnV0yH2,
+
     kQnSPDrpH2,                // SPD eventplane from QnCorrections framework
     kQnSPDxH2,
     kQnSPDyH2,
@@ -486,6 +499,13 @@ public:
     kQnDiffTPC_SPD,
     kQnDiffTPC_FMDA,
     kQnDiffTPC_FMDC,
+    kQnDiffTPCa_V0,
+    kQnDiffTPCa_V0A,
+    kQnDiffTPCa_V0C,
+    kQnDiffTPCa_TPCc,
+    kQnDiffTPCc_V0,
+    kQnDiffTPCc_V0A,
+    kQnDiffTPCc_V0C,
     kQnDiffV0A_V0C,
     kQnDiffV0A_SPD,
     kQnDiffV0A_FMDA,
@@ -564,10 +584,12 @@ public:
     kQnDeltaPhiTPCrpH2,
     kQnDeltaPhiV0ArpH2,
     kQnDeltaPhiV0CrpH2,
+    kQnDeltaPhiV0rpH2,
     kQnDeltaPhiSPDrpH2,
     kQnTPCrpH2FlowV2,
     kQnV0ArpH2FlowV2,
     kQnV0CrpH2FlowV2,
+    kQnV0rpH2FlowV2,
     kQnSPDrpH2FlowV2,
 
     // End of Eventplane variables from Qn Framework
@@ -610,8 +632,11 @@ public:
     kRefMultOvRefMultTPConly,   // ref mult / tpc only ref mult should give a hint on out of bunch pile-up if much higher than factor ~4 (LHC15o)
 
     kNch,                    // MC true number of charged particles in |eta|<1.6
+    kNchJpsiExcl,            // MC true number of charged particles in |eta|<1.6 without J/psi daughter tracks
     kNch05,                  // MC true number of charged particles in |eta|<0.5
+    kNch05JpsiExcl,          // MC true number of charged particles in |eta|<0.5 without J/psi daughter tracks
     kNch10,                  // MC true number of charged particles in |eta|<1.0
+    kNch10JpsiExcl,          // MC true number of charged particles in |eta|<1.0 without J/psi daughter tracks
 
     kCentrality,             // event centrality fraction V0M
     kCentralityV0A,          // event centrality fraction V0A
@@ -669,6 +694,7 @@ public:
   static Bool_t GetDCA(const AliAODTrack *track, Double_t* d0z0, Double_t* covd0z0=0);
   static void SetTPCEventPlane(AliEventplane *const evplane);
   static void SetTPCEventPlaneACremoval(AliDielectronQnEPcorrection *acCuts) {fgQnEPacRemoval = acCuts; fgEventPlaneACremoval = kTRUE;}
+  static void SetQnVectorNormalisation(TString qnNorm) {fgQnVectorNorm = qnNorm;}
   static void GetVzeroRP(const AliVEvent* event, Double_t* qvec, Int_t sideOption);      // 0- V0A; 1- V0C; 2- V0A+V0C
   static void GetZDCRP(const AliVEvent* event, Double_t qvec[][2]);
   static AliAODVertex* GetVertex(const AliAODEvent *event, AliAODVertex::AODVtx_t vtype);
@@ -732,8 +758,12 @@ private:
 
   static TString          fgZDCRecenteringFile; // file with ZDC Q-vector averages needed for event plane recentering
   static TProfile3D      *fgZDCRecentering[3][2];   // 2 VZERO sides x 2 Q-vector components
+
   static AliDielectronQnEPcorrection *fgQnEPacRemoval; //! filter for auto correlation removal within Qn Framework
   static Bool_t fgEventPlaneACremoval;
+  static TString fgQnVectorNorm;                       // String containing the normalisation for the QnVector if the non-default AddTask is used
+
+
   static Double_t CalculateEPDiff(Double_t detArp, Double_t detBrp);
 
 
@@ -933,11 +963,13 @@ inline void AliDielectronVarManager::FillVarESDtrack(const AliESDtrack *particle
       AliMCParticle *motherMC=mc->GetMCTrackMother(particle); //mother
       if(motherMC) values[AliDielectronVarManager::kPdgCodeGrandMother]=mc->GetMotherPDG(motherMC);
       AliMCParticle *MCpart = mc->GetMCTrack(particle);
-        // Fill distance of primary vertex to secondary vertex -> IP is not defined since no propagation
-        // Pure MC variable no reconstucted value filled
-      values[AliDielectronVarManager::kDistPrimToSecVtxXYMC] = TMath::Sqrt(TMath::Power(MCpart->Xv() - values[AliDielectronVarManager::kXvPrimMCtruth],2)
-                                                  + TMath::Power(MCpart->Yv() - values[AliDielectronVarManager::kYvPrimMCtruth],2));
-      values[AliDielectronVarManager::kDistPrimToSecVtxZMC] = TMath::Abs(MCpart->Zv() - values[AliDielectronVarManager::kZvPrimMCtruth]);
+      // Fill distance of primary vertex to secondary vertex (as an alternative to the IP)
+      // Pure MC variable by intention, no reconstucted value filled.
+      if (Req(kDistPrimToSecVtxXYMC) || Req(kDistPrimToSecVtxZMC)) {
+        values[AliDielectronVarManager::kDistPrimToSecVtxXYMC] = TMath::Sqrt(  TMath::Power(MCpart->Xv() - values[AliDielectronVarManager::kXvPrimMCtruth],2)
+                                                                             + TMath::Power(MCpart->Yv() - values[AliDielectronVarManager::kYvPrimMCtruth],2));
+        values[AliDielectronVarManager::kDistPrimToSecVtxZMC] = TMath::Abs(MCpart->Zv() - values[AliDielectronVarManager::kZvPrimMCtruth]);
+      }
     }
     values[AliDielectronVarManager::kNumberOfDaughters]=mc->NumberOfDaughters(particle);
   } //if(mc->HasMC())
@@ -1105,7 +1137,7 @@ inline void AliDielectronVarManager::FillVarAODTrack(const AliAODTrack *particle
 
   // Reset AliESDtrack interface specific information
   if(Req(kNclsITS))      values[AliDielectronVarManager::kNclsITS]       = particle->GetITSNcls();
-  if(Req(kITSchi2Cl))    values[AliDielectronVarManager::kITSchi2Cl]     = particle->GetITSchi2() / particle->GetITSNcls();
+  if(Req(kITSchi2Cl))    values[AliDielectronVarManager::kITSchi2Cl]     = (particle->GetITSNcls()>0)? particle->GetITSchi2() / particle->GetITSNcls() : 0;
   if(Req(kNclsTPC))      values[AliDielectronVarManager::kNclsTPC]       = tpcNcls;
   if(Req(kNclsSTPC))     values[AliDielectronVarManager::kNclsSTPC]      = tpcNclsS;
   if(Req(kNclsSFracTPC)) values[AliDielectronVarManager::kNclsSFracTPC]  = tpcNcls>0?tpcNclsS/tpcNcls:0;
@@ -1470,10 +1502,13 @@ inline void AliDielectronVarManager::FillVarMCParticle(const AliMCParticle *part
 
   // Fill common AliVParticle interface information
   FillVarVParticle(particle, values);
-  // Fill distance of primary vertex to secondary vertex -> IP is not defined since no propagation
-  values[AliDielectronVarManager::kDistPrimToSecVtxXYMC] = TMath::Sqrt(TMath::Power(particle->Xv() - values[AliDielectronVarManager::kXvPrim],2)
-                                                  + TMath::Power(particle->Yv() - values[AliDielectronVarManager::kYvPrim],2));
-  values[AliDielectronVarManager::kDistPrimToSecVtxZMC] = TMath::Abs(particle->Zv() - values[AliDielectronVarManager::kZvPrim]);
+
+  // Fill distance of primary vertex to secondary vertex (as a well-defined alternative to the IP-approximation below)
+  if (Req(kDistPrimToSecVtxXYMC) || Req(kDistPrimToSecVtxZMC)) {
+    values[AliDielectronVarManager::kDistPrimToSecVtxXYMC] = TMath::Sqrt(  TMath::Power(particle->Xv() - values[AliDielectronVarManager::kXvPrim],2)
+                                                                         + TMath::Power(particle->Yv() - values[AliDielectronVarManager::kYvPrim],2));
+    values[AliDielectronVarManager::kDistPrimToSecVtxZMC] = TMath::Abs(particle->Zv() - values[AliDielectronVarManager::kZvPrim]);
+  }
   //Approximation of the Impact Parameter
   //Get TVectors for primary and secondary vertex as well as particle momentum
   // distance of space point to a straight line
@@ -1978,6 +2013,21 @@ inline void AliDielectronVarManager::FillVarDielectronPair(const AliDielectronPa
 	values[AliDielectronVarManager::kPsiPair]      = 0.;
 
 	 */
+
+    if(Req(kOpeningAngleCorr)) {
+      Float_t a = 1.54e-01;
+      values[AliDielectronVarManager::kOpeningAngleCorr]  =
+        values[AliDielectronVarManager::kOpeningAngle]
+        - a * TMath::Sqrt(  values[AliDielectronVarManager::kPairDCAabsXY] * values[AliDielectronVarManager::kOneOverPt] );
+    }
+
+    if(Req(kMCorr)) {
+      Float_t a =  7.59e-02;
+      values[AliDielectronVarManager::kMCorr]  =
+        values[AliDielectronVarManager::kM]
+        - a * TMath::Sqrt( values[AliDielectronVarManager::kPairDCAabsXY] * values[AliDielectronVarManager::kPt] );
+    }
+
   }
   //common, regardless of calculation method
 
@@ -2063,10 +2113,12 @@ inline void AliDielectronVarManager::FillVarDielectronPair(const AliDielectronPa
   if(Req(kQnDeltaPhiTPCrpH2) || Req(kQnTPCrpH2FlowV2))   values[AliDielectronVarManager::kQnDeltaPhiTPCrpH2]  = TVector2::Phi_mpi_pi(phi - qnTPCeventplane);
   if(Req(kQnDeltaPhiV0ArpH2) || Req(kQnV0ArpH2FlowV2))   values[AliDielectronVarManager::kQnDeltaPhiV0ArpH2]  = TVector2::Phi_mpi_pi(phi - values[AliDielectronVarManager::kQnV0ArpH2]);
   if(Req(kQnDeltaPhiV0CrpH2) || Req(kQnV0CrpH2FlowV2))   values[AliDielectronVarManager::kQnDeltaPhiV0CrpH2]  = TVector2::Phi_mpi_pi(phi - values[AliDielectronVarManager::kQnV0CrpH2]);
+  if(Req(kQnDeltaPhiV0rpH2) || Req(kQnV0rpH2FlowV2))   values[AliDielectronVarManager::kQnDeltaPhiV0rpH2]  = TVector2::Phi_mpi_pi(phi - values[AliDielectronVarManager::kQnV0rpH2]);
   if(Req(kQnDeltaPhiSPDrpH2) || Req(kQnSPDrpH2FlowV2))   values[AliDielectronVarManager::kQnDeltaPhiSPDrpH2]  = TVector2::Phi_mpi_pi(phi - values[AliDielectronVarManager::kQnSPDrpH2]);
   if(Req(kQnTPCrpH2FlowV2)) values[AliDielectronVarManager::kQnTPCrpH2FlowV2]    = TMath::Cos( 2.*values[AliDielectronVarManager::kQnDeltaPhiTPCrpH2] );
   if(Req(kQnV0ArpH2FlowV2)) values[AliDielectronVarManager::kQnV0ArpH2FlowV2]    = TMath::Cos( 2.*values[AliDielectronVarManager::kQnDeltaPhiV0ArpH2] );
   if(Req(kQnV0CrpH2FlowV2)) values[AliDielectronVarManager::kQnV0CrpH2FlowV2]    = TMath::Cos( 2.*values[AliDielectronVarManager::kQnDeltaPhiV0CrpH2] );
+  if(Req(kQnV0rpH2FlowV2)) values[AliDielectronVarManager::kQnV0rpH2FlowV2]    = TMath::Cos( 2.*values[AliDielectronVarManager::kQnDeltaPhiV0rpH2] );
   if(Req(kQnSPDrpH2FlowV2)) values[AliDielectronVarManager::kQnSPDrpH2FlowV2]    = TMath::Cos( 2.*values[AliDielectronVarManager::kQnDeltaPhiSPDrpH2] );
 
   AliDielectronMC *mc=AliDielectronMC::Instance();
@@ -2235,16 +2287,6 @@ inline void AliDielectronVarManager::FillVarVEvent(const AliVEvent *event, Doubl
   values[AliDielectronVarManager::kXvPrim]       = 0;
   values[AliDielectronVarManager::kYvPrim]       = 0;
   values[AliDielectronVarManager::kZvPrim]       = 0;
-  // The true vertex is needed for the pair DCA analysis (needs DCA of reco track w.r.t. true vertex).
-  AliDielectronMC *mc=AliDielectronMC::Instance();
-  if (mc->HasMC()){
-    AliMCEvent* mcevent = mc->GetMCEvent();
-    const AliVVertex* mcvtx = mcevent->GetPrimaryVertex();
-    values[AliDielectronVarManager::kXvPrimMCtruth]       = (mcvtx ? mcvtx->GetX() : 0.0);
-    values[AliDielectronVarManager::kYvPrimMCtruth]       = (mcvtx ? mcvtx->GetY() : 0.0);
-    values[AliDielectronVarManager::kZvPrimMCtruth]       = (mcvtx ? mcvtx->GetZ() : 0.0);
-  }
-
   values[AliDielectronVarManager::kNVtxContrib]  = 0;
 //   values[AliDielectronVarManager::kChi2NDF]      = 0; //This is the pair value!!!
 
@@ -2557,6 +2599,17 @@ inline void AliDielectronVarManager::FillVarESDEvent(const AliESDEvent *event, D
   const AliESDVertex *vtxTPC = event->GetPrimaryVertexTPC();
   values[AliDielectronVarManager::kNVtxContribTPC] = (vtxTPC ? vtxTPC->GetNContributors() : 0);
 
+  // The true vertex is needed for the pair DCA analysis (needs DCA of reco track w.r.t. true vertex).
+  if (AliDielectronMC::Instance()->HasMC()){
+    if (Req(kDistPrimToSecVtxXYMC) || Req(kDistPrimToSecVtxZMC) || Req(kXvPrimMCtruth) || Req(kYvPrimMCtruth) || Req(kZvPrimMCtruth)) {
+      AliMCEvent* mcevent = AliDielectronMC::Instance()->GetMCEvent();
+      const AliVVertex* mcvtx = mcevent->GetPrimaryVertex();
+      values[AliDielectronVarManager::kXvPrimMCtruth] = (mcvtx ? mcvtx->GetX() : 0.0);
+      values[AliDielectronVarManager::kYvPrimMCtruth] = (mcvtx ? mcvtx->GetY() : 0.0);
+      values[AliDielectronVarManager::kZvPrimMCtruth] = (mcvtx ? mcvtx->GetZ() : 0.0);
+    }
+  }
+
   // Event multiplicity estimators
   Int_t nTrSPD05=0; Int_t nTrITSTPC05=0; Int_t nTrITSSA05=0;
   nTrSPD05    = AliESDtrackCuts::GetReferenceMultiplicity(event, AliESDtrackCuts::kTracklets, 0.5);
@@ -2649,6 +2702,17 @@ inline void AliDielectronVarManager::FillVarAODEvent(const AliAODEvent *event, D
   values[AliDielectronVarManager::kRefMultTPConly] = header->GetTPConlyRefMultiplicity(); // similar to Nacc
   values[AliDielectronVarManager::kRefMultOvRefMultTPConly] = (values[AliDielectronVarManager::kRefMultTPConly] > 0. ? (values[AliDielectronVarManager::kRefMult]/values[AliDielectronVarManager::kRefMultTPConly]) : 0.);
 
+  // The true vertex is needed for the pair DCA analysis (needs DCA of reco track w.r.t. true vertex).
+  if (AliDielectronMC::Instance()->HasMC()){
+    if (Req(kDistPrimToSecVtxXYMC) || Req(kDistPrimToSecVtxZMC) || Req(kXvPrimMCtruth) || Req(kYvPrimMCtruth) || Req(kZvPrimMCtruth)) {
+      // @TODO: adopt the code from FillVarESDEvent() for AOD...
+      printf("WARNING: filling of MC true vertex not implemented for AOD tracks!\n");
+      values[AliDielectronVarManager::kXvPrimMCtruth] = 0.;
+      values[AliDielectronVarManager::kYvPrimMCtruth] = 0.;
+      values[AliDielectronVarManager::kZvPrimMCtruth] = 0.;
+    }
+  }
+
   ///////////////////////////////////////////
   //////////// NANO AODs ////////////////////
   ///////////////////////////////////////////
@@ -2737,14 +2801,17 @@ inline void AliDielectronVarManager::FillVarMCEvent(const AliMCEvent *event, Dou
   values[AliDielectronVarManager::kXvPrim]       = (vtx ? vtx->GetX() : 0.0);
   values[AliDielectronVarManager::kYvPrim]       = (vtx ? vtx->GetY() : 0.0);
   values[AliDielectronVarManager::kZvPrim]       = (vtx ? vtx->GetZ() : 0.0);
-  // For MC this is identical (see comment in FillVarVEvent()).
+  // For MC truth, these variables are identical to the above. (different in FillVarESDEvent() / FillVarAODEvent()).
   values[AliDielectronVarManager::kXvPrimMCtruth]       = values[AliDielectronVarManager::kXvPrim];
   values[AliDielectronVarManager::kYvPrimMCtruth]       = values[AliDielectronVarManager::kYvPrim];
   values[AliDielectronVarManager::kZvPrimMCtruth]       = values[AliDielectronVarManager::kZvPrim];
   // Fill AliMCEvent interface specific information
   values[AliDielectronVarManager::kNch]   = AliDielectronHelper::GetNch(event, 1.6);
+  values[AliDielectronVarManager::kNchJpsiExcl]   = AliDielectronHelper::GetNch(event, 1.6, kTRUE);
   values[AliDielectronVarManager::kNch05] = AliDielectronHelper::GetNch(event, 0.5);
+  values[AliDielectronVarManager::kNch05JpsiExcl] = AliDielectronHelper::GetNch(event, 0.5, kTRUE);
   values[AliDielectronVarManager::kNch10] = AliDielectronHelper::GetNch(event, 1.0);
+  values[AliDielectronVarManager::kNch10JpsiExcl] = AliDielectronHelper::GetNch(event, 1.0, kTRUE);
 
   values[AliDielectronVarManager::kNumberOfJPsis] = AliDielectronHelper::GetNMothers(event, 0.9, 443, 11);
   values[AliDielectronVarManager::kNumberOfJPsisPrompt]  = AliDielectronHelper::GetNMothers(event, 0.9, 443, 11, 1);
@@ -3468,12 +3535,14 @@ inline void AliDielectronVarManager::FillValues(const TParticle *particle, Doubl
 
 //________________________________________________________________
 inline void AliDielectronVarManager::FillQnEventplanes(TList *qnlist, Double_t * const values){
-  Bool_t bTPCqVector(kFALSE), bV0AqVector(kFALSE), bV0CqVector(kFALSE), bSPDqVector(kFALSE), bFMDAqVector(kFALSE), bFMDCqVector(kFALSE);
+  Bool_t bTPCqVector(kFALSE), bTPCaSideqVector(kFALSE), bTPCcSideqVector(kFALSE), bV0AqVector(kFALSE), bV0CqVector(kFALSE), bV0qVector(kFALSE),bSPDqVector(kFALSE), bFMDAqVector(kFALSE), bFMDCqVector(kFALSE);
   for (Int_t i = AliDielectronVarManager::kQnTPCrpH2; i <= AliDielectronVarManager::kQnCorrFMDAy_FMDCy; i++) {
     values[i] = -999.;
   }
+  TString qnListDetector;
   // TPC Eventplane q-Vector
-  const AliQnCorrectionsQnVector *qVecQnFrameworkTPC = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,"TPC","latest","latest");
+  qnListDetector = "TPC" + fgQnVectorNorm;
+  const AliQnCorrectionsQnVector *qVecQnFrameworkTPC = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,qnListDetector.Data(),"latest","latest");
   TVector2 *qVectorTPC = new TVector2(-200.,-200.);
   if(qVecQnFrameworkTPC != NULL){
     bTPCqVector = kTRUE;
@@ -3484,8 +3553,35 @@ inline void AliDielectronVarManager::FillQnEventplanes(TList *qnlist, Double_t *
   }
   delete qVectorTPC;
 
+  // TPC A-Side/Neg. Eta Eventplane q-Vector
+  qnListDetector = "TPCNegEta" + fgQnVectorNorm;
+  const AliQnCorrectionsQnVector *qVecQnFrameworkTPCaSide = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,qnListDetector.Data(),"latest","latest");
+  TVector2 *qVectorTPCaSide = new TVector2(-200.,-200.);
+  if(qVecQnFrameworkTPCaSide != NULL){
+    bTPCaSideqVector = kTRUE;
+    qVectorTPCaSide->Set(qVecQnFrameworkTPCaSide->Qx(2),qVecQnFrameworkTPCaSide->Qy(2));
+    values[AliDielectronVarManager::kQnTPCaSiderpH2] = TVector2::Phi_mpi_pi(qVectorTPCaSide->Phi())/2;
+    values[AliDielectronVarManager::kQnTPCaSidexH2]  = qVecQnFrameworkTPCaSide->Qx(2);
+    values[AliDielectronVarManager::kQnTPCaSideyH2]  = qVecQnFrameworkTPCaSide->Qy(2);
+  }
+  delete qVectorTPCaSide;
+
+  // TPC C-Side/Pos. Eta Eventplane q-Vector
+  qnListDetector = "TPCPosEta" + fgQnVectorNorm;
+  const AliQnCorrectionsQnVector *qVecQnFrameworkTPCcSide = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,qnListDetector.Data(),"latest","latest");
+  TVector2 *qVectorTPCcSide = new TVector2(-200.,-200.);
+  if(qVecQnFrameworkTPCcSide != NULL){
+    bTPCcSideqVector = kTRUE;
+    qVectorTPCcSide->Set(qVecQnFrameworkTPCcSide->Qx(2),qVecQnFrameworkTPCcSide->Qy(2));
+    values[AliDielectronVarManager::kQnTPCcSiderpH2] = TVector2::Phi_mpi_pi(qVectorTPCcSide->Phi())/2;
+    values[AliDielectronVarManager::kQnTPCcSidexH2]  = qVecQnFrameworkTPCcSide->Qx(2);
+    values[AliDielectronVarManager::kQnTPCcSideyH2]  = qVecQnFrameworkTPCcSide->Qy(2);
+  }
+  delete qVectorTPCcSide;
+
   // VZEROA Eventplane q-Vector
-  const AliQnCorrectionsQnVector *qVecQnFrameworkV0A = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,"VZEROA","latest","latest");
+  qnListDetector = "VZEROA" + fgQnVectorNorm;
+  const AliQnCorrectionsQnVector *qVecQnFrameworkV0A = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,qnListDetector.Data(),"latest","latest");
   TVector2 *qVectorV0A = new TVector2(-200.,-200.);
   if(qVecQnFrameworkV0A != NULL){
     bV0AqVector = kTRUE;
@@ -3497,7 +3593,8 @@ inline void AliDielectronVarManager::FillQnEventplanes(TList *qnlist, Double_t *
   delete qVectorV0A;
 
   // VZEROC Eventplane q-Vector
-  const AliQnCorrectionsQnVector *qVecQnFrameworkV0C = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,"VZEROC","latest","latest");
+  qnListDetector = "VZEROC" + fgQnVectorNorm;
+  const AliQnCorrectionsQnVector *qVecQnFrameworkV0C = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,qnListDetector.Data(),"latest","latest");
   TVector2 *qVectorV0C = new TVector2(-200.,-200.);
   if(qVecQnFrameworkV0C != NULL){
     bV0CqVector = kTRUE;
@@ -3508,8 +3605,22 @@ inline void AliDielectronVarManager::FillQnEventplanes(TList *qnlist, Double_t *
   }
   delete qVectorV0C;
 
+  // VZERO Eventplane q-Vector only accessible with NewDetConfig AddTask for QnFramework
+  qnListDetector = "VZERO" + fgQnVectorNorm;
+  const AliQnCorrectionsQnVector *qVecQnFrameworkV0 = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,qnListDetector.Data(),"latest","latest");
+  TVector2 *qVectorV0 = new TVector2(-200.,-200.);
+  if(qVecQnFrameworkV0 != NULL){
+    bV0qVector = kTRUE;
+    qVectorV0->Set(qVecQnFrameworkV0->Qx(2),qVecQnFrameworkV0->Qy(2));
+    values[AliDielectronVarManager::kQnV0rpH2] = TVector2::Phi_mpi_pi(qVectorV0->Phi())/2;
+    values[AliDielectronVarManager::kQnV0xH2]  = qVecQnFrameworkV0->Qx(2);
+    values[AliDielectronVarManager::kQnV0yH2]  = qVecQnFrameworkV0->Qy(2);
+  }
+  delete qVectorV0;
+
   // SPD Eventplane q-Vector
-  const AliQnCorrectionsQnVector *qVecQnFrameworkSPD = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,"SPD","latest","latest");
+  qnListDetector = "SPD" + fgQnVectorNorm;
+  const AliQnCorrectionsQnVector *qVecQnFrameworkSPD = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,qnListDetector.Data(),"latest","latest");
   TVector2 *qVectorSPD = new TVector2(-200.,-200.);
   if(qVecQnFrameworkSPD != NULL){
     bSPDqVector = kTRUE;
@@ -3521,7 +3632,8 @@ inline void AliDielectronVarManager::FillQnEventplanes(TList *qnlist, Double_t *
   delete qVectorSPD;
 
   // FMDA Eventplane q-Vector
-  const AliQnCorrectionsQnVector *qVecQnFrameworkFMDA = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,"FMDA","latest","latest");
+  qnListDetector = "FMDA" + fgQnVectorNorm;
+  const AliQnCorrectionsQnVector *qVecQnFrameworkFMDA = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,qnListDetector.Data(),"latest","latest");
   TVector2 *qVectorFMDA = new TVector2(-200.,-200.);
   if(qVecQnFrameworkFMDA != NULL){
     bFMDAqVector = kTRUE;
@@ -3533,7 +3645,8 @@ inline void AliDielectronVarManager::FillQnEventplanes(TList *qnlist, Double_t *
   delete qVectorFMDA;
 
   // FMDC Eventplane q-Vector
-  const AliQnCorrectionsQnVector *qVecQnFrameworkFMDC = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,"FMDC","latest","latest");
+  qnListDetector = "FMDC" + fgQnVectorNorm;
+  const AliQnCorrectionsQnVector *qVecQnFrameworkFMDC = AliDielectronQnEPcorrection::GetQnVectorFromList(qnlist,qnListDetector.Data(),"latest","latest");
   TVector2 *qVectorFMDC = new TVector2(-200.,-200.);
   if(qVecQnFrameworkFMDC != NULL){
     bFMDCqVector = kTRUE;
@@ -3580,6 +3693,35 @@ inline void AliDielectronVarManager::FillQnEventplanes(TList *qnlist, Double_t *
       values[kQnCorrTPCx_FMDCy] = values[kQnTPCxH2] * values[kQnFMDCyH2];
       values[kQnCorrTPCy_FMDCx] = values[kQnTPCyH2] * values[kQnFMDCxH2];
       values[kQnCorrTPCy_FMDCy] = values[kQnTPCyH2] * values[kQnFMDCyH2];
+    }
+  }
+
+  // TPC A-Side diff
+  if(bTPCaSideqVector){
+    if(bTPCcSideqVector){
+      values[AliDielectronVarManager::kQnDiffTPCa_TPCc] = AliDielectronVarManager::CalculateEPDiff(values[AliDielectronVarManager::kQnTPCaSiderpH2],values[AliDielectronVarManager::kQnTPCcSiderpH2]);
+    }
+    if(bV0qVector){
+      values[AliDielectronVarManager::kQnDiffTPCa_V0] = AliDielectronVarManager::CalculateEPDiff(values[AliDielectronVarManager::kQnTPCaSiderpH2],values[AliDielectronVarManager::kQnV0rpH2]);
+    }
+    if(bV0AqVector){
+      values[AliDielectronVarManager::kQnDiffTPCa_V0A] = AliDielectronVarManager::CalculateEPDiff(values[AliDielectronVarManager::kQnTPCaSiderpH2],values[AliDielectronVarManager::kQnV0ArpH2]);
+    }
+    if(bV0CqVector){
+      values[AliDielectronVarManager::kQnDiffTPCa_V0C] = AliDielectronVarManager::CalculateEPDiff(values[AliDielectronVarManager::kQnTPCaSiderpH2],values[AliDielectronVarManager::kQnV0CrpH2]);
+    }
+  }
+
+  // TPC C-Side diff
+  if(bTPCcSideqVector){
+    if(bV0qVector){
+      values[AliDielectronVarManager::kQnDiffTPCc_V0] = AliDielectronVarManager::CalculateEPDiff(values[AliDielectronVarManager::kQnTPCcSiderpH2],values[AliDielectronVarManager::kQnV0rpH2]);
+    }
+    if(bV0AqVector){
+      values[AliDielectronVarManager::kQnDiffTPCc_V0A] = AliDielectronVarManager::CalculateEPDiff(values[AliDielectronVarManager::kQnTPCcSiderpH2],values[AliDielectronVarManager::kQnV0ArpH2]);
+    }
+    if(bV0CqVector){
+      values[AliDielectronVarManager::kQnDiffTPCc_V0C] = AliDielectronVarManager::CalculateEPDiff(values[AliDielectronVarManager::kQnTPCcSiderpH2],values[AliDielectronVarManager::kQnV0CrpH2]);
     }
   }
 

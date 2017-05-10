@@ -61,7 +61,8 @@ struct TrackletAODTrain : public TrainSetup
     fOptions.Add("phi-overlap-cut",  "X","Phi overlap cut",         0.005);
     fOptions.Add("z-eta-overlap-cut","X","Z-Eta overlap cut",       0.05);
     fOptions.Add("copy",         "LIST","',' separated list to copy","cent,v0");
-    fOptions.Add("filter-str",   "MODE","Filter strange clusters",  0);    
+    fOptions.Add("filter-mode",  "MODE","Filter strange clusters",  0);
+    fOptions.Add("filter-weight","FILE","File with filter weights", "");
     fOptions.SetDescription("Create branch in AOD with tracklet info");
     
   }
@@ -108,6 +109,8 @@ struct TrackletAODTrain : public TrainSetup
     fRailway->LoadSource("AliAODSimpleHeader.C");
     fRailway->LoadSource("AliSimpleHeaderTask.C");    
     fRailway->LoadSource("AliAODTracklet.C");
+    fRailway->LoadSource("AliTrackletWeights.C");
+    fRailway->LoadSource("AliTrackletAODUtils.C");
     fRailway->LoadSource("AliTrackletAODTask.C");
 
     // --- Task to copy header information ---------------------------
@@ -122,7 +125,8 @@ struct TrackletAODTrain : public TrainSetup
     
     // --- Create the task using interpreter -------------------------
     Long_t             ret  =
-      gROOT->ProcessLine("AliTrackletAODTask::Create()");
+      gROOT->ProcessLine(Form("AliTrackletAODTask::Create(\"%s\")",
+			      fOptions.AsString("filter-weight")));
     AliAnalysisTaskSE* task = reinterpret_cast<AliAnalysisTaskSE*>(ret);
     if (!task) return;
     
@@ -134,7 +138,7 @@ struct TrackletAODTrain : public TrainSetup
     FromOption(task, "DPhiShift",	"dphi-shift",	     0.0045);
     FromOption(task, "PhiOverlapCut",	"phi-overlap-cut"  , 0.005);
     FromOption(task, "ZEtaOverlapCut",	"z-eta-overlap-cut", 0.05);
-    FromOption(task, "FilterStrange",   "filter-str",        0);
+    FromOption(task, "FilterMode",      "filter-mode",       0);
     
     task->Print("");    
   }

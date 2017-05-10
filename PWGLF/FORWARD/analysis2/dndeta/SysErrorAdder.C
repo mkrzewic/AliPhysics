@@ -23,6 +23,9 @@ struct SysErrorAdder
     kDensityFill   = 3002, // 0, // 3002,
     kEmpiricalFill = 3144, // 0, // 3244
     kHadronFill    = 3244, // 0,
+    kEMFill        = 3344,
+    kDiffRatFill   = 3001,
+    kDiffMassFill  = 3002,
     kOtherFill     = 0
   };
   /** System */
@@ -193,7 +196,10 @@ struct SysErrorAdder
     ModError(gse, id, kHadronFill, l);
     return id;
   }
-  virtual const char* MakeName() const { return GetTriggerString(); } 
+  virtual const char* MakeName(Double_t eff) const
+  {
+    return GetTriggerString();
+  } 
   /** 
    * @return The systematic error from merging 
    */
@@ -243,7 +249,7 @@ struct SysErrorAdder
     reac.Append(" --> CHARGED X");
     
     GraphSysErr* gse = new GraphSysErr(10);
-    gse->SetName(MakeName());
+    gse->SetName(MakeName(eff));
     gse->SetSumLineColor(kRed+2);
     gse->SetSumLineWidth(2);
     gse->SetSumTitle("All errors");
@@ -263,7 +269,7 @@ struct SysErrorAdder
     gse->SetKey("title", "Systematic study of dNch/deta over widest "
 		"possible eta region at the LHC");
     gse->SetKey("author", "CHRISTENSEN");
-    gse->SetKey("comment", "We present dNch/deta over widest "
+    gse->SetKey("abstract", "We present dNch/deta over widest "
 		"possible eta region at the LHC");
     gse->SetKey("dscomment", "The pseudo-rapidity density of charged particle");
     gse->AddQualifier(Form("SQRT(S)%s IN GEV",
@@ -302,6 +308,16 @@ struct SysErrorAdder
     }
     return gse;
   }
+  /** 
+   * Create a systematic uncertainty adder 
+   * 
+   * @param t Trigger type 
+   * @param s System type 
+   * @param e Collision energy 
+   * @param c Centrality method
+   * 
+   * @return Newly created object 
+   */
   static SysErrorAdder* Create(const TString& t,
 			       const TString& s,
 			       UShort_t       e,
@@ -340,6 +356,28 @@ struct OfflineAdder : public SysErrorAdder
   }
 };
 
+struct BareAdder : public SysErrorAdder
+{
+  BareAdder(const TString& sys, UShort_t sNN, TString& trig)
+    : SysErrorAdder(sys,sNN,trig)
+  {}
+  /** 
+   * Get trigger systematic error 
+   * 
+   * @param low   On return, the low error 
+   * @param high  On return, the high error
+   */
+  virtual void GetTrigger(Double_t& low, Double_t& high) const
+  {
+    low  = high = 0;
+  }
+  Int_t  MakeTrigger(GraphSysErr* gse, TLegend* l) const
+  {
+    gse->AddQualifier("TRIGGER", fTrig);
+    return SysErrorAdder::MakeTrigger(gse, l);
+  }
+};
+  
 /**
  * For pp INEL results
  * 
@@ -386,7 +424,17 @@ struct INELAdder : public SysErrorAdder
   Int_t  MakeTrigger(GraphSysErr* gse, TLegend* l) const
   {
     gse->AddQualifier("TRIGGER", "INEL");
-    return SysErrorAdder::MakeTrigger(gse, l);
+    Int_t id = SysErrorAdder::MakeTrigger(gse, l);
+
+    if (fSNN == 5023) {
+      Int_t rId = gse->DefineCommon("Diff. ratio",true,
+				    0.023,0.034,GraphSysErr::kBox);
+      Int_t mId = gse->DefineCommon("Diff. mass",true,
+				    0,0.065,GraphSysErr::kBox);
+      ModError(gse, rId, kDiffRatFill, l);
+      ModError(gse, mId, kDiffMassFill, l);
+    }
+    return id;
   }
 };
 /**
@@ -405,10 +453,11 @@ struct INELGt0Adder : public SysErrorAdder
     : SysErrorAdder(sys, sNN, "INEL>0"), fLow(0), fHigh(0)
   {
     switch (sNN) {
+    case  5023:  fLow = fHigh = 0.023; break;
     case 13000:  fLow = fHigh = 0.023; break;
     }    
   }
-  const char* MakeName() const { return "INELGt0"; }
+  const char* MakeName(Double_t) const { return "INELGt0"; }
   /** 
    * Get trigger systematic error 
    * 
@@ -423,7 +472,16 @@ struct INELGt0Adder : public SysErrorAdder
   {
     gse->AddQualifier("TRIGGER", "INEL>0");
     gse->AddQualifier("N", ">0");
-    return SysErrorAdder::MakeTrigger(gse, l);
+    Int_t id = SysErrorAdder::MakeTrigger(gse, l);
+    if (fSNN == 5023) {
+      Int_t rId = gse->DefineCommon("Diff. ratio",true,
+				    0.005,0.005,GraphSysErr::kBox);
+      Int_t mId = gse->DefineCommon("Diff. mass",true,
+				    0.005,0,GraphSysErr::kBox);
+      ModError(gse, rId, kDiffRatFill, l);
+      ModError(gse, mId, kDiffMassFill, l);
+    }
+    return id;
   }
   Double_t fLow;
   Double_t fHigh;
@@ -448,15 +506,20 @@ struct NSDAdder : public SysErrorAdder
     if (value > 0) return;
     if (fSys.EqualTo("pp", TString::kIgnoreCase)) {
       switch (fSNN) {
-      case  900:   fValue = 0.02; break;
-      case 2760:   fValue = 0.03; break;
-      case 5023:   fValue = 0.00; break;
+      case  900:   fValue = 0.02;  break;
+      case 2760:   fValue = 0.03;  break;
+      case 5023:   fValue = 0.044; break;
       case 7000: 
       case 8000:
       case 13000:  fValue = 0.02; break;
       default: break;
       }
     }
+  }
+  const char* MakeName(Double_t e) const
+  {
+    // if (e < 1e-3 || TMath::Abs(e - 1) < 1e-3) return "V0AND";
+    return "NSD";
   }
   /** 
    * Get trigger systematic error 
@@ -470,8 +533,21 @@ struct NSDAdder : public SysErrorAdder
   }
   Int_t  MakeTrigger(GraphSysErr* gse, TLegend* l) const
   {
+    if (TString(gse->GetName()).EqualTo("V0AND")) {
+      gse->AddQualifier("TRIGGER", "V0AND");
+      return -1;
+    }
     gse->AddQualifier("TRIGGER", "NSD");
-    return SysErrorAdder::MakeTrigger(gse, l);
+    Int_t id = SysErrorAdder::MakeTrigger(gse, l);
+    if (fSNN == 5023) {
+      Int_t rId = gse->DefineCommon("Diff. ratio",true,
+				    0.008,0.014,GraphSysErr::kBox);
+      Int_t mId = gse->DefineCommon("Diff. mass",true,
+				    0,0.043,GraphSysErr::kBox);
+      ModError(gse, rId, kDiffRatFill, l);
+      ModError(gse, mId, kDiffMassFill, l);
+    }
+    return id;
   }
   
 };
@@ -488,6 +564,7 @@ struct CENTAdder : public SysErrorAdder
   TH1*     fLookup;
   Double_t fCMin;
   Double_t fCMax;
+  Double_t fEM;
   /** 
    * Constructor 
    * 
@@ -496,7 +573,12 @@ struct CENTAdder : public SysErrorAdder
    * @param method MEthod to use  
    */
   CENTAdder(const TString& sys, UShort_t sNN, const TString& method)
-    : SysErrorAdder(sys, sNN, method), fCent(0), fValue(0), fCMin(0), fCMax(0),
+    : SysErrorAdder(sys, sNN, method),
+      fCent(0),
+      fValue(0),
+      fCMin(0),
+      fCMax(0),
+      fEM(0),
       fLookup(0)
   {
     Double_t off = .1;
@@ -529,8 +611,9 @@ struct CENTAdder : public SysErrorAdder
       Double_t min = 0.004, max = 0.062, top = 100; // 0.02
       if (sNN == 5023) {
 	min = 0.005;
-	max = 0.075;
-	top = 80;
+	max = 0.095;
+	top = 90;
+	fEM = 0.04;
 	// max = (7.5-min)/TMath::Power(80,2) * TMath::Power(100,2) + min;
       }
       for (Int_t i = 1; i <= 100; i++) {
@@ -573,7 +656,14 @@ struct CENTAdder : public SysErrorAdder
   {
     gse->AddQualifier("TRIGGER", fTrig);
     gse->AddQualifier("CENTRALITY IN PCT", Form("%6.2f TO %6.2f",fCMin,fCMax));
-    return SysErrorAdder::MakeTrigger(gse, l);
+
+    Int_t ret = SysErrorAdder::MakeTrigger(gse, l);
+
+    Double_t em = fCMax >= 80 ? fEM : 0;
+    Int_t    ei = gse->DefineCommon("EM contamination", true, em, em);
+    ModError(gse, ei, kEMFill, l, 0);
+    
+    return ret;
   }
   /** 
    * Get centrality 
@@ -655,11 +745,16 @@ SysErrorAdder::Create(const TString& t,
   tt.ToUpper();
 
   SysErrorAdder* a = 0;
-  if (tt.EqualTo("OFFLINE")    ||tt.EqualTo("UNKNOWN"))a=new OfflineAdder(s,e);
-  else if (tt.EqualTo("INEL")  ||tt.EqualTo("MBOR"))   a=new INELAdder(s,e);
-  else if (tt.EqualTo("INEL>0")||tt.EqualTo("INELGT0"))a=new INELGt0Adder(s,e);
-  else if (tt.EqualTo("NSD")   ||tt.EqualTo("V0AND"))  a=new NSDAdder(s,e);
-  else                                                 a=new CENTAdder(s,e,c);
+  if      (tt.EqualTo("OFFLINE"))  a=new OfflineAdder(s,e);
+  else if (tt.EqualTo("UNKNOWN"))  a=new OfflineAdder(s,e);
+  else if (tt.EqualTo("INEL"))     a=new INELAdder(s,e);
+  else if (tt.EqualTo("INEL>0"))   a=new INELGt0Adder(s,e);
+  else if (tt.EqualTo("INELGT0"))  a=new INELGt0Adder(s,e);
+  else if (tt.EqualTo("NSD"))      a=new NSDAdder(s,e);
+  else if (tt.EqualTo("MBOR"))     a=new BareAdder(s,e,tt);
+  else if (tt.EqualTo("V0AND"))    a=new BareAdder(s,e,tt);
+  else if (tt.EqualTo("VISX"))     a=new BareAdder(s,e,tt);
+  else                             a=new CENTAdder(s,e,c);
   Info("Create", "Created %s adder for %s/%s/%hu/%s: %p",
        a->GetTriggerString(), t.Data(), s.Data(), e, c.Data(), a);
   return a;

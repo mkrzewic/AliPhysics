@@ -22,13 +22,22 @@ class AliPHOSGeometry;
 
 #include "THistManager.h"
 #include "AliTLorentzVector.h"
-//#include "AliAnalysisTaskEmcalJetLight.h"
 #include "AliAnalysisTaskEmcalJet.h"
 
 /**
  * \class AliAnalysisTaskPWGJEQA
  * \brief This is a task used to do basic PWGJE QA on tracks, clusters, and jets.
- * Based on code from Salvatore Aiola: See the tasks AliAnalysisTaskEmcalJetQA (clusters),
+ *
+ * Set the names of the tracks/clusters/cells in the AddTask, as well as "mcparticles" if MC production
+ * (or "" if not). Set also flags for whether to perform track/calo/jet/event QA.
+ *
+ * For Pt-hard productions, you should further call the function SetIsPtHard(kTRUE), and you can
+ * reject outliers with SetRejectOutlierEvents(kTRUE).
+ *
+ * There exist post-processing scripts to efficiently plot the QA: 
+ * see http://alidoc.cern.ch/AliPhysics/master/_r_e_a_d_m_ejetfw.html
+ *
+ * This task is based on code from Salvatore Aiola: See the tasks AliAnalysisTaskEmcalJetQA (clusters),
  * AliAnalysisTaskEmcalJetSpectraQA (jets), and AliEmcalTrackingQATask (tracks) for more detailed histograms.
  */
 class AliAnalysisTaskPWGJEQA : public AliAnalysisTaskEmcalJet {
@@ -58,13 +67,11 @@ public:
   void                        UserCreateOutputObjects();
 
   void                        SetCellEnergyCut(Float_t cut)                        { fCellEnergyCut      = cut        ; }
-  void                        SetSeparateEMCalDCal(Bool_t b)                       { fSeparateEMCalDCal = b           ; }
-  void                        SetPtBin(Float_t w, Float_t max)                     { fPtBinWidth        = w; fMaxPt = max ; }
   void                        SetGeneratorLevelName(const char* name)              { fGeneratorLevelName = name       ; }
   void                        SetDetectorLevelName(const char* name)               { fDetectorLevelName = name        ; }
   
   void                        SetDoTrackQA(Bool_t b) { fDoTrackQA = b; }
-  void                        SetDoEmcalQA(Bool_t b) { fDoEmcalQA = b; }
+  void                        SetDoCaloQA(Bool_t b) { fDoCaloQA = b; }
   void                        SetDoJetQA(Bool_t b)   { fDoJetQA   = b; }
   void                        SetDoEventQA(Bool_t b) { fDoEventQA = b; }
   void                        SetRejectOutlierEvents(Bool_t b) {fRejectOutlierEvents = b; }
@@ -100,15 +107,13 @@ protected:
                                                             Double_t trackEta, Double_t trackPhi, Double_t trackPt, Byte_t trackType);
   
   Float_t                     fCellEnergyCut;            ///< Energy cell cut
-  Float_t                     fPtBinWidth;               ///< Histogram pt bin width
   Float_t                     fMaxPt;                    ///< Histogram pt limit
-  Bool_t                      fSeparateEMCalDCal;        ///< Separate EMCal from DCal in QA plots
   Int_t                       fNTotClusters[3];          //!<!Total number of accepted clusters in current event (DCal/EMCal)
   AliTLorentzVector           fLeadingCluster[3];        //!<!Leading cluster in current event (EMCal/DCal)
   Int_t                       fNTotTracks;               //!<!Total number of accepted tracks in current event
   AliTLorentzVector           fLeadingTrack;             //!<!Leading track in current event
   Bool_t                      fDoTrackQA;                ///< Set whether to enable track QA
-  Bool_t                      fDoEmcalQA;                ///< Set whether to enable cell/cluster QA
+  Bool_t                      fDoCaloQA;                 ///< Set whether to enable cell/cluster QA
   Bool_t                      fDoJetQA;                  ///< Set whether to enable jet QA
   Bool_t                      fDoEventQA;                ///< Set whether to enable event QA
   TString                     fGeneratorLevelName;       ///< generator level container name
@@ -117,39 +122,32 @@ protected:
   Bool_t                      fIsPtHard;                 ///< flag to enable pt-hard histos and make available outlier cut
   
   // Service fields (non-streamed)
-  AliMCParticleContainer* fGeneratorLevel      ; //! generator level container
-  AliTrackContainer*    fDetectorLevel         ; //! detector level container
-  Int_t                 fNPtHistBins           ; //! number of pt bins
-  Double_t*             fPtHistBins            ; //! pt bins
-  Int_t                 fNEtaHistBins          ; //! number of eta bins
-  Double_t*             fEtaHistBins           ; //! eta bins
-  Int_t                 fNPhiHistBins          ; //! number of phi bins
-  Double_t*             fPhiHistBins           ; //! phi bins
-  Int_t                 fNCentHistBins         ; //! number of cent bins
-  Double_t*             fCentHistBins          ; //! cent bins
-  Int_t                 fNPtRelDiffHistBins    ; //! number of pt relative difference bins
-  Double_t*             fPtRelDiffHistBins     ; //! pt relative difference bins
-  Int_t                 fNPtResHistBins        ; //! number of pt res bins
-  Double_t*             fPtResHistBins         ; //! pt res bins
-  Double_t*             f1OverPtResHistBins    ; //! 1/pt res bins
-  Int_t                 fN1OverPtResHistBins   ; //! number of 1/pt res bins
-  Int_t                 fNIntegerHistBins      ; //! number of integer bins
-  Double_t*             fIntegerHistBins       ; //! integer bins
-  AliPHOSGeometry*      fPHOSGeo;              ; //!<! phos geometry
+  AliMCParticleContainer* fGeneratorLevel      ; //!<! generator level container
+  AliTrackContainer*    fDetectorLevel         ; //!<! detector level container
+  Int_t                 fNPtHistBins           ; //!<! number of pt bins
+  Double_t*             fPtHistBins            ; //!<! pt bins
+  Int_t                 fNEtaHistBins          ; //!<! number of eta bins
+  Double_t*             fEtaHistBins           ; //!<! eta bins
+  Int_t                 fNPhiHistBins          ; //!<! number of phi bins
+  Double_t*             fPhiHistBins           ; //!<! phi bins
+  Int_t                 fNCentHistBins         ; //!<! number of cent bins
+  Double_t*             fCentHistBins          ; //!<! cent bins
+  Int_t                 fNPtRelDiffHistBins    ; //!<! number of pt relative difference bins
+  Double_t*             fPtRelDiffHistBins     ; //!<! pt relative difference bins
+  Int_t                 fNPtResHistBins        ; //!<! number of pt res bins
+  Double_t*             fPtResHistBins         ; //!<! pt res bins
+  Int_t                 fNIntegerHistBins      ; //!<! number of integer bins
+  Double_t*             fIntegerHistBins       ; //!<! integer bins
+  AliPHOSGeometry*      fPHOSGeo               ; //!<! phos geometry
   
-  // Histograms
-  THnSparse*            fTracks                ; //! all tracks
-  THnSparse*            fParticlesPhysPrim     ; //! all physical primary particles
-  THnSparse*            fParticlesMatched      ; //! primary particles matched to detector level tracks
-  
-  THistManager                fHistManager;              //!< Histogram manager
+  THistManager          fHistManager           ; //!< Histogram manager
   
 private:
   AliAnalysisTaskPWGJEQA(const AliAnalysisTaskPWGJEQA&);            // not implemented
   AliAnalysisTaskPWGJEQA &operator=(const AliAnalysisTaskPWGJEQA&); // not implemented
   
   /// \cond CLASSIMP
-  ClassDef(AliAnalysisTaskPWGJEQA, 2);
+  ClassDef(AliAnalysisTaskPWGJEQA, 5);
   /// \endcond
 };
 #endif

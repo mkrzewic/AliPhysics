@@ -45,6 +45,7 @@ class AliAnalysisTaskEHCorrel : public AliAnalysisTaskSE {
     virtual void   Terminate(Option_t *);
 
     Bool_t  PassEventSelect(AliVEvent *fVevent);
+    Bool_t  PassAddtionalPileUpCuts();
     void SetEMCalTriggerEG1(Bool_t flagTr1) { fEMCEG1=flagTr1; fEMCEG2=kFALSE;};
     void SetEMCalTriggerEG2(Bool_t flagTr2) { fEMCEG2=flagTr2; fEMCEG1=kFALSE;};
     void    CheckCentrality(AliAODEvent* fAOD, Bool_t &centralitypass);
@@ -70,10 +71,30 @@ class AliAnalysisTaskEHCorrel : public AliAnalysisTaskSE {
     void    SetHadronCutCase(Int_t hadCutCase) {fHadCutCase = hadCutCase;};
     void    SetTriggerElePtCut(Bool_t trigElePtcut) {fTrigElePtCut = trigElePtcut;};
     void    GetVtxZCentralityBin();
+    Bool_t  GetTenderSwitch() {return fUseTender;};
+    void    SetTenderSwitch(Bool_t usetender){fUseTender = usetender;};
     
-    void SetClusterTypeEMC(Bool_t flagClsEMC) {fFlagClsTypeEMC = flagClsEMC;};
-    void SetClusterTypeDCAL(Bool_t flagClsDCAL) {fFlagClsTypeDCAL = flagClsDCAL;};
-
+    void    SetClusterTypeEMC(Bool_t flagClsEMC) {fFlagClsTypeEMC = flagClsEMC;};
+    void    SetClusterTypeDCAL(Bool_t flagClsDCAL) {fFlagClsTypeDCAL = flagClsDCAL;};
+    
+    void    SetPartnerEleMinTPCNCls(Int_t MinNClsPE) {fTPCNClsPartnerE = MinNClsPE;};
+    void    SetPartnerEleMinPt(Double_t PtPE) {fPartElePt = PtPE;};
+    void    SetInvmassCut(Double_t invmasscut) {fInvmassCut = invmasscut;};
+    
+    void    SetHadMinTPCNCls(Int_t MinNClsHad) {fTPCNClsHad = MinNClsHad;};
+    void    SetHadSPDkAny(Bool_t HadSPDkAny) {fFlagHadSPDkAny = HadSPDkAny;};
+    void    SetHadLargeITSNCls(Bool_t HadLargITSNCls) {fFlagHadITSNCls = HadLargITSNCls;};
+    
+    void    SetHadFiducialCut(Bool_t HadFiducialCut) {fFlagHadFiducialCut = HadFiducialCut;};
+    void    SetHadPosEtaOnly(Bool_t HadPosEtaOnly) {fFlagHadPosEtaOnly = HadPosEtaOnly;};
+    void    SetHadNegEtaOnly(Bool_t HadNegEtaOnly) {fFlagHadNegEtaOnly = HadNegEtaOnly;};
+    
+    void    SetMEBinChange(Bool_t MEBinChange) {fFlagMEBinChange = MEBinChange;};
+    void    SetElecSPDkFirst(Bool_t EleSPDkFirst) {fFlagEleSPDkFirst = EleSPDkFirst;};
+    
+    void    SetAdditionalPileUpCuts(Bool_t addpilupcuts) {fApplyAddPileUpCuts = addpilupcuts;};
+    
+    void    IsPbPb(Bool_t isPbPb) {fIsPbPb = isPbPb;};
 
   private:
     AliVEvent 		    *fVevent;//!V event object
@@ -81,7 +102,12 @@ class AliAnalysisTaskEHCorrel : public AliAnalysisTaskSE {
     const AliVVertex    *fpVtx; //!
     AliPIDResponse      *fpidResponse; //!pid response
     AliMultSelection    *fMultSelection;//!
+    
+    TClonesArray        *fTracks_tender;//Tender tracks
+    TClonesArray        *fCaloClusters_tender;//Tender cluster
 
+    Bool_t              fApplyAddPileUpCuts;//
+    Bool_t              fUseTender;// switch to add tender
     Double_t            fCentrality;//!
     Double_t            fCentralityMin;//
     Double_t            fCentralityMax;//
@@ -90,7 +116,8 @@ class AliAnalysisTaskEHCorrel : public AliAnalysisTaskSE {
     Bool_t              fEMCEG2;//
     Bool_t              fFlagClsTypeEMC;//switch to select EMC clusters
     Bool_t              fFlagClsTypeDCAL;//switch to select DCAL clusters
-    Int_t               fTPCNClsElec;// Had track TPC NClusters
+    Int_t               fTPCNClsElec;// track TPC NClusters
+    Bool_t              fFlagEleSPDkFirst;//
     Double_t            fTPCnSigma;//!
     Double_t            fTPCnSigmaMin;//
     Double_t            fTPCnSigmaMax;//
@@ -101,15 +128,24 @@ class AliAnalysisTaskEHCorrel : public AliAnalysisTaskSE {
     Double_t            fEovPMin;//
     Double_t            fEovPMax;//
     Int_t               fTPCNClsHad;// Had track TPC NClusters
+    Int_t               fTPCNClsPartnerE;//
+    Double_t            fPartElePt;//
     Double_t            fInvmassCut;//
+    Bool_t              fFlagHadSPDkAny;//
+    Bool_t              fFlagHadITSNCls;//
+    Bool_t              fFlagHadFiducialCut;//
+    Bool_t              fFlagHadPosEtaOnly;//
+    Bool_t              fFlagHadNegEtaOnly;//
     Double_t            fTPCnSigmaHadMin;//
     Double_t            fTPCnSigmaHadMax;//
     Int_t               fHadCutCase;//
     AliEventPoolManager *fPoolMgr;//!
-    Bool_t              fTrigElePtCut;//!
+    Bool_t              fTrigElePtCut;//
     Int_t               fNEle;//!
     Double_t            fVtxZBin;//!
     Double_t            fCentBin;//!
+    Bool_t              fFlagMEBinChange;//
+    Bool_t              fIsPbPb;//
 
     TList       	   	*fOutputList;		//!output list
     TH1F                *fNevents;		//!no of events

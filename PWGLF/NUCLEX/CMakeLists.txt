@@ -31,7 +31,9 @@ include_directories(${ROOT_INCLUDE_DIRS}
                     ${AliPhysics_SOURCE_DIR}/CORRFW
                     ${AliPhysics_SOURCE_DIR}/OADB
                     ${AliPhysics_SOURCE_DIR}/OADB/COMMON/MULTIPLICITY
-                    ${AliPhysics_SOURCE_DIR}/PWGCF/Correlations/Base
+		    ${AliPhysics_SOURCE_DIR}/PWGCF/Correlations/Base		
+                    ${AliPhysics_SOURCE_DIR}/PWGPP/EVCHAR/FlowVectorCorrections/QnCorrections
+		    ${AliPhysics_SOURCE_DIR}/PWGPP/EVCHAR/FlowVectorCorrections/QnCorrectionsInterface/
   )
 set(SRCS
   Exotica/Hdibaryon/AliAnalysisTaskHdibaryonLPpi.cxx
@@ -56,6 +58,7 @@ set(SRCS
   Nuclei/NucleiPbPb/AliAnalysisTaskNucleiYieldESD.cxx
   Nuclei/NucleiPbPb/AliNuclexEventCuts.cxx
   Nuclei/NucleiPbPb/AliAnalysisTaskEventCutsValidation.cxx
+  Nuclei/NucleiPbPb/AliAnalysisTaskNucleiPIDqa.cxx
   Nuclei/Nucleipp/AliAnalysisTaskB2.cxx
   Nuclei/Nucleipp/AliAnalysisTaskB2AOD.cxx
   Nuclei/Nucleipp/AliLnAODtrackCuts.cxx
@@ -71,6 +74,8 @@ set(SRCS
   Utils/NuclexFilter/AliAnalysisTaskReadNuclexAOD.cxx
   Utils/RecoDecay/AliAODRecoDecayLF.cxx
   Utils/RecoDecay/AliAODRecoDecayLF2Prong.cxx
+  Utils/CODEX/AliAnalysisCODEX.cxx
+  Utils/CODEX/AliAnalysisCODEXtask.cxx
   )
 
 # Headers from sources
@@ -82,7 +87,7 @@ get_directory_property(incdirs INCLUDE_DIRECTORIES)
 generate_dictionary("${MODULE}" "${MODULE}LinkDef.h" "${HDRS}" "${incdirs}")
 
 set(ROOT_DEPENDENCIES)
-set(ALIROOT_DEPENDENCIES ANALYSISalice CORRFW OADB PWGUDbase PWGHFvertexingHF)
+set(ALIROOT_DEPENDENCIES ANALYSISalice CORRFW OADB PWGUDbase PWGHFvertexingHF PWGPPevcharQn PWGflowTasks)
 
 # Generate the ROOT map
 # Dependecies

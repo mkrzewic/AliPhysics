@@ -55,33 +55,36 @@ public:
   };
 
   /**
-   * Dummy constructor
+   * @brief Dummy constructor
    */
   AliAnalysisTaskChargedParticlesRefMC();
 
   /**
-   * Main constructor
+   * @brief Main constructor
    * @param[in] name Name of the task
    */
   AliAnalysisTaskChargedParticlesRefMC(const char *name);
 
   /**
-   * Destuctor
+   * @brief Destuctor
    */
   virtual ~AliAnalysisTaskChargedParticlesRefMC();
 
   /**
-   * Enable Sumw2 when creating the histograms. Attention: Enabling Sumw2
-   * will increase memory consumption significantly. Option should only be
+   * @brief Enable Sumw2 when creating the histograms.
+   *
+   * Attention: Enabling Sumw2 will increase memory consumption significantly. Option should only be
    * used in case histograms are filled with a weight.
    * @param[in] doEnable If true Sumw2 is enabled for all histograms
    */
   void EnableSumw2(Bool_t doEnable) { fEnableSumw2 = doEnable; }
 
   /**
-   * Set rapidity shift originating from the asymmetric collision system.
+   * @brief Set rapidity shift originating from the asymmetric collision system.
+   *
    * The rapidity shift is applied to tracks in order to get the rapidity
    * in the cms system.
+   *
    * @param[in] yshift Rapidity shift applied to tracks
    */
   void SetRapidityShift(Double_t yshift) { fYshift = yshift; }
@@ -99,11 +102,12 @@ public:
   void  SetAnalysisUtil(AliAnalysisUtils *util) { fAliAnalysisUtils = util; }
 
   /**
-   * Set the track selection
-   * @param[in] cutname Name of the track cuts
-   * @param[in] isAOD check whether we run on ESDs or AODs
+   * @brief Set the virtual track selection.
+   *
+   * Assumes that the track selection object is already fully configured
+   * @param[in] sel Virtual track selection
    */
-  void SetTrackSelection(AliEmcalTrackSelection * sel) { fTrackCuts = sel; }
+  void SetEMCALTrackSelection(AliEmcalTrackSelection *sel) { fTrackCuts = sel; }
 
   /**
    * Define kinematic cut to particles and tracks on \f$ \eta \f$ in the lab frame. By default
@@ -129,14 +133,38 @@ public:
   void SetTrackPhiCut(double phimin, double phimax) { fPhiCut.SetLimits(phimin, phimax); }
 
   /**
-   * Set offline trigger selection. The trigger selection will be used to select events
-   * for the given trigger class given the presence of a patch with energy above threshold.
-   * @param[in] sel
+   * @brief Set minimum \f$ p_{t}\f$ used to select track candidate
+   * @param[in] minpt Minimum \f$ p_{t}\f$
+   */
+  void SetMinPtTracks(Double_t minpt) { fMinPt = minpt; }
+
+  /**
+   * @brief Set offline trigger selection.
+   *
+   * The trigger selection will be used to select events for the given trigger class given the presence
+   * of a patch with energy above threshold.
+   *
+   * @param[in] sel Trigger offline selection
    */
   void SetOfflineTriggerSelection(AliEmcalTriggerOfflineSelection *sel) { fTriggerSelection = sel; }
 
   /**
-   * Enable PID-related plots (THnSparses, might be big)
+   * @brief Get the trigger offline selection.
+   *
+   * Providing access to the trigger offline selection. Note that
+   * it must be initialized from outside the task.
+   *
+   * @return Trigger offline selection of this instance (nullptr if not defined)
+   */
+  AliEmcalTriggerOfflineSelection *GetOfflineTriggerSelection() const { return fTriggerSelection; }
+
+  /**
+   * @brief Enable PID-related plots.
+   *
+   * Monitoring track counts for different particle species.
+   * Attention: PID plots are stored as THnSparses, therefore
+   * they might be big.
+   *
    * @param[in] plotPID If true then PID-related plots are enabled
    */
   void SetPlotPID(Bool_t plotPID) { fStudyPID = plotPID; }
@@ -180,8 +208,9 @@ public:
 protected:
 
   /**
-   * Create the output histograms. Histograms are available for three different
-   * categories
+   * @brief Create the output histograms.
+   *
+   * Histograms are available for three different categories
    * -# Events
    * -# Tracks
    * -# Trigger jets
@@ -191,7 +220,9 @@ protected:
   virtual void UserCreateOutputObjects();
 
   /**
-   * Main event loop: Fill histograms for MC-true particles and reconstructed
+   * @brief Main event loop
+
+   * Fill histograms for MC-true particles and reconstructed
    * true particles (reconstructed particles with assigned MC-truth information),
    * and fill several kinematic histograms.
    * -# track-\f$ p_{t} \f$
@@ -208,7 +239,9 @@ protected:
   virtual bool  Run();
 
   /**
-   * Apply standard event selection consisting of
+   * @brief Apply standard event selection.
+   *
+   * The standard event selection is consisting of
    * - Trigger selection
    * - Vertex selection
    * - Pileup rejection
@@ -224,6 +257,8 @@ protected:
   virtual bool IsEventSelected();
 
   /**
+   * @brief Loading initial settings at the beginning of the job.
+   *
    * Implentation of framework function ExceOnce: Loading acceptance map from the OADB
    * in case a valid OADB container is provided, and forwarding it to the EMCAL trigger
    * offline selection.
@@ -231,9 +266,10 @@ protected:
   virtual void ExecOnce();
 
   /**
-   * Fill track histograms
+   * @brief Fill track histograms
    * @param[in] eventclass Trigger class fired
    * @param[in] weight \f$ p_{t} \f$-hard dependent weight
+   * @param[in] posCharge Switch whether track charge is positive or negative
    * @param[in] pt track \f$ p_{t} \f$
    * @param[in] etalab Track \f$ \eta \f$ in lab frame
    * @param[in] etacent Track \f$ \eta \f$ in cms frame
@@ -241,7 +277,7 @@ protected:
    * @param[in] inEmcal Track in EMCAL \f$ \phi \f$ acceptance
    * @param[in] pid True particle species
    */
-  void FillTrackHistos(const TString &eventclass, Double_t weight, Double_t pt, Double_t eta, Double_t etacent, Double_t phi, Bool_t inEmcal, const TString &pid);
+  void FillTrackHistos(const TString &eventclass, Double_t weight, Bool_t posCharge, Double_t pt, Double_t eta, Double_t etacent, Double_t phi, Bool_t inEmcal, const TString &pid);
 
   /**
    * Apply trigger selection using offline patches and trigger thresholds based on offline ADC Amplitude
@@ -297,6 +333,7 @@ private:
 
   Double_t                              fYshift;                    ///< Rapidity shift
   Double_t                              fEtaSign;                   ///< Sign of the \f$\eta\f$-distribution (swaps when beam directions swap): p-Pb: +1, Pb-p: -1
+  Double_t                              fMinPt;                     ///< Minimum \f$ p_{t}\f$-used to select tracks
   AliCutValueRange<double>              fEtaLabCut;                 ///< Cut applied in \f$\eta_{Lab}\f$-frame
   AliCutValueRange<double>              fEtaCmsCut;                 ///< Cut applied in \f$\eta_{centre-of-mass}\f$ frame
   AliCutValueRange<double>              fPhiCut;                    ///< Track \f$\phi\f$ cut

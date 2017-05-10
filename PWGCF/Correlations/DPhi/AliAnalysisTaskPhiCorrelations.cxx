@@ -52,6 +52,7 @@
 #include "AliGenCocktailEventHeader.h"
 #include "AliGenEventHeader.h"
 #include "AliCollisionGeometry.h"
+#include "AliGenHepMCEventHeader.h"
 
 #include "AliEventPoolManager.h"
 #include "AliBasicParticle.h"
@@ -190,7 +191,8 @@ fExclusionRadius(-1.),
 fCustomParticlesA(""),
 fCustomParticlesB(""),
 fEventPoolOutputList(),
-fUsePtBinnedEventPool(0)
+fUsePtBinnedEventPool(0),
+fCheckEventNumberInMixedEvent(kFALSE)
 {
   // Default constructor
   // Define input and output slots here
@@ -299,7 +301,11 @@ void  AliAnalysisTaskPhiCorrelations::CreateOutputObjects()
     histType += "D";
   fHistos = new AliUEHistograms("AliUEHistogramsSame", histType, fCustomBinning);
   fHistosMixed = new AliUEHistograms("AliUEHistogramsMixed", histType, fCustomBinning);
-  
+
+  // On demand, check event number before correlating tracks in mixed events
+  // To avoid same event contributions in mixed event when importing event pool
+  fHistosMixed->SetCheckEventNumberInCorrelation(fCheckEventNumberInMixedEvent);
+
   fHistos->SetSelectCharge(fSelectCharge);
   fHistosMixed->SetSelectCharge(fSelectCharge);
   
@@ -387,15 +393,15 @@ void  AliAnalysisTaskPhiCorrelations::CreateOutputObjects()
   Double_t* centralityBins = (Double_t*) fHistos->GetUEHist(2)->GetEventHist()->GetAxis(1, 0)->GetXbins()->GetArray();
   
   if (fFillYieldRapidity) {
-    const Int_t nPtBins = 400;
+    const Int_t nPtBins = 200;
     Double_t ptBins[nPtBins+1];
     for (int i=0; i<=nPtBins; i++)
       ptBins[i] = 20.0 / nPtBins * i;
     
-    const Int_t nyBins = 20;
+    const Int_t nyBins = 200;
     Double_t yBins[nyBins+1];
     for (int i=0; i<=nyBins; i++)
-      yBins[i] = -1.0 + 2.0 / nyBins * i;
+      yBins[i] = -10.0 + 20.0 / nyBins * i;
 
     fListOfHistos->Add(new TH3F("yieldsRapidity", ";centrality;pT;y", nCentralityBins, centralityBins, nPtBins, ptBins, nyBins, yBins));
   }
@@ -1465,13 +1471,17 @@ Double_t AliAnalysisTaskPhiCorrelations::GetCentrality(AliVEvent* inputEvent, TO
       }
       
       AliCollisionGeometry* collGeometry = dynamic_cast<AliCollisionGeometry*> (eventHeader);
-      if (!collGeometry)
+      AliGenHepMCEventHeader* hepMCHeader = dynamic_cast<AliGenHepMCEventHeader*> (eventHeader);
+      if (!collGeometry && !hepMCHeader)
       {
         eventHeader->Dump();
         AliFatal("Asking for MC_b centrality, but event header has no collision geometry information");
       }
       
-      centrality = collGeometry->ImpactParameter();
+      if (collGeometry)
+        centrality = collGeometry->ImpactParameter();
+      else if (hepMCHeader)
+        centrality = hepMCHeader->impact_parameter();
     }    
     else if (fCentralityMethod == "MCGen_V0M")
     {
@@ -1817,6 +1827,7 @@ TObjArray* AliAnalysisTaskPhiCorrelations::GetParticlesFromDetector(AliVEvent* i
 	  {
 	    AliBasicParticle* particle = new AliBasicParticle((AliVVZERO::GetVZEROEtaMax(i) + AliVVZERO::GetVZEROEtaMin(i)) / 2, AliVVZERO::GetVZEROAvgPhi(i), 1.1, 0); // fix pT = 1.1 and charge = 0
 	    particle->SetUniqueID((fAnalyseUE->GetEventCounter() * 50000 + j + i * 1000) * 10 + idet);
+	    particle->SetEventIndex(fAnalyseUE->GetEventCounter());
 	    
 	    obj->Add(particle);
 	  }
@@ -1844,6 +1855,7 @@ TObjArray* AliAnalysisTaskPhiCorrelations::GetParticlesFromDetector(AliVEvent* i
 	  
 	  AliBasicParticle* particle = new AliBasicParticle(eta,phi, pT, 0); // pT = TMath::Abs(trklets->GetDeltaPhi(itrklets)) in mrad and charge = 0
 	  particle->SetUniqueID((fAnalyseUE->GetEventCounter() * 50000 + itrklets) * 10 + idet);
+	  particle->SetEventIndex(fAnalyseUE->GetEventCounter());
 	  
 	  obj->Add(particle);
        	}      
@@ -1867,6 +1879,7 @@ TObjArray* AliAnalysisTaskPhiCorrelations::GetParticlesFromDetector(AliVEvent* i
 	
 	AliBasicParticle* particle = new AliBasicParticle(eta,track->Phi(), track->Pt(), track->Charge()); 
 	particle->SetUniqueID((fAnalyseUE->GetEventCounter() * 50000 + iTrack) * 10 + idet);
+	particle->SetEventIndex(fAnalyseUE->GetEventCounter());
 	
 	obj->Add(particle);
       }
@@ -1938,6 +1951,7 @@ TObjArray* AliAnalysisTaskPhiCorrelations::GetParticlesFromDetector(AliVEvent* i
           new AliBasicParticle(track->Eta(), track->Phi(), track->Pt(), track->Charge());
         // NOTE "+ idet" is missing here on purpose as the tracks are the same as in the case of idet == 0
         particle->SetUniqueID((fAnalyseUE->GetEventCounter() * 50000 + iTrack) * 10);
+        particle->SetEventIndex(fAnalyseUE->GetEventCounter());
         obj->Add(particle);
       }
     }
@@ -1989,6 +2003,8 @@ TObjArray* AliAnalysisTaskPhiCorrelations::GetParticlesFromDetector(AliVEvent* i
         particle->SetUniqueID((fAnalyseUE->GetEventCounter() * 50000 + iParticle) * 10 + 6);
       else
         particle->SetUniqueID((fAnalyseUE->GetEventCounter() * 50000 + iParticle) * 10 + idet);
+
+      particle->SetEventIndex(fAnalyseUE->GetEventCounter());
 
       obj->Add(particle);
     }

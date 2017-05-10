@@ -6,6 +6,9 @@
 #include <TNamed.h>
 #include <TString.h>
 #include <TPad.h>
+#include <set>
+
+class TNtuple;
 
 /// \class AliHFMultiTrials
 
@@ -88,6 +91,9 @@ class AliHFMultiTrials : public TNamed {
 
   void SetFixRefoS(Float_t refloS){fFixRefloS=refloS;}
 
+  void AddInvMassFitSaveAsFormat(std::string format) { fInvMassFitSaveAsFormats.insert(format); }
+  void DisableInvMassFitSaveAs() { fInvMassFitSaveAsFormats.clear(); }
+
 
   enum EBkgFuncCases{ kExpoBkg, kLinBkg, kPol2Bkg, kPol3Bkg, kPol4Bkg, kPol5Bkg, kPowBkg, kPowTimesExpoBkg, kNBkgFuncCases };
   enum EFitParamCases{ kFixSigFreeMean, kFixSigUpFreeMean, kFixSigDownFreeMean, kFreeSigFreeMean, kFixSigFixMean, kFreeSigFixMean, kNFitConfCases};
@@ -101,8 +107,9 @@ class AliHFMultiTrials : public TNamed {
 			  Int_t theCase);
 
   AliHFMultiTrials(const AliHFMultiTrials &source);
-  AliHFMultiTrials& operator=(const AliHFMultiTrials& source); 
+  AliHFMultiTrials& operator=(const AliHFMultiTrials& source);
 
+  std::set<std::string> fInvMassFitSaveAsFormats; /// saves the invariant mass fit canvases in the file formats listed in this vector (if empty, does nothing)
   Int_t fNumOfRebinSteps; /// number of rebin steps
   Int_t* fRebinSteps;     //[fNumOfRebinSteps] values of rebin
   Int_t fNumOfFirstBinSteps; /// number of steps in the first bin for rebin
@@ -137,7 +144,7 @@ class AliHFMultiTrials : public TNamed {
   Bool_t fSaveBkgVal;		/// switch for saving bkg values in nsigma
 
   Bool_t fDrawIndividualFits; /// flag for drawing fits
- 
+
   TH1F* fHistoRawYieldDistAll;  /// histo with yield from all trials
   TH1F* fHistoRawYieldTrialAll; /// histo with yield from all trials
   TH1F* fHistoSigmaTrialAll;    /// histo with gauss sigma from all trials
@@ -164,11 +171,11 @@ class AliHFMultiTrials : public TNamed {
   TH1F *fhTemplRefl;        /// template of reflection contribution
   Float_t fFixRefloS;
   TNtuple* fNtupleMultiTrials; /// tree
- 
+
   Double_t fMinYieldGlob;   /// minimum yield
   Double_t fMaxYieldGlob;   /// maximum yield
 
-  /// \cond CLASSIMP    
+  /// \cond CLASSIMP
   ClassDef(AliHFMultiTrials,5); /// class for multiple trials of invariant mass fit
   /// \endcond
 };
