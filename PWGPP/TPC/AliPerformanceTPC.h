@@ -36,9 +36,6 @@ public :
   AliPerformanceTPC(TRootIOCtor*);
   AliPerformanceTPC(const Char_t* name="AliPerformanceTPC", const Char_t* title="AliPerformanceTPC",Int_t analysisMode=0,Bool_t hptGenerator=kFALSE, Int_t run=-1, Bool_t highMult = kFALSE, Bool_t useSparse = kTRUE);
 
-  AliPerformanceTPC(const AliPerformanceTPC&);
-  AliPerformanceTPC& operator=(const AliPerformanceTPC&);
-
   virtual ~AliPerformanceTPC();
 
   // Init data members
@@ -135,6 +132,8 @@ private:
   TH3D *h_tpc_track_neg_recvertex_3_5_6;//!
   TH3D *h_tpc_track_neg_recvertex_4_5_6;//!
 
+  AliPerformanceTPC(const AliPerformanceTPC&);
+  AliPerformanceTPC& operator=(const AliPerformanceTPC&);
   ClassDef(AliPerformanceTPC,15);
 };
 
