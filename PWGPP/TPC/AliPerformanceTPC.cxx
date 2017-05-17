@@ -90,6 +90,9 @@ AliPerformanceTPC::AliPerformanceTPC(TRootIOCtor*):
   // histogram folder
   fAnalysisFolder(0),
   fUseHLT(kFALSE),
+  fMult(0),
+  fMultP(0),
+  fMultN(0),
   h_tpc_clust_0_1_2(NULL),
   h_tpc_event_recvertex_0(NULL),
   h_tpc_event_recvertex_1(NULL),
@@ -131,6 +134,9 @@ AliPerformanceTPC::AliPerformanceTPC(const Char_t* name, const Char_t* title,Int
   // histogram folder 
   fAnalysisFolder(0),
   fUseHLT(kFALSE),
+  fMult(0),
+  fMultP(0),
+  fMultN(0),
   h_tpc_clust_0_1_2(NULL),
   h_tpc_event_recvertex_0(NULL),
   h_tpc_event_recvertex_1(NULL),
