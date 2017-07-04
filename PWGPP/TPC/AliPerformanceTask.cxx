@@ -201,6 +201,8 @@ void AliPerformanceTask::UserExec(Option_t *)
     if(!fVEvent) {
       AliInfo("ERROR: HLTEvent unavailable from ESDInputHandler");
       return;
+    } else {
+      AliInfo("Using the HLT ESD event");
     }
   }// end if fUseHLT
   else {
@@ -214,23 +216,9 @@ void AliPerformanceTask::UserExec(Option_t *)
       //fVEvent =InputEvent(); //this one does not currently work, TaskSE makes stupid assumptions about the tree
       if(!fVEvent) { AliInfo("ERROR: Event not available!"); return;}
   }
-  
-    if(fUseVfriend) {
-    if (fUseHLT)
-    {
-        AliVEventHandler *vH = AliAnalysisManager::GetAnalysisManager()->GetInputEventHandler();
-        AliVEvent *offlineVEvent = vH->GetEvent();
-        if(!offlineVEvent) {
-            AliInfo("ERROR: Could not get offline event");
-            return;
-      }
-      fVfriendEvent = fVEvent->FindFriend();
-    }
-    else
-    {
-      fVfriendEvent = fVEvent->FindFriend();
-    }
 
+  if(fUseVfriend) {
+    fVfriendEvent = fVEvent->FindFriend();
     if(!fVfriendEvent) {
       AliInfo("ERROR: ESD friends not available");
     }
