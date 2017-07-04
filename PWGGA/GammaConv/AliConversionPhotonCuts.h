@@ -36,8 +36,6 @@ class AliAnalysisManager;
 class AliAODMCParticle;
 
 
-using namespace std;
-
 class AliConversionPhotonCuts : public AliAnalysisCuts {
       
   public: 
@@ -85,7 +83,7 @@ class AliConversionPhotonCuts : public AliAnalysisCuts {
     };
 
 
-    Bool_t SetCutIds(TString cutString); 
+    Bool_t SetCutIds(TString cutString);
     Int_t fCuts[kNCuts];
     Bool_t SetCut(cutIds cutID, Int_t cut);
     Bool_t UpdateCutString();
@@ -235,6 +233,8 @@ class AliConversionPhotonCuts : public AliAnalysisCuts {
     Bool_t            fDoShrinkTPCAcceptance;               // Flag for shrinking the TPC acceptance due to different reasons
     Double_t          fPtCut;                               // pt cut
     Double_t          fSinglePtCut;                         // pt cut for electron/positron
+    Double_t          fSinglePtCut2;                        // second pt cut for electron/positron if asymmetric cut is chosen
+    Bool_t            fDoAsymPtCut;                         // Flag for setting asymmetric pT cut on electron/positron
     Double_t          fMaxZ;                                // z cut
     Double_t          fMinClsTPC;                           // minimum clusters in the TPC
     Double_t          fMinClsTPCToF;                        // minimum clusters to findable clusters
@@ -300,6 +300,7 @@ class AliConversionPhotonCuts : public AliAnalysisCuts {
     Float_t           fConversionPointYArray;               // Array with conversion Point y
     Float_t           fConversionPointZArray;               // Array with conversion Point z
     TObjString*       fCutString;                           // cut number used for analysis
+    TString           fCutStringRead;                       //
     Int_t             fIsHeavyIon;                          // flag for pp (0), PbPb (1), pPb (2)
     Bool_t            fUseITSpid;                           // flag to use tof pid    
     Double_t          fITSPIDnSigmaAboveElectronLine;       // sigma cut RRnewTOF
@@ -347,7 +348,7 @@ class AliConversionPhotonCuts : public AliAnalysisCuts {
 
   private:
   
-    ClassDef(AliConversionPhotonCuts,13)
+    ClassDef(AliConversionPhotonCuts,15)
 };
 
 #endif

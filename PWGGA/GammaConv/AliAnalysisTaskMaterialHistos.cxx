@@ -420,7 +420,7 @@ void AliAnalysisTaskMaterialHistos::UserCreateOutputObjects()
     
     
     
-    hNEvents[iCut]            = new TH1F("NEvents","NEvents",12,-0.5,11.5);
+    hNEvents[iCut]            = new TH1F("NEvents","NEvents",14,-0.5,13.5);
     hNEvents[iCut]->GetXaxis()->SetBinLabel(1,"Accepted");
     hNEvents[iCut]->GetXaxis()->SetBinLabel(2,"Centrality");
     hNEvents[iCut]->GetXaxis()->SetBinLabel(3,"Miss. MC or inc. ev.");
@@ -439,6 +439,8 @@ void AliAnalysisTaskMaterialHistos::UserCreateOutputObjects()
     hNEvents[iCut]->GetXaxis()->SetBinLabel(10,"EMCAL problem");
     hNEvents[iCut]->GetXaxis()->SetBinLabel(11,"rejectedForJetJetMC");
     hNEvents[iCut]->GetXaxis()->SetBinLabel(12,"SPD hits vs tracklet");
+    hNEvents[iCut]->GetXaxis()->SetBinLabel(13,"Out-of-Bunch pileup Past-Future");
+    hNEvents[iCut]->GetXaxis()->SetBinLabel(14,"Pileup V0M-TPCout Tracks");
     fESDList[iCut]->Add(hNEvents[iCut]);  
     
     
