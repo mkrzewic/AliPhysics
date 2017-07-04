@@ -13,6 +13,8 @@
 #pragma link C++ class AliAnalysisTaskNOmegaLPK+;
 #pragma link C++ class AliAnalysisTaskOmegaOmegaOX+;
 #pragma link C++ class AliAnalysisTaskNOmegaLX+;
+/// * Ps
+#pragma link C++ class AliAnalysisTaskPsEfficiency+;
 
 /// Nuclei
 /// * DeltaMasses
@@ -30,8 +32,7 @@
 /// * EventCuts
 #pragma link C++ class AliNuclexEventCuts+;
 #pragma link C++ class AliNuclexEventCutsContainer+;
-/// * EventCutsValidation
-#pragma link C++ class AliAnalysisTaskEventCutsValidation+;
+
 /// * Nucleipp
 #pragma link C++ class AliLnID+;
 #pragma link C++ class AliLnHistoMap+;

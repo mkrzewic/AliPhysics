@@ -56,7 +56,8 @@
 #include "AliMCParticle.h" 
 #include "AliHeader.h" 
 #include "AliGenEventHeader.h" 
-#include "AliStack.h" 
+#include "AliMCInfoCuts.h" 
+#include "AliRecInfoCuts.h" 
 #include "AliTracker.h" 
 #include "AliTRDtrackV1.h" 
 #include "AliTreeDraw.h" 
@@ -131,9 +132,12 @@ AliPerformanceMatch::~AliPerformanceMatch()
   delete fTrackingEffHisto;
   delete fTPCConstrain;
 
-  delete fAnalysisFolder;
-  if(fFolderObj) { fFolderObj->Delete(); }
+  if (fFolderObj && fAnalysisFolder && !fAnalysisFolder->IsOwner()) {
+    fFolderObj->Delete();
+  } //delete the registered non-sparse histograms
+
   delete fFolderObj;
+  delete fAnalysisFolder;
 }
 
 //_____________________________________________________________________________
@@ -306,7 +310,7 @@ void AliPerformanceMatch::Init(){
 }
 
 //_____________________________________________________________________________
-void AliPerformanceMatch::ProcessITSTPC(Int_t iTrack, AliVEvent *const vEvent, AliStack* /*const stack*/, AliVTrack *const vTrack)
+void AliPerformanceMatch::ProcessITSTPC(Int_t iTrack, AliVEvent *const vEvent, AliMCEvent* /*const mcev*/, AliVTrack *const vTrack)
 {
   //
   // addition to standard analysis - check if ITS stand-alone tracks have a match in the TPC
@@ -352,7 +356,7 @@ void AliPerformanceMatch::ProcessITSTPC(Int_t iTrack, AliVEvent *const vEvent, A
 }
 
 //_____________________________________________________________________________
-void AliPerformanceMatch::ProcessTPCITS(AliStack* /*const stack*/, AliVEvent *const vEvent,AliVTrack *const vTrack)
+void AliPerformanceMatch::ProcessTPCITS(AliMCEvent* /*const mcev*/, AliVEvent *const vEvent,AliVTrack *const vTrack)
 {
   
   //
@@ -395,7 +399,13 @@ void AliPerformanceMatch::ProcessTPCITS(AliStack* /*const stack*/, AliVEvent *co
   }
 }
 
-void AliPerformanceMatch::ProcessTPCConstrain(AliStack* /*const stack*/, AliVEvent *const vEvent, AliVTrack *const vTrack){
+//_____________________________________________________________________________
+/*void AliPerformanceMatch::ProcessTPCTRD(AliMCEvent* , AliVTrack *const vTrack, AliVfriendTrack *const vFriendTrack)
+{
+  return;
+}*/
+
+void AliPerformanceMatch::ProcessTPCConstrain(AliMCEvent* /*const mcev*/, AliVEvent *const vEvent, AliVTrack *const vTrack){
   //
   // Contrain TPC inner track to the vertex
   // then compare to the global tracks
@@ -540,7 +550,6 @@ void AliPerformanceMatch::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEven
   }
   AliHeader* header = 0;
   AliGenEventHeader* genHeader = 0;
-  AliStack* stack = 0;
   TArrayF vtxMC(3);
   
   if(bUseMC)
@@ -555,12 +564,6 @@ void AliPerformanceMatch::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEven
       Error("Exec","Header not available");
       return;
     }
-    // MC particle stack
-    stack = mcEvent->Stack();
-    if (!stack) {
-      Error("Exec","Stack not available");
-      return;
-    }
     // get MC vertex
     genHeader = header->GenEventHeader();
     if (!genHeader) {
@@ -571,7 +574,7 @@ void AliPerformanceMatch::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEven
   } 
 
   // trigger
-  if(!bUseMC && !GetTriggerClass().IsNull()) {
+  if(!bUseMC && GetTriggerClass()) {
     Bool_t isEventTriggered = vEvent->IsTriggerClassFired(GetTriggerClass());
     if(!isEventTriggered) return; 
   }
@@ -595,21 +598,22 @@ void AliPerformanceMatch::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEven
 
     if(GetAnalysisMode() == 0){
       if(!IsUseTOFBunchCrossing()){
-	ProcessTPCITS(stack,vEvent,track);
+	ProcessTPCITS(mcEvent,vEvent,track);
       }
       else
 	if( track->GetTOFBunchCrossing(vEvent->GetMagneticField())==0) {
-	  ProcessTPCITS(stack,vEvent,track);
+	  ProcessTPCITS(mcEvent,vEvent,track);
 	}
     }
-    else if(GetAnalysisMode() == 1) {ProcessITSTPC(iTrack,vEvent,stack,track);}
+    /* else if(GetAnalysisMode() == 2) ProcessTPCTRD(mcev,track,friendTrack);*/
+    else if(GetAnalysisMode() == 1) {ProcessITSTPC(iTrack,vEvent,mcEvent,track);}
     else if(GetAnalysisMode() == 2){
       if(!IsUseTOFBunchCrossing()){
-	ProcessTPCConstrain(stack,vEvent,track);
+	ProcessTPCConstrain(mcEvent,vEvent,track);
       }
       else
 	if( track->GetTOFBunchCrossing(vEvent->GetMagneticField())==0) {
-	  ProcessTPCConstrain(stack,vEvent,track);
+	  ProcessTPCConstrain(mcEvent,vEvent,track);
 	}
     }
     else {
@@ -844,5 +848,14 @@ void AliPerformanceMatch::ResetOutputData(){
         if(h_tpc_constrain_tpc_0_2_3) h_tpc_constrain_tpc_0_2_3->Reset("ICE");
     }
 
+}
+
+//_____________________________________________________________________________
+TCollection* AliPerformanceMatch::GetListOfDrawableObjects() 
+{
+  TObjArray* tmp = fFolderObj;
+  fFolderObj = NULL;
+  if (fAnalysisFolder) { fAnalysisFolder->SetOwner(kFALSE); }
+  return tmp;
 }
 

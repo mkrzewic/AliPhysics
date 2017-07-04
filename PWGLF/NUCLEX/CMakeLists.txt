@@ -41,6 +41,7 @@ set(SRCS
   Exotica/NOmega/AliAnalysisTaskNOmegaLPK.cxx
   Exotica/NOmega/AliAnalysisTaskOmegaOmegaOX.cxx
   Exotica/NOmega/AliAnalysisTaskNOmegaLX.cxx
+  Exotica/Ps/AliAnalysisTaskPsEfficiency.cxx
   Hypernuclei/Hyp2Body/AliAnalysisTaskHelium3Pi.cxx
   Hypernuclei/Hyp2Body/AliAnalysisTaskHelium3PiAOD.cxx
   Hypernuclei/Hyp2Body/AliAnalysisTaskHelium3PiMC.cxx
@@ -57,7 +58,6 @@ set(SRCS
   Nuclei/NucleiPbPb/AliAnalysisTaskNucleiYield.cxx
   Nuclei/NucleiPbPb/AliAnalysisTaskNucleiYieldESD.cxx
   Nuclei/NucleiPbPb/AliNuclexEventCuts.cxx
-  Nuclei/NucleiPbPb/AliAnalysisTaskEventCutsValidation.cxx
   Nuclei/NucleiPbPb/AliAnalysisTaskNucleiPIDqa.cxx
   Nuclei/Nucleipp/AliAnalysisTaskB2.cxx
   Nuclei/Nucleipp/AliAnalysisTaskB2AOD.cxx

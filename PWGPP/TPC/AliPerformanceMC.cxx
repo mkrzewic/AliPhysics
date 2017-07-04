@@ -50,7 +50,8 @@
 #include "AliMCParticle.h" 
 #include "AliHeader.h" 
 #include "AliGenEventHeader.h" 
-#include "AliStack.h" 
+#include "AliMCInfoCuts.h" 
+#include "AliRecInfoCuts.h" 
 #include "AliTracker.h" 
 #include "AliTreeDraw.h" 
 #include "AliTPCseed.h" 
@@ -173,7 +174,6 @@ void AliPerformanceMC::Exec(AliMCEvent* const mcEvent, AliVEvent *const /*vEvent
   //
   AliHeader* header = 0;
   AliGenEventHeader* genHeader = 0;
-  AliStack* stack = 0;
   TArrayF vtxMC(3);
   
   if(bUseMC)
@@ -186,12 +186,6 @@ void AliPerformanceMC::Exec(AliMCEvent* const mcEvent, AliVEvent *const /*vEvent
     header = mcEvent->Header();
     if (!header) {
       Error("Exec","Header not available");
-      return;
-    }
-    // MC particle stack
-    stack = mcEvent->Stack();
-    if (!stack) {
-      Error("Exec","Stack not available");
       return;
     }
     // get MC vertex
@@ -229,7 +223,7 @@ void AliPerformanceMC::Exec(AliMCEvent* const mcEvent, AliVEvent *const /*vEvent
     TParticle *particle = mcParticle->Particle();
     if(!particle) continue;
 
-    Bool_t prim = stack->IsPhysicalPrimary(iPart);
+    Bool_t prim = mcEvent->IsPhysicalPrimary(iPart);
 
     // Only 5 charged particle species (e,mu,pi,K,p)
     if (fCutsMC.IsPdgParticle(TMath::Abs(particle->GetPdgCode())) == kFALSE) break;

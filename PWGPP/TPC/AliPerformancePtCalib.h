@@ -24,7 +24,6 @@ class TH2F;
 class TList;
 
 class AliMCEvent;
-class AliStack;
 class AliTrackReference;
 class AliVEvent; 
 class AliVfriendEvent; 

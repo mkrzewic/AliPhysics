@@ -149,6 +149,7 @@ void AddTask_GammaCalo_pp(  Int_t     trainConfig                   = 1,        
     fV0ReaderV1->SetCreateAODs(kFALSE);// AOD Output
     if (periodNameV0Reader.CompareTo("") != 0) fV0ReaderV1->SetPeriodName(periodNameV0Reader);
     fV0ReaderV1->SetUseAODConversionPhoton(kTRUE);
+    if(trainConfig>=99 && trainConfig<200) fV0ReaderV1->SetImprovedPsiPair(0); //switch off for 8TeV as AODs are used for which improved psipair is not available
 
     if (!mgr) {
       Error("AddTask_V0ReaderV1", "No analysis manager found.");
@@ -269,6 +270,8 @@ void AddTask_GammaCalo_pp(  Int_t     trainConfig                   = 1,        
     cuts.AddCut("00003113","1111121057032220000","0163103100000050"); // MB
     cuts.AddCut("00003113","1111121058032220000","0163103100000050"); //
     cuts.AddCut("00003113","1111121059032220000","0163103100000050"); //
+  } else if (trainConfig == 11){  // new default
+    cuts.AddCut("00003113","1111121057032220000","0163103100000050"); // MB
   
     
   } else if (trainConfig == 20){  // min Energy EMC1
@@ -973,17 +976,24 @@ void AddTask_GammaCalo_pp(  Int_t     trainConfig                   = 1,        
     cuts.AddCut("00003113","2444400040033200000","0163803100000010");
     cuts.AddCut("00003123","2444400040033200000","0163803100000010");
     
-  // 13 TeV direct photon PHOS
+  // 7 TeV direct photon PHOS
   } else if (trainConfig == 351){
-    cuts.AddCut("00000113","2444400000013300000","0163803100000010"); // QA
+    cuts.AddCut("00000113","2444400000013300000","0163803100000010"); // no nonlinearity
+    cuts.AddCut("00000113","2444401000013300000","0163803100000010"); // with PHOS nonlinearity
   } else if (trainConfig == 352){
     cuts.AddCut("00000113","2444400040013300000","0163803100000010"); // 100ns timing cut, no track matching
     cuts.AddCut("00000113","2444400043013300000","0163803100000010"); // 100ns timing cut
     cuts.AddCut("00000113","2444400043013350000","0163803100000010"); // 100ns timing cut, M02<0.3
     cuts.AddCut("00000113","2444400043013330000","0163803100000010"); // 100ns timing cut, M02<0.5
     cuts.AddCut("00000113","2444400043013320000","0163803100000010"); // 100ns timing cut, M02<0.7
+  } else if (trainConfig == 353){ // same as 352 but with PHOS nonlinearity
+    cuts.AddCut("00000113","2444401040013300000","0163803100000010"); // 100ns timing cut, no track matching
+    cuts.AddCut("00000113","2444401043013300000","0163803100000010"); // 100ns timing cut
+    cuts.AddCut("00000113","2444401043013350000","0163803100000010"); // 100ns timing cut, M02<0.3
+    cuts.AddCut("00000113","2444401043013330000","0163803100000010"); // 100ns timing cut, M02<0.5
+    cuts.AddCut("00000113","2444401043013320000","0163803100000010"); // 100ns timing cut, M02<0.7
   
-  // 13 TeV PHOS
+  // 7 TeV PHOS
   } else if (trainConfig == 361){
     cuts.AddCut("00000113","2444400000013300000","0163803100000010"); // QA
     cuts.AddCut("00000113","2444400040013300000","0163803100000010"); // 100ns timing cut, no track matching

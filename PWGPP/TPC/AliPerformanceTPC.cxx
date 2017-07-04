@@ -60,7 +60,8 @@
 #include "AliMCEvent.h" 
 #include "AliHeader.h" 
 #include "AliGenEventHeader.h" 
-#include "AliStack.h" 
+#include "AliMCInfoCuts.h" 
+#include "AliRecInfoCuts.h" 
 #include "AliTracker.h" 
 #include "AliTreeDraw.h" 
 #include "AliTPCTransform.h" 
@@ -166,95 +167,97 @@ AliPerformanceTPC::AliPerformanceTPC(const Char_t* name, const Char_t* title,Int
   Init();
 }
 
-//_____________________________________________________________________________
-AliPerformanceTPC::AliPerformanceTPC(const AliPerformanceTPC& that):
-  AliPerformanceObject(that),
-  fTPCClustHisto(that.fTPCClustHisto),
-  fTPCEventHisto(that.fTPCEventHisto),
-  fTPCTrackHisto(that.fTPCTrackHisto),
-  fFolderObj(NULL),
-  fAnalysisFolder(NULL),
-  fUseHLT(that.fUseHLT),
-  h_tpc_clust_0_1_2(NULL),
-  h_tpc_event_recvertex_0(NULL),
-  h_tpc_event_recvertex_1(NULL),
-  h_tpc_event_recvertex_2(NULL),
-  h_tpc_event_recvertex_3(NULL),
-  h_tpc_event_recvertex_4(NULL),
-  h_tpc_event_recvertex_5(NULL),
-  h_tpc_event_6(NULL),
-  h_tpc_track_pos_recvertex_2_5_6(NULL),
-  h_tpc_track_neg_recvertex_2_5_6(NULL),
-  h_tpc_track_all_recvertex_5_8(NULL),
-  h_tpc_track_all_recvertex_0_5_7(NULL),
-  h_tpc_track_pos_recvertex_0_5_7(NULL),
-  h_tpc_track_neg_recvertex_0_5_7(NULL),
-  h_tpc_track_all_recvertex_1_5_7(NULL),
-  h_tpc_track_all_recvertex_2_5_7(NULL),
-  h_tpc_track_all_recvertex_3_5_7(NULL),
-  h_tpc_track_pos_recvertex_3_5_7(NULL),
-  h_tpc_track_neg_recvertex_3_5_7(NULL),
-  h_tpc_track_all_recvertex_4_5_7(NULL),
-  h_tpc_track_pos_recvertex_4_5_7(NULL),
-  h_tpc_track_neg_recvertex_4_5_7(NULL),
-  h_tpc_track_pos_recvertex_3_5_6(NULL),
-  h_tpc_track_pos_recvertex_4_5_6(NULL),
-  h_tpc_track_neg_recvertex_3_5_6(NULL),
-  h_tpc_track_neg_recvertex_4_5_6(NULL)
-{
-}
-
-//_____________________________________________________________________________
-AliPerformanceTPC& AliPerformanceTPC::operator=(const AliPerformanceTPC& that)
-{
-  AliPerformanceObject::operator=(that);
-  fTPCClustHisto = that.fTPCClustHisto;
-  fTPCEventHisto = that.fTPCEventHisto;
-  fTPCTrackHisto = that.fTPCTrackHisto;
-  fFolderObj = NULL;
-  fAnalysisFolder = NULL;
-  fUseHLT = that.fUseHLT;
-  h_tpc_clust_0_1_2=NULL;
-  h_tpc_event_recvertex_0=NULL;
-  h_tpc_event_recvertex_1=NULL;
-  h_tpc_event_recvertex_2=NULL;
-  h_tpc_event_recvertex_3=NULL;
-  h_tpc_event_recvertex_4=NULL;
-  h_tpc_event_recvertex_5=NULL;
-  h_tpc_event_6=NULL;
-  h_tpc_track_pos_recvertex_2_5_6=NULL;
-  h_tpc_track_neg_recvertex_2_5_6=NULL;
-  h_tpc_track_all_recvertex_5_8=NULL;
-  h_tpc_track_all_recvertex_0_5_7=NULL;
-  h_tpc_track_pos_recvertex_0_5_7=NULL;
-  h_tpc_track_neg_recvertex_0_5_7=NULL;
-  h_tpc_track_all_recvertex_1_5_7=NULL;
-  h_tpc_track_all_recvertex_2_5_7=NULL;
-  h_tpc_track_all_recvertex_3_5_7=NULL;
-  h_tpc_track_pos_recvertex_3_5_7=NULL;
-  h_tpc_track_neg_recvertex_3_5_7=NULL;
-  h_tpc_track_all_recvertex_4_5_7=NULL;
-  h_tpc_track_pos_recvertex_4_5_7=NULL;
-  h_tpc_track_neg_recvertex_4_5_7=NULL;
-  h_tpc_track_pos_recvertex_3_5_6=NULL;
-  h_tpc_track_pos_recvertex_4_5_6=NULL;
-  h_tpc_track_neg_recvertex_3_5_6=NULL;
-  h_tpc_track_neg_recvertex_4_5_6=NULL;
-  return *this;
-}
+////_____________________________________________________________________________
+//AliPerformanceTPC::AliPerformanceTPC(const AliPerformanceTPC& that):
+//  AliPerformanceObject(that),
+//  fTPCClustHisto(*that.fTPCClustHisto),
+//  fTPCEventHisto(*that.fTPCEventHisto),
+//  fTPCTrackHisto(*that.fTPCTrackHisto),
+//  fFolderObj(NULL),
+//  fAnalysisFolder(NULL),
+//  fUseHLT(that.fUseHLT),
+//  h_tpc_clust_0_1_2(NULL),
+//  h_tpc_event_recvertex_0(NULL),
+//  h_tpc_event_recvertex_1(NULL),
+//  h_tpc_event_recvertex_2(NULL),
+//  h_tpc_event_recvertex_3(NULL),
+//  h_tpc_event_recvertex_4(NULL),
+//  h_tpc_event_recvertex_5(NULL),
+//  h_tpc_event_6(NULL),
+//  h_tpc_track_pos_recvertex_2_5_6(NULL),
+//  h_tpc_track_neg_recvertex_2_5_6(NULL),
+//  h_tpc_track_all_recvertex_5_8(NULL),
+//  h_tpc_track_all_recvertex_0_5_7(NULL),
+//  h_tpc_track_pos_recvertex_0_5_7(NULL),
+//  h_tpc_track_neg_recvertex_0_5_7(NULL),
+//  h_tpc_track_all_recvertex_1_5_7(NULL),
+//  h_tpc_track_all_recvertex_2_5_7(NULL),
+//  h_tpc_track_all_recvertex_3_5_7(NULL),
+//  h_tpc_track_pos_recvertex_3_5_7(NULL),
+//  h_tpc_track_neg_recvertex_3_5_7(NULL),
+//  h_tpc_track_all_recvertex_4_5_7(NULL),
+//  h_tpc_track_pos_recvertex_4_5_7(NULL),
+//  h_tpc_track_neg_recvertex_4_5_7(NULL),
+//  h_tpc_track_pos_recvertex_3_5_6(NULL),
+//  h_tpc_track_pos_recvertex_4_5_6(NULL),
+//  h_tpc_track_neg_recvertex_3_5_6(NULL),
+//  h_tpc_track_neg_recvertex_4_5_6(NULL)
+//{
+//}
+//
+////_____________________________________________________________________________
+//AliPerformanceTPC& AliPerformanceTPC::operator=(const AliPerformanceTPC& that)
+//{
+//  AliPerformanceObject::operator=(that);
+//  fTPCClustHisto = *that.fTPCClustHisto;
+//  fTPCEventHisto = *that.fTPCEventHisto;
+//  fTPCTrackHisto = *that.fTPCTrackHisto;
+//  fFolderObj = NULL;
+//  fAnalysisFolder = NULL;
+//  fUseHLT = that.fUseHLT;
+//  h_tpc_clust_0_1_2=NULL;
+//  h_tpc_event_recvertex_0=NULL;
+//  h_tpc_event_recvertex_1=NULL;
+//  h_tpc_event_recvertex_2=NULL;
+//  h_tpc_event_recvertex_3=NULL;
+//  h_tpc_event_recvertex_4=NULL;
+//  h_tpc_event_recvertex_5=NULL;
+//  h_tpc_event_6=NULL;
+//  h_tpc_track_pos_recvertex_2_5_6=NULL;
+//  h_tpc_track_neg_recvertex_2_5_6=NULL;
+//  h_tpc_track_all_recvertex_5_8=NULL;
+//  h_tpc_track_all_recvertex_0_5_7=NULL;
+//  h_tpc_track_pos_recvertex_0_5_7=NULL;
+//  h_tpc_track_neg_recvertex_0_5_7=NULL;
+//  h_tpc_track_all_recvertex_1_5_7=NULL;
+//  h_tpc_track_all_recvertex_2_5_7=NULL;
+//  h_tpc_track_all_recvertex_3_5_7=NULL;
+//  h_tpc_track_pos_recvertex_3_5_7=NULL;
+//  h_tpc_track_neg_recvertex_3_5_7=NULL;
+//  h_tpc_track_all_recvertex_4_5_7=NULL;
+//  h_tpc_track_pos_recvertex_4_5_7=NULL;
+//  h_tpc_track_neg_recvertex_4_5_7=NULL;
+//  h_tpc_track_pos_recvertex_3_5_6=NULL;
+//  h_tpc_track_pos_recvertex_4_5_6=NULL;
+//  h_tpc_track_neg_recvertex_3_5_6=NULL;
+//  h_tpc_track_neg_recvertex_4_5_6=NULL;
+//  return *this;
+//}
 
 //_____________________________________________________________________________
 AliPerformanceTPC::~AliPerformanceTPC()
 {
   // destructor
+  delete fTPCClustHisto;
+  delete fTPCEventHisto;
+  delete fTPCTrackHisto;
 
-  //members
-    delete fTPCClustHisto;
-    delete fTPCEventHisto;
-    delete fTPCTrackHisto;
-    delete fAnalysisFolder;
-    if (fFolderObj) { fFolderObj->Delete(); } //delete the registered non-sparse histograms
-    delete fFolderObj;
+  if (fFolderObj && fAnalysisFolder && !fAnalysisFolder->IsOwner()) {
+    fFolderObj->Delete();
+  } //delete the registered non-sparse histograms
+
+  delete fFolderObj;
+  delete fAnalysisFolder;
 }
 
 
@@ -523,7 +526,7 @@ void AliPerformanceTPC::Init()
 
 
 //_____________________________________________________________________________
-void AliPerformanceTPC::ProcessTPC(AliStack* const stack, AliVTrack *const vTrack, AliVEvent *const vEvent, Bool_t vertStatus)
+void AliPerformanceTPC::ProcessTPC(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent *const vEvent, Bool_t vertStatus)
 {
     
     //
@@ -630,12 +633,13 @@ void AliPerformanceTPC::ProcessTPC(AliStack* const stack, AliVTrack *const vTrac
     //
   // Fill rec vs MC information
   //
-    if(!stack) return;
+  if(!mcev) return;
+
 }
 
 
 //_____________________________________________________________________________
-void AliPerformanceTPC::ProcessTPCITS(AliStack* const stack, AliVTrack *const vTrack, AliVEvent* const vEvent, Bool_t vertStatus)
+void AliPerformanceTPC::ProcessTPCITS(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent* const vEvent, Bool_t vertStatus)
 {
  
     // Fill comparison information (TPC+ITS)
@@ -724,12 +728,12 @@ void AliPerformanceTPC::ProcessTPCITS(AliStack* const stack, AliVTrack *const vT
   //
   // Fill rec vs MC information
   //
-  if(!stack) return;
+  if(!mcev) return;
 }
 
 
 //_____________________________________________________________________________
-void AliPerformanceTPC::ProcessConstrained(AliStack* const /*stack*/, AliVTrack *const /*vTrack*/, AliVEvent* const /*vEvent*/)
+void AliPerformanceTPC::ProcessConstrained(AliMCEvent* const /*mcev*/, AliVTrack *const /*vTrack*/, AliVEvent* const /*vEvent*/)
 {
   // Fill comparison information (constarained parameters) 
   AliDebug(AliLog::kWarning, "Warning: Not implemented");
@@ -750,7 +754,6 @@ void AliPerformanceTPC::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent,
 
   AliHeader* header = 0;
   AliGenEventHeader* genHeader = 0;
-  AliStack* stack = 0;
   TArrayF vtxMC(3);
   
   if(bUseMC)
@@ -765,12 +768,6 @@ void AliPerformanceTPC::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent,
       Error("Exec","Header not available");
       return;
     }
-    // MC particle stack
-    stack = mcEvent->Stack();
-    if (!stack) {
-      Error("Exec","Stack not available");
-      return;
-    }
     // get MC vertex
     genHeader = header->GenEventHeader();
     if (!genHeader) {
@@ -782,10 +779,10 @@ void AliPerformanceTPC::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent,
   
   // check trigger
   
-  if(!bUseMC && !GetTriggerClass().IsNull()) {
+  if(!bUseMC && GetTriggerClass()) {
     Bool_t isEventTriggered = vEvent->IsTriggerClassFired(GetTriggerClass());
     if(!isEventTriggered) {
-      AliInfo(Form("ERROR: fired trigger %s != %s",vEvent->GetFiredTriggerClasses().Data(), GetTriggerClass().Data()));
+      printf("ERROR: Could not determine trigger class");
       return;
     }
   }
@@ -839,8 +836,8 @@ void AliPerformanceTPC::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent,
                      //Double_t x[3]={cluster->GetRow(),cluster->GetPad(),cluster->GetTimeBin()};
                      //Int_t i[1]={cluster->GetDetector()};
                          //transform->Transform(x,i,0,1);
-                     //AliInfo("gx %f gy  %f  gz %f ", cluster->GetX(), cluster->GetY(),cluster->GetZ());
-                     //AliInfo("gclf[0] %f gclf[1]  %f  gclf[2] %f ", gclf[0], gclf[1],  gclf[2]);
+                     //printf("gx %f gy  %f  gz %f \n", cluster->GetX(), cluster->GetY(),cluster->GetZ());
+                     //printf("gclf[0] %f gclf[1]  %f  gclf[2] %f \n", gclf[0], gclf[1],  gclf[2]);
                  
                          Int_t TPCside; 
                      if(gclf[2]>0.) TPCside=0; // A side 
@@ -865,11 +862,11 @@ void AliPerformanceTPC::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent,
                 } //end if(bUseVfriend && vfriendEvent && ...)
             }
     }
-    if(GetAnalysisMode() == 0) ProcessTPC(stack,vTrack,vEvent,vertStatus);
-    else if(GetAnalysisMode() == 1) ProcessTPCITS(stack,vTrack,vEvent,vertStatus);
-    else if(GetAnalysisMode() == 2) ProcessConstrained(stack,vTrack,vEvent);
+    if(GetAnalysisMode() == 0) ProcessTPC(mcEvent,vTrack,vEvent,vertStatus);
+    else if(GetAnalysisMode() == 1) ProcessTPCITS(mcEvent,vTrack,vEvent,vertStatus);
+    else if(GetAnalysisMode() == 2) ProcessConstrained(mcEvent,vTrack,vEvent);
     else {
-      AliInfo(Form("ERROR: AnalysisMode %d ",fAnalysisMode));
+      printf("ERROR: AnalysisMode %d \n",fAnalysisMode);
       return;
     }
     // TPC only
@@ -1018,7 +1015,7 @@ void AliPerformanceTPC::Analyse()
         fTPCTrackHisto->GetAxis(8)->SetRangeUser(-1.5,1.5);
         fTPCTrackHisto->GetAxis(9)->SetRangeUser(-0.5,1.5);
       
-        AliInfo("exportToFolder");
+        printf("exportToFolder\n");
         // export objects to analysis folder
         fAnalysisFolder = ExportToFolder(aFolderObj);
         if (fFolderObj) delete fFolderObj;
@@ -1026,7 +1023,7 @@ void AliPerformanceTPC::Analyse()
         aFolderObj=0;
     }
     else{
-        AliInfo("exportToFolder");
+        printf("exportToFolder\n");
         fAnalysisFolder = ExportToFolder(fFolderObj);
     }
  
@@ -1177,3 +1174,13 @@ void AliPerformanceTPC::ResetOutputData(){
     
 
 }
+
+//_____________________________________________________________________________
+TCollection* AliPerformanceTPC::GetListOfDrawableObjects() 
+{
+  TObjArray* tmp = fFolderObj;
+  fFolderObj = NULL;
+  if (fAnalysisFolder) { fAnalysisFolder->SetOwner(kFALSE); }
+  return tmp;
+}
+

@@ -120,7 +120,8 @@ AliFemtoManager* ConfigFemtoAnalysis(const TString& aParamString="")
   //Setup the event reader for ALICE AOD
   AliFemtoEventReaderAODChain *rdr = new AliFemtoEventReaderAODChain();
     rdr->SetUseMultiplicity(tMacroConfig.multiplicity);  //Sets the type of the event multiplicity estimator
-    rdr->SetFilterBit(tMacroConfig.filter_bit);
+    if(tAnalysisConfig.analysisType!=AFALK::kProtPiM && tAnalysisConfig.analysisType!=AFALK::kAProtPiP &&
+       tAnalysisConfig.analysisType!=AFALK::kPiPPiM) rdr->SetFilterBit(tMacroConfig.filter_bit);
     //rdr->SetCentralityPreSelection(0, 900);
     if(tAnalysisConfig.analysisType==AFALK::kXiKchP || tAnalysisConfig.analysisType==AFALK::kAXiKchP ||
        tAnalysisConfig.analysisType==AFALK::kXiKchM || tAnalysisConfig.analysisType==AFALK::kAXiKchM) rdr->SetReadCascade(1);
@@ -538,9 +539,7 @@ BuildParticleConfiguration(
       const TString tParticleType = ((TObjString*)tCutFullLine->At(1))->String().Strip(TString::kBoth, ' ');
       const TString tParticleCut = ((TObjString*)tCutFullLine->At(2))->String().Strip(TString::kBoth, ' ');
 
-      if(tParticleType.EqualTo("ALL")) tDesiredName = TString("ALL");
-      if(tParticleType.EqualTo("ALLV0S")) tDesiredName = TString("ALLV0S");
-      if(tParticleType.EqualTo(tDesiredName)) tCmd = tV0CutVarName + "." + tParticleCut(0, tParticleCut.Length());
+      if(tParticleType.EqualTo(tDesiredName) || tParticleType.EqualTo("ALL") || tParticleType.EqualTo("ALLV0S")) tCmd = tV0CutVarName + "." + tParticleCut(0, tParticleCut.Length());
 
       if(tParticleType.EqualTo("CLAM"))  //do for both Lam and ALam
       {
@@ -615,9 +614,7 @@ BuildParticleConfiguration(
       const TString tParticleType = ((TObjString*)tCutFullLine->At(1))->String().Strip(TString::kBoth, ' ');
       const TString tParticleCut = ((TObjString*)tCutFullLine->At(2))->String().Strip(TString::kBoth, ' ');
 
-      if(tParticleType.EqualTo("ALL")) tDesiredName = TString("ALL");
-      if(tParticleType.EqualTo("ALLTRACKS")) tDesiredName = TString("ALLTRACKS");
-      if(tParticleType.EqualTo(tDesiredName)) tCmd = tESDCutVarName + "." + tParticleCut(0, tParticleCut.Length());
+      if(tParticleType.EqualTo(tDesiredName) || tParticleType.EqualTo("ALL") || tParticleType.EqualTo("ALLTRACKS")) tCmd = tESDCutVarName + "." + tParticleCut(0, tParticleCut.Length());
     }
 
     if(!tCmd.IsNull())
@@ -671,9 +668,7 @@ BuildParticleConfiguration(
       const TString tParticleType = ((TObjString*)tCutFullLine->At(1))->String().Strip(TString::kBoth, ' ');
       const TString tParticleCut = ((TObjString*)tCutFullLine->At(2))->String().Strip(TString::kBoth, ' ');
 
-      if(tParticleType.EqualTo("ALL")) tDesiredName = TString("ALL");
-      if(tParticleType.EqualTo("ALLXIS")) tDesiredName = TString("ALLXIS");
-      if(tParticleType.EqualTo(tDesiredName)) tCmd = tXiCutVarName + "." + tParticleCut(0, tParticleCut.Length());
+      if(tParticleType.EqualTo(tDesiredName) || tParticleType.EqualTo("ALL") || tParticleType.EqualTo("ALLXIS")) tCmd = tXiCutVarName + "." + tParticleCut(0, tParticleCut.Length());
     }
 
     if(!tCmd.IsNull())

@@ -1297,10 +1297,10 @@ void AliMultSelectionTask::UserExec(Option_t *)
         const Double_t *ZNCtower = lESDZDC->GetZNCTowerEnergy();
         const Double_t *ZPAtower = lESDZDC->GetZPATowerEnergy();
         const Double_t *ZPCtower = lESDZDC->GetZPCTowerEnergy();
-        if (fZnaFired->GetValueInteger() > 0) fZnaTower -> SetValue ( (Float_t) ZNAtower[0] );
-        if (fZncFired->GetValueInteger() > 0) fZncTower -> SetValue ( (Float_t) ZNCtower[0] );
-        if (fZpaFired->GetValueInteger() > 0) fZpaTower -> SetValue ( (Float_t) ZPAtower[0] );
-        if (fZpcFired->GetValueInteger() > 0) fZpcTower -> SetValue ( (Float_t) ZPCtower[0] );
+        fZnaTower -> SetValue ( (Float_t) ZNAtower[0] );
+        fZncTower -> SetValue ( (Float_t) ZNCtower[0] );
+        fZpaTower -> SetValue ( (Float_t) ZPAtower[0] );
+        fZpcTower -> SetValue ( (Float_t) ZPCtower[0] );
 
     } else if (lVevent->InheritsFrom("AliAODEvent")) {
         AliAODEvent *aodevent = dynamic_cast<AliAODEvent *>(lVevent);
@@ -1320,10 +1320,10 @@ void AliMultSelectionTask::UserExec(Option_t *)
         const Double_t *ZNCtower = lAODZDC->GetZNCTowerEnergy();
         const Double_t *ZPAtower = lAODZDC->GetZPATowerEnergy();
         const Double_t *ZPCtower = lAODZDC->GetZPCTowerEnergy();
-        if (fZnaFired->GetValueInteger() > 0) fZnaTower -> SetValue ( (Float_t) ZNAtower[0] );
-        if (fZncFired->GetValueInteger() > 0) fZncTower -> SetValue ( (Float_t) ZNCtower[0] );
-        if (fZpaFired->GetValueInteger() > 0) fZpaTower -> SetValue ( (Float_t) ZPAtower[0] );
-        if (fZpcFired->GetValueInteger() > 0) fZpcTower -> SetValue ( (Float_t) ZPCtower[0] );
+        fZnaTower -> SetValue ( (Float_t) ZNAtower[0] );
+        fZncTower -> SetValue ( (Float_t) ZNCtower[0] );
+        fZpaTower -> SetValue ( (Float_t) ZPAtower[0] );
+        fZpcTower -> SetValue ( (Float_t) ZPCtower[0] );
     }
     
     fHistEventSelections -> Fill ( fEvSel_Triggered     , 0.5 ); 
@@ -1728,7 +1728,7 @@ Int_t AliMultSelectionTask::SetupRun(const AliVEvent* const esd)
 
     //=====================================================================
     //Option to override estimators from alternate oadb file
-    if ( fAlternateOADBForEstimators.EqualTo("")==kFALSE ) {
+    if ( fAlternateOADBForEstimators.EqualTo("")==kFALSE && fAlternateOADBFullManualBypass.EqualTo("")==kTRUE) {
         AliWarning("Extra option detected: Load estimators from OADB file called: ");
         AliWarning(Form(" path: %s", fAlternateOADBForEstimators.Data() ));
 
@@ -2189,13 +2189,17 @@ TString AliMultSelectionTask::GetPeriodNameByRunNumber() const
     if ( fCurrentRun >= 244340 && fCurrentRun <= 244628 ) lProductionName = "LHC15n";
     
     //2016
+    if ( fCurrentRun >= 254124 && fCurrentRun <= 254332 ) lProductionName = "LHC16g";
+    if ( fCurrentRun >= 254378 && fCurrentRun <= 255467 ) lProductionName = "LHC16h";
+    if ( fCurrentRun >= 255515 && fCurrentRun <= 255618 ) lProductionName = "LHC16i";
     if ( fCurrentRun >= 256146 && fCurrentRun <= 256420 ) lProductionName = "LHC16j";
     if ( fCurrentRun >= 256504 && fCurrentRun <= 258537 ) lProductionName = "LHC16k";
     if ( fCurrentRun >= 258883 && fCurrentRun <= 260187 ) lProductionName = "LHC16l";
+    if ( fCurrentRun >= 260218 && fCurrentRun <= 260647 ) lProductionName = "LHC16m";
     
     //Registered Productions : Run 2 Pb-Pb
     if ( fCurrentRun >= 243395 && fCurrentRun <= 243984 ) lProductionName = "LHC15m";
-    if ( fCurrentRun >= 244917 && fCurrentRun <= 256145 ) lProductionName = "LHC15o";
+    if ( fCurrentRun >= 244917 && fCurrentRun <= 246994 ) lProductionName = "LHC15o";
     
     //Registered Productions : Run 2 p-Pb
     if ( fCurrentRun >= 265115 && fCurrentRun <= 265525 ) lProductionName = "LHC16q";

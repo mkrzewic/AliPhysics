@@ -85,6 +85,9 @@ AliRsnMiniAnalysisTask *AddTaskKStarPlusMinusRun2
  Bool_t      ptDep = kTRUE,
  Float_t     DCAxy = 0.06,
  Bool_t      enableSys = kFALSE,
+ Float_t     crossedRows = 70,
+ Float_t     rowsbycluster = 0.08,
+ Float_t     chi2tpc = 4,
  Int_t       Sys= 0
  )
 {  
@@ -205,7 +208,13 @@ AliRsnMiniAnalysisTask *AddTaskKStarPlusMinusRun2
    
    AliRsnCutSet *cutsPair = new AliRsnCutSet("pairCuts", AliRsnTarget::kMother);
    cutsPair->AddCut(cutY);
-   cutsPair->SetCutScheme(cutY->GetName());
+   if (ptDep) {
+     cutsPair->SetCutScheme(cutY->GetName()); 
+   } else {
+     AliRsnCutMiniPair *cutV0 = new AliRsnCutMiniPair("cutV0", AliRsnCutMiniPair::kContainsV0Daughter);
+     cutsPair->AddCut(cutV0);
+     cutsPair->SetCutScheme(TString::Format("%s&!%s",cutY->GetName(),cutV0->GetName()).Data());
+   }
    
    //
    // -- CONFIG ANALYSIS --------------------------------------------------------------------------
@@ -216,7 +225,7 @@ AliRsnMiniAnalysisTask *AddTaskKStarPlusMinusRun2
    } else 
      Printf("========================== DATA analysis - PID cuts used");
    
-   if (!ConfigKStarPlusMinusRun2(task, isPP, isMC, piPIDCut, cutPiCandidate, pi_k0s_PIDCut, aodFilterBit, enableMonitor, monitorOpt.Data(), massTol, massTolVeto, pLife, radiuslow, radiushigh, Switch, k0sDCA, k0sCosPoinAn, k0sDaughDCA, NTPCcluster, "", cutsPair, ptDep, DCAxy, enableSys, Sys)) return 0x0;
+   if (!ConfigKStarPlusMinusRun2(task, isPP, isMC, piPIDCut, cutPiCandidate, pi_k0s_PIDCut, aodFilterBit, enableMonitor, monitorOpt.Data(), massTol, massTolVeto, pLife, radiuslow, radiushigh, Switch, k0sDCA, k0sCosPoinAn, k0sDaughDCA, NTPCcluster, "", cutsPair, ptDep, DCAxy, enableSys, crossedRows, rowsbycluster,chi2tpc, Sys)) return 0x0;
    
    //
    // -- CONTAINERS --------------------------------------------------------------------------------

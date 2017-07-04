@@ -1,5 +1,5 @@
 /**************************************************************************
- * Author: Andrey Ivanov.                                           *
+ * Authors: Andrey Ivanov, Igor Altsybeev, St.Petersburg State University *
  * Contributors are mentioned in the code where appropriate.              *
  *                                                                        *
  * Permission to use, copy, modify and distribute this software and its   *
@@ -12,11 +12,9 @@
  **************************************************************************/
 // Analysis task for Long Range Correlation (LRC) analysis using TPC data
 // This includes a TList of AliLRCBase objects that are processing LRC analysis
-// for a given Eta window 
-// This task is worcking with ESD data only
+// for a given Eta and Phi windows
 
-// Authors : Andrey Ivanov , Igor Altsybeev, St.Peterburg State University
-// Email: Andrey.Ivanov@cern.ch, Igor.Altsybeev@cern.ch
+// Email: Igor.Altsybeev@cern.ch
 
 #include <AliAnalysisManager.h>
 #include <AliESDInputHandler.h>

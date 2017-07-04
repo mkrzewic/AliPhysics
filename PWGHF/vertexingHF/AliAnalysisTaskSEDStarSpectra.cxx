@@ -46,7 +46,6 @@
 #include <AliAnalysisDataSlot.h>
 #include <AliAnalysisDataContainer.h>
 #include "AliRDHFCutsDStartoKpipi.h"
-#include "AliStack.h"
 #include "AliMCEvent.h"
 #include "AliAnalysisManager.h"
 #include "AliAODMCHeader.h"
@@ -596,7 +595,7 @@ void  AliAnalysisTaskSEDStarSpectra::DefineHistograms(){
   fDeltaMassD1 = new TH1F("DeltaMassD1","delta mass d1",600,0,0.8);
   fOutput->Add(fDeltaMassD1);
 
-  const Int_t nhist=14;
+  const Int_t nhist=99;
   TString nameMass=" ", nameSgn=" ", nameBkg=" ";
 
   for(Int_t i=-2;i<nhist;i++){

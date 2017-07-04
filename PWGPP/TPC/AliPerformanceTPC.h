@@ -22,7 +22,7 @@ class TNtuple;
 
 class AliVTrack;
 class AliMCEvent;
-class AliStack;
+class AliMCEvent;
 class AliVEvent;
 class AliVEvent;
 class AliVfriendEvent; 
@@ -35,9 +35,6 @@ class AliPerformanceTPC : public AliPerformanceObject {
 public :
   AliPerformanceTPC(TRootIOCtor*);
   AliPerformanceTPC(const Char_t* name="AliPerformanceTPC", const Char_t* title="AliPerformanceTPC",Int_t analysisMode=0,Bool_t hptGenerator=kFALSE, Int_t run=-1, Bool_t highMult = kFALSE, Bool_t useSparse = kTRUE);
-
-  AliPerformanceTPC(const AliPerformanceTPC&);
-  AliPerformanceTPC& operator=(const AliPerformanceTPC&);
 
   virtual ~AliPerformanceTPC();
 
@@ -59,9 +56,9 @@ public :
   virtual TTree* CreateSummary();
     
   // Process events
-  void ProcessConstrained(AliStack* const stack, AliVTrack *const vTrack, AliVEvent *const vEvent);
-  void ProcessTPC(AliStack* const stack, AliVTrack *const vTrack, AliVEvent *const vEvent, Bool_t vertStatus);
-  void ProcessTPCITS(AliStack* const stack, AliVTrack *const vTrack, AliVEvent *const vEvent, Bool_t vertStatus);
+  void ProcessConstrained(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent *const vEvent);
+  void ProcessTPC(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent *const vEvent, Bool_t vertStatus);
+  void ProcessTPCITS(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent *const vEvent, Bool_t vertStatus);
 
   // Create folder for analysed histograms
   TFolder *CreateFolder(TString folder = "folderTPC",TString title = "Analysed TPC performance histograms");
@@ -82,8 +79,7 @@ public :
   
   void SetUseHLT(Bool_t useHLT = kTRUE) {fUseHLT = useHLT;}
   Bool_t GetUseHLT() { return fUseHLT; }
-  TCollection* GetListOfDrawableObjects() {TObjArray* tmp = fFolderObj; fFolderObj = NULL; return tmp;}
-
+  TCollection* GetListOfDrawableObjects();
   virtual void ResetOutputData();
 
     
@@ -132,6 +128,10 @@ private:
   TH3D *h_tpc_track_pos_recvertex_4_5_6;//!
   TH3D *h_tpc_track_neg_recvertex_3_5_6;//!
   TH3D *h_tpc_track_neg_recvertex_4_5_6;//!
+
+  AliPerformanceTPC(const AliPerformanceTPC&);
+  AliPerformanceTPC& operator=(const AliPerformanceTPC&);
+
 
   ClassDef(AliPerformanceTPC,14);
 };

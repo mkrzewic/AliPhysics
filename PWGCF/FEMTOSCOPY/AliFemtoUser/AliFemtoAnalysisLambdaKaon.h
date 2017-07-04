@@ -102,6 +102,7 @@ struct AnalysisParams
   bool monitorPart1CutPassOnly;
   bool monitorPart2CutPassOnly;
   bool monitorPairCutPassOnly;
+  bool useMCWeightGenerator;
 };
 
 struct EventCutParams
@@ -164,6 +165,8 @@ struct V0CutParams
   double maxDcaV0Daughters;
   double minPosDaughterToPrimVertex,
          minNegDaughterToPrimVertex;
+
+  bool ignoreOnFlyStatus;
 };
 
 struct ESDCutParams
@@ -200,6 +203,7 @@ struct ESDCutParams
   bool useCustomFilter;
   bool useCustomMisID;
   bool useElectronRejection;
+  bool useCustomElectronRejection;
   bool usePionRejection;
 };
 
@@ -219,6 +223,7 @@ struct XiCutParams
 
   double maxDecayLengthXi;
   double minCosPointingAngleXi;
+  double minCosPointingAngleV0toXi;
   double maxDcaXi;
   double maxDcaXiDaughters;
 
@@ -232,7 +237,7 @@ struct XiCutParams
   double minDcaV0;
   double minInvMassV0,
          maxInvMassV0;
-  double minCosPointingAngleV0;
+  double minCosPointingAngleV0;  //this is V0 to primary vertex, not terribly useful for Xi analysis
   double etaV0;
   double minPtV0,
          maxPtV0;
@@ -249,7 +254,12 @@ struct XiCutParams
 
   int minTPCnclsV0Daughters;
 
-  bool useCustomFilter;
+  bool useCustomV0Filter;
+  bool useCustomV0MisID;
+  bool useCustomBacPionFilter;
+  bool useCustomBacPionMisID;
+
+  bool ignoreOnFlyStatusV0;
 };
 
 struct PairCutParams
@@ -269,6 +279,8 @@ struct PairCutParams
 
   double minAvgSepTrackPos,  // Set these for V0-PosTrack; V0-NegTrack, AntiV0-Pos, etc. cases
          minAvgSepTrackNeg;  // will automatically be handled by AliFemtoAnalysisLambdaKaon::CreateV0TrackPairCut
+
+  double minAvgSepTrackBacPion;
 };
 
 //----------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -313,6 +325,7 @@ struct PairCutParams
   AliFemtoESDTrackCutNSigmaFilter* CreateESDCut(ESDCutParams &aCutParams);
 
   void AddCustomXiSelectionFilters(ParticlePDGType aXiType, AliFemtoXiTrackCutNSigmaFilter* aCut);
+  void AddCustomXiV0RejectionFilters(ParticlePDGType aXiType, AliFemtoXiTrackCutNSigmaFilter* aCut);
   AliFemtoXiTrackCutNSigmaFilter* CreateXiCut(XiCutParams &aCutParams);
 
   AliFemtoV0PairCut* CreateV0PairCut(PairCutParams &aPairCutParams);

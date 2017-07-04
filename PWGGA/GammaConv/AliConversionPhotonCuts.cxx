@@ -1878,7 +1878,7 @@ void AliConversionPhotonCuts::PrintCutsWithValues() {
     printf("\t reject: p_{e,T} > %3.2f, n sigma_{pi,TPC} < %3.2f\n", fPIDMaxPnSigmaAbovePionLine, fPIDnSigmaAbovePionLineHighPt );
     if (fDoPionRejectionLowP) printf("\t reject: p_{e,T} < %3.2f, -%3.2f < n sigma_{pi,TPC} < %3.2f\n", fPIDMinPPionRejectionLowP, fPIDnSigmaAtLowPAroundPionLine, fPIDnSigmaAtLowPAroundPionLine );
     if (fDoKaonRejectionLowP) printf("\t reject: -%3.2f < n sigma_{K,TPC} < %3.2f\n", fPIDnSigmaAtLowPAroundKaonLine, fPIDnSigmaAtLowPAroundKaonLine );
-    if (fDoProtonRejectionLowP) printf("\t reject: -%3.2f < n sigma_{K,TPC} < %3.2f\n", fPIDnSigmaAtLowPAroundProtonLine, fPIDnSigmaAtLowPAroundProtonLine );
+    if (fDoProtonRejectionLowP) printf("\t reject: -%3.2f < n sigma_{p,TPC} < %3.2f\n", fPIDnSigmaAtLowPAroundProtonLine, fPIDnSigmaAtLowPAroundProtonLine );
   } else {
     printf("\t accept: %3.2f <= Kappa_{TPC} < %3.2f\n", fKappaMinCut, fKappaMaxCut );
   }  
@@ -2232,6 +2232,9 @@ Bool_t AliConversionPhotonCuts::SetSinglePtCut(Int_t singlePtCut){   // Set Cut
   case 7:  // 0.0 GeV
     fSinglePtCut = 0.0;
     break;
+  case 8:  // 0.02 GeV ; equivalent to .05 for the low B field runs 
+    fSinglePtCut = 0.02;
+    break;
   default:
     AliError(Form("singlePtCut not defined %d",singlePtCut));
     return kFALSE;
@@ -2524,6 +2527,15 @@ Bool_t AliConversionPhotonCuts::SetLowPRejectionCuts(Int_t LowPRejectionSigmaCut
     fDoKaonRejectionLowP = kFALSE;
     fDoProtonRejectionLowP = kFALSE;
     fDoPionRejectionLowP = kTRUE;
+    fPIDMinPPionRejectionLowP = fPIDMinPnSigmaAbovePionLine;
+    break;
+  case 8:  //
+    fPIDnSigmaAtLowPAroundKaonLine=0.;
+    fPIDnSigmaAtLowPAroundProtonLine=0.5;
+    fPIDnSigmaAtLowPAroundPionLine=0.;
+    fDoKaonRejectionLowP = kFALSE;
+    fDoProtonRejectionLowP = kTRUE;
+    fDoPionRejectionLowP = kFALSE;
     fPIDMinPPionRejectionLowP = fPIDMinPnSigmaAbovePionLine;
     break;
   default:

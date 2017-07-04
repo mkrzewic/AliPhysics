@@ -18,7 +18,6 @@ class TH2F;
 
 class AliVTrack;
 class AliMCEvent;
-class AliStack;
 class AliTrackReference;
 class AliVEvent; 
 class AliVfriendEvent; 
@@ -56,10 +55,10 @@ public :
   virtual TFolder* GetAnalysisFolder() const {return fAnalysisFolder;}
 
   // Process matching
-  void ProcessTPCITS(AliStack* const stack, AliVEvent *const vEvent, AliVTrack *const vTrack);
-  void ProcessTPCTRD(AliStack* const stack, AliVTrack *const vTrack, AliVfriendTrack *const friendTrack);
-  void ProcessITSTPC(Int_t trackIdx, AliVEvent* const vEvent, AliStack* const stack, AliVTrack *const vTrack);
-  void ProcessTPCConstrain(AliStack* const stack, AliVEvent *const vEvent, AliVTrack *const vTrack); // - 01.11.2011
+  void ProcessTPCITS(AliMCEvent* const mcev, AliVEvent *const vEvent, AliVTrack *const vTrack);
+  void ProcessTPCTRD(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVfriendTrack *const friendTrack);
+  void ProcessITSTPC(Int_t trackIdx, AliVEvent* const vEvent, AliMCEvent* const mcev, AliVTrack *const vTrack);
+  void ProcessTPCConstrain(AliMCEvent* const mcev, AliVEvent *const vEvent, AliVTrack *const vTrack); // - 01.11.2011
 
   // Fill histogrrams
   void FillHistograms(AliVTrack *const refParam, AliVTrack *const param, Bool_t isRec);
@@ -87,7 +86,7 @@ public :
   void SetUseHLT(Bool_t useHLT = kTRUE) {fUseHLT = useHLT;}
   Bool_t GetUseHLT() { return fUseHLT; }  
 
-  TObjArray* GetListOfDrawableObjects() {TObjArray* tmp = fFolderObj; fFolderObj = NULL; return tmp;}
+  TCollection* GetListOfDrawableObjects();
     
   virtual void ResetOutputData();
 

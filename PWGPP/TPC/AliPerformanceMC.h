@@ -18,7 +18,6 @@ class TParticle;
 class TClonesArray;
 
 class AliMCEvent;
-class AliStack;
 class AliTrackReference;
 class AliVEvent; 
 class AliVfriendEvent; 

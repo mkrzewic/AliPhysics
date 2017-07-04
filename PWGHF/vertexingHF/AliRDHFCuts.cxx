@@ -340,9 +340,9 @@ Int_t AliRDHFCuts::IsEventSelectedInCentrality(AliVEvent *event) {
   }else{    
     Float_t centvalue=GetCentrality((AliAODEvent*)event);          
     if (centvalue<-998.){//-999 if no centralityP
-      return 0;
+      return 3;
     }else if(fEvRejectionBits&(1<<kMismatchOldNewCentrality)){
-      return 0;
+      return 3;
     }else{      
       if (centvalue<fMinCentrality || centvalue>fMaxCentrality){
 	return 2;      
@@ -561,81 +561,6 @@ Bool_t AliRDHFCuts::IsEventSelected(AliVEvent *event) {
     }
   }
 
-  // vertex requirements
-   
-  const AliVVertex *vertex = event->GetPrimaryVertex();
-
-  if(!vertex){
-    accept=kFALSE;
-    fEvRejectionBits+=1<<kNoVertex;
-  }else{
-    TString title=vertex->GetTitle();
-    if(title.Contains("Z") && fMinVtxType>1){
-      accept=kFALSE;
-      fEvRejectionBits+=1<<kNoVertex;
-    }
-    else if(title.Contains("3D") && fMinVtxType>2){
-      accept=kFALSE;
-      fEvRejectionBits+=1<<kNoVertex;
-    }
-    if(vertex->GetNContributors()<fMinVtxContr){
-      accept=kFALSE;
-      fEvRejectionBits+=1<<kTooFewVtxContrib;
-    }
-    if(TMath::Abs(vertex->GetZ())>fMaxVtxZ) {
-      fEvRejectionBits+=1<<kZVtxOutFid;
-      if(accept) fWhyRejection=6;
-      accept=kFALSE;
-    } 
-  }
-
-  if(fCutOnzVertexSPD>0){
-    const AliVVertex *vSPD = ((AliAODEvent*)event)->GetPrimaryVertexSPD();
-    if(!vSPD || (vSPD && vSPD->GetNContributors()<fMinVtxContr)){
-      accept=kFALSE;
-      fEvRejectionBits+=1<<kBadSPDVertex;
-    }else{
-      if(fCutOnzVertexSPD==1 && TMath::Abs(vSPD->GetZ())>12.) {
-	fEvRejectionBits+=1<<kZVtxSPDOutFid;
-	if(accept) fWhyRejection=6;
-	accept=kFALSE;
-      } 
-      if(fCutOnzVertexSPD==2 && vertex){
-	if(TMath::Abs(vSPD->GetZ()-vertex->GetZ())>0.5) {
-	  fEvRejectionBits+=1<<kZVtxSPDOutFid;
-	  if(accept) fWhyRejection=6;
-	  accept=kFALSE;
-	} 
-      }
-    }
-  }
-
-  // pile-up rejection
-  if(fOptPileup==kRejectPileupEvent){
-    Bool_t isPileup=kFALSE;
-    if(fUseMultDepPileupCut){
-      isPileup=event->IsPileupFromSPDInMultBins();
-    }else{
-      Int_t cutc=(Int_t)fMinContrPileup;
-      Double_t cutz=(Double_t)fMinDzPileup;
-      isPileup=event->IsPileupFromSPD(cutc,cutz,3.,2.,10.);
-    }
-    if(isPileup){
-      if(accept) fWhyRejection=1;
-      fEvRejectionBits+=1<<kPileup;
-      accept=kFALSE;
-    }
-  }
-  else if(fOptPileup==kRejectMVPileupEvent){
-    AliAnalysisUtils utils;
-    Bool_t isPUMV = utils.IsPileUpMV(event);
-    if(isPUMV) {
-      if(accept) fWhyRejection=1;
-      fEvRejectionBits+=1<<kPileup;
-      accept=kFALSE;
-    }
-  }
-
   // centrality selection
   if (fUseCentrality!=kCentOff) {  
     Int_t rejection=IsEventSelectedInCentrality(event);    
@@ -673,6 +598,100 @@ Bool_t AliRDHFCuts::IsEventSelected(AliVEvent *event) {
       }
     }
   }
+
+  // vertex requirements
+   
+  const AliVVertex *vertex = event->GetPrimaryVertex();
+
+  if(!vertex){
+    accept=kFALSE;
+    fEvRejectionBits+=1<<kNoVertex;
+  }else{
+    TString title=vertex->GetTitle();
+    if(title.Contains("Z") && fMinVtxType>1){
+      accept=kFALSE;
+      fEvRejectionBits+=1<<kNoVertex;
+    }
+    else if(title.Contains("3D") && fMinVtxType>2){
+      accept=kFALSE;
+      fEvRejectionBits+=1<<kNoVertex;
+    }
+    if(vertex->GetNContributors()<fMinVtxContr){
+      accept=kFALSE;
+      fEvRejectionBits+=1<<kTooFewVtxContrib;
+    }
+    if(TMath::Abs(vertex->GetZ())>fMaxVtxZ) {
+      fEvRejectionBits+=1<<kZVtxOutFid;
+      if(accept) fWhyRejection=6;
+      accept=kFALSE;
+    } 
+  }
+
+  if(fCutOnzVertexSPD>0){
+    const AliVVertex *vSPD = ((AliAODEvent*)event)->GetPrimaryVertexSPD();
+    if(!vSPD || (vSPD && vSPD->GetNContributors()<fMinVtxContr)){
+      accept=kFALSE;
+      fEvRejectionBits+=1<<kBadSPDVertex;
+    }else{
+      if(fCutOnzVertexSPD==1 && TMath::Abs(vSPD->GetZ())>12.) {
+	// protection for events with bad reconstructed track vertex (introduced for 2011 Pb-Pb)
+	fEvRejectionBits+=1<<kZVtxSPDOutFid;
+	if(accept) fWhyRejection=6;
+	accept=kFALSE;
+      } 
+      if(fCutOnzVertexSPD>=2 && vertex){
+	Double_t dz = vSPD->GetZ()-vertex->GetZ();
+	// cut on absolute distance between track and SPD vertex (introduced for 2011 Pb-Pb)
+	if(TMath::Abs(dz)>0.5) {
+	  fEvRejectionBits+=1<<kBadTrackVertex;
+	  if(accept) fWhyRejection=0;
+	  accept=kFALSE;
+	}
+	if(accept && fCutOnzVertexSPD==3){
+	  // cut on nsigma distance between track and SPD vertex (for 2015 Pb-Pb)
+	  double covTrc[6],covSPD[6];
+	  vertex->GetCovarianceMatrix(covTrc);
+	  vSPD->GetCovarianceMatrix(covSPD);
+	  double errTot = TMath::Sqrt(covTrc[5]+covSPD[5]);
+	  double errTrc = TMath::Sqrt(covTrc[5]);
+	  double nsigTot = TMath::Abs(dz)/errTot, nsigTrc = TMath::Abs(dz)/errTrc;
+	  if (TMath::Abs(dz)>0.2 || nsigTot>10 || nsigTrc>20){
+	    // reject, bad reconstructed track vertex
+	    fEvRejectionBits+=1<<kBadTrackVertex;
+	    if(accept) fWhyRejection=0;
+	    accept=kFALSE;
+	  }
+	}
+      }
+    }
+  }
+
+  // pile-up rejection
+  if(fOptPileup==kRejectPileupEvent){
+    Bool_t isPileup=kFALSE;
+    if(fUseMultDepPileupCut){
+      isPileup=event->IsPileupFromSPDInMultBins();
+    }else{
+      Int_t cutc=(Int_t)fMinContrPileup;
+      Double_t cutz=(Double_t)fMinDzPileup;
+      isPileup=event->IsPileupFromSPD(cutc,cutz,3.,2.,10.);
+    }
+    if(isPileup){
+      if(accept) fWhyRejection=1;
+      fEvRejectionBits+=1<<kPileup;
+      accept=kFALSE;
+    }
+  }
+  else if(fOptPileup==kRejectMVPileupEvent){
+    AliAnalysisUtils utils;
+    Bool_t isPUMV = utils.IsPileUpMV(event);
+    if(isPUMV) {
+      if(accept) fWhyRejection=1;
+      fEvRejectionBits+=1<<kPileup;
+      accept=kFALSE;
+    }
+  }
+
 
   // Correcting PP2012 flag to remoce tracks crossing SPD misaligned staves for periods 12def
   if(fApplySPDMisalignedPP2012 && !(event->GetRunNumber()>=195681 && event->GetRunNumber()<=197388)) fApplySPDMisalignedPP2012=false;

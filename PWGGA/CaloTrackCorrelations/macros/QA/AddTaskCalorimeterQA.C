@@ -1,4 +1,5 @@
 /// \file AddTaskCalorimeterQA.C
+/// \ingroup CaloTrackCorrMacrosQA
 /// \brief Configuration of EMCal QA
 ///
 /// Configuration macro of EMCal detector QA analysis, although it can be
@@ -6,7 +7,7 @@
 ///
 /// Wagon contacts: EMCAL Gustavo.Conesa.Balbastre@cern.ch, Marie.Germain@cern.ch
 ///
-/// \author : Gustavo Conesa Balbastre <Gustavo.Conesa.Balbastre@cern.ch>, (LPSC-CNRS)
+/// \author Gustavo Conesa Balbastre <Gustavo.Conesa.Balbastre@cern.ch>, (LPSC-CNRS)
 ///
 
 
@@ -166,7 +167,9 @@ AliAnalysisTaskCaloTrackCorrelation *AddTaskCalorimeterQA(const char *suffix="de
   emcalQA->SetCalorimeter("EMCAL");
   if(simulation)
   {
-    emcalQA->SwitchOnDataMC() ;//Access MC stack and fill more histograms, AOD MC not implemented yet.
+    // Access MC stack and fill more histograms
+    emcalQA->SwitchOnDataMC() ;
+    
     emcalQA->SwitchOffStudyBadClusters();
     emcalQA->SwitchOffFillAllCellTimeHisto();
   }

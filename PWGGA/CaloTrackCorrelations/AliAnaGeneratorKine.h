@@ -5,6 +5,7 @@
 
 //___________________________________________________________________________
 /// \class AliAnaGeneratorKine
+/// \ingroup CaloTrackCorrelationsAnalysis 
 /// \brief Get trigger particles/partons/jets and correlations at generator level.
 ///
 /// Do direct photon/decay photon (eta, pi0, other)/pi0/eta isolation
@@ -21,7 +22,6 @@
 // --- ROOT ---
 class TH2F ;
 class TParticle ;
-class AliStack ;
 class TLorentzVector ;
 
 // --- ANALYSIS ---
@@ -96,9 +96,6 @@ private:
   Float_t          fMinChargedPt;           //!<! Minimum energy for charged particles in correlation
   Float_t          fMinNeutralPt;           //!<! Minimum energy for neutral particles in correlation
   
-  AliStack       * fStack;                  //!<! access ESD stack
-  TClonesArray   * fAODMCparticles ;        //!<! access AOD stack
-
 //  TParticle      * fParton2;              //!<! Initial state Parton
 //  TParticle      * fParton3;              //!<! Initial state Parton
   

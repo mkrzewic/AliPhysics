@@ -5,6 +5,7 @@
 
 //_________________________________________________________________________
 /// \class AliAnaElectron
+/// \ingroup CaloTrackCorrelationsAnalysis 
 /// \brief Selection of electron clusters in calorimeter.
 ///
 /// Class for the electron identification,
@@ -27,7 +28,6 @@ class TObjString;
 
 // --- ANALYSIS system ---
 #include "AliAnaCaloTrackCorrBaseClass.h"
-class AliStack;
 class TParticle;
 
 class TList ;
