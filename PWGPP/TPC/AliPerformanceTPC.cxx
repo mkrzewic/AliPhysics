@@ -185,9 +185,6 @@ AliPerformanceTPC::AliPerformanceTPC(const Char_t* name, const Char_t* title,Int
 //  fFolderObj(NULL),
 //  fAnalysisFolder(NULL),
 //  fUseHLT(that.fUseHLT),
-//  fMult(that.fMult),
-//  fMultP(that.fMultP),
-//  fMultN(that.fMultN),
 //  h_tpc_clust_0_1_2(NULL),
 //  h_tpc_event_recvertex_0(NULL),
 //  h_tpc_event_recvertex_1(NULL),
@@ -227,9 +224,6 @@ AliPerformanceTPC::AliPerformanceTPC(const Char_t* name, const Char_t* title,Int
 //  fFolderObj = NULL;
 //  fAnalysisFolder = NULL;
 //  fUseHLT = that.fUseHLT;
-//  fMult(that.fMult),
-//  fMultP(that.fMultP),
-//  fMultN(that.fMultN),
 //  h_tpc_clust_0_1_2=NULL;
 //  h_tpc_event_recvertex_0=NULL;
 //  h_tpc_event_recvertex_1=NULL;
@@ -258,6 +252,7 @@ AliPerformanceTPC::AliPerformanceTPC(const Char_t* name, const Char_t* title,Int
 //  h_tpc_track_neg_recvertex_4_5_6=NULL;
 //  return *this;
 //}
+
 //_____________________________________________________________________________
 AliPerformanceTPC::~AliPerformanceTPC()
 {

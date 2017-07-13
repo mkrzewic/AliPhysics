@@ -210,12 +210,11 @@ AliPerformanceTask* AddTaskPerformanceTPCdEdxQA(Bool_t bUseMCInfo=kFALSE, Bool_t
     Error("AddTaskPerformanceTPC", "Cannot create AliPerformanceEff");
   }
 
-  AliRecInfoCuts *pRecInfoCutsTPC2 = NULL;
   if (bTPCTrackingOnly)
   {
     //For low pt tracks, HLT finds only short track segments.
     //Hence, for the tpc-tracking only tracking-efficiency, we lower the minimum number of hits per reconstructed TPC track
-    pRecInfoCutsTPC2 = new AliRecInfoCuts(*pRecInfoCutsTPC); 
+    AliRecInfoCuts *pRecInfoCutsTPC2 = new AliRecInfoCuts(*pRecInfoCutsTPC);
     pRecInfoCutsTPC2->SetMinNClustersTPC(20);
     pCompEff5->SetAliRecInfoCuts(pRecInfoCutsTPC2);
   }
