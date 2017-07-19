@@ -49,6 +49,10 @@ set(SRCS
     AliAnalysisTaskRhoMass.cxx
     AliAnalysisTaskRhoMassSparse.cxx
     AliAnalysisTaskRhoSparse.cxx
+    AliAnalysisTaskJetUE.cxx
+    AliAnalysisTaskRhoBaseDev.cxx
+    AliAnalysisTaskRhoDev.cxx
+    AliAnalysisTaskRhoTransDev.cxx
     AliAnalysisTaskScale.cxx
     AliEmcalJetByJetCorrection.cxx
     AliEmcalPicoTrackInGridMaker.cxx
@@ -126,6 +130,8 @@ set(SRCS
     Tracks/AliAnalysisTaskEmcalPatchMasking.cxx
     Tracks/AliAnalysisTaskEmcalNoiseTriggers.cxx
     Tracks/AliAnalysisTaskCountITStracks.cxx
+    Tracks/AliAnalysisTaskEmcalTriggerJets.cxx
+    UserTasks/AliAnalysisTaskJetUEStudies.cxx
     UserTasks/AliAnalysisTaskBackFlucRandomCone.cxx
     UserTasks/AliAnalysisTaskChargedJetsPA.cxx
     UserTasks/AliAnalysisTaskChargedJetsHadronCF.cxx
@@ -164,7 +170,6 @@ set(SRCS
     UserTasks/AliAnalysisTaskEmcalRun2QA.cxx
     UserTasks/AliAnalysisTaskEmcalQGTagging.cxx
     UserTasks/AliAnalysisTaskFakeJets.cxx
-    UserTasks/AliAnalysisTaskEmcalJetShapesMC.cxx
     UserTasks/AliAnalysisTaskEmcalMissingEnergy.cxx
     UserTasks/AliAnalysisTaskEmcalNeutralJets.cxx
     UserTasks/AliAnalysisTaskEmcalTriggerPatchJetMatch.cxx
@@ -191,7 +196,7 @@ set(SRCS
     UserTasks/AliAnalysisTaskSoftDrop.cxx
     UserTasks/AliAnalysisTaskTriggerRejection.cxx
     UserTasks/AliAnalysisTaskV0sInJetsEmcal.cxx
-    UserTasks/AliEmcalPicoTrackFromJetMaker.cxx  
+    UserTasks/AliEmcalPicoTrackFromJetMaker.cxx
     UserTasks/AliAnalysisTaskPi0Hadron.cxx
     UserTasks/AliAnalysisTaskEmcalJetTree.cxx
     UserTasks/AliJetEmbeddingSelRhoTask.cxx
@@ -212,6 +217,7 @@ if(FASTJET_FOUND)
         AliJetEmbeddingFromAODTask.cxx
 	AliJetEmbeddingFromPYTHIATask.cxx
         AliJetShape.cxx
+        UserTasks/AliAnalysisTaskEmcalJetShapesMC.cxx
         UserTasks/AliAnalysisTaskFullpAJets.cxx
         UserTasks/AliAnalysisTaskFullppJet.cxx
         UserTasks/AliAnalysisTaskHJetDphi.cxx
@@ -265,7 +271,7 @@ generate_rootmap("${MODULE}" "${LIBDEPS}" "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}
 # Generate a PARfile target for this library. Note the extra includes ("Tracks UserTasks")
 add_target_parfile(${MODULE} "${SRCS}" "${HDRS}" "${MODULE}LinkDef.h" "${LIBDEPS}" "Tracks UserTasks")
 
-# Create an object to be reused in case of static libraries 
+# Create an object to be reused in case of static libraries
 # Otherwise the sources will be compiled twice
 add_library(${MODULE}-object OBJECT ${SRCS} G__${MODULE}.cxx)
 # Add a library to the project using the object

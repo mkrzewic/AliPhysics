@@ -28,6 +28,7 @@
 
 class TString;
 class TList;
+class TProfile2D;
 class AliFlowEventSimple;
 class AliFlowEvent;
 class AliFlowAnalysisCRC;
@@ -91,10 +92,6 @@ public:
   Bool_t GetUseQvectorTerms() const {return this->fUseQvectorTerms;};
   void SetWeightsList(TList* const kList) {this->fWeightsList = (TList*)kList->Clone();};
   TList* GetWeightsList() const {return this->fWeightsList;};
-  void SetWeightsListChDep(TList* const kList) {this->fWeightsListChDep = (TList*)kList->Clone();};
-  TList* GetWeightsListChDep() const {return this->fWeightsListChDep;};
-  void SetWeightsListVtxDep(TList* const kList) {this->fWeightsListVtxDep = (TList*)kList->Clone();};
-  TList* GetWeightsListVtxDep() const {return this->fWeightsListVtxDep;};
   
   // Multiparticle correlations vs multiplicity:
   void SetnBinsMult(Int_t const nbm) {this->fnBinsMult = nbm;};
@@ -166,6 +163,8 @@ public:
   Bool_t GetCalculateCRCPt() const {return this->fCalculateCRCPt;};
   void SetCalculateCME(Bool_t const cCRC) {this->fCalculateCME = cCRC;};
   Bool_t GetCalculateCME() const {return this->fCalculateCME;};
+  void SetCalculateCRCInt(Bool_t const cCRC) {this->fCalculateCRCInt = cCRC;};
+  Bool_t GetCalculateCRCInt() const {return this->fCalculateCRCInt;};
   void SetCalculateCRC2(Bool_t const cCRC) {this->fCalculateCRC2 = cCRC;};
   Bool_t GetCalculateCRC2() const {return this->fCalculateCRC2;};
   void SetCalculateCRCVZ(Bool_t const cCRC) {this->fCalculateCRCVZ = cCRC;};
@@ -196,6 +195,8 @@ public:
   Bool_t GetInvertZDC() const {return this->fInvertZDC;};
   void SetTestSin(Bool_t const cCRC) {this->fCRCTestSin = cCRC;};
   Bool_t GetTestSin() const {return this->fCRCTestSin;};
+  void SetRecenterZDCVtxRbR(Bool_t const cCRC) {this->fVtxRbR = cCRC;};
+  Bool_t GetRecenterZDCVtxRbR() const {return this->fVtxRbR;};
   void SetNUAforCRC(Bool_t const cCRC) {this->fUseNUAforCRC = cCRC;};
   Bool_t GetNUAforCRC() const {return this->fUseNUAforCRC;};
   void SetUseCRCRecenter(Bool_t const cCRC) {this->fUseCRCRecenter = cCRC;};
@@ -207,6 +208,8 @@ public:
   TList* GetZDCESEList() const {return this->fZDCESEList;};
   void SetCRCZDCCalibList(TList* const wlist) {this->fCRCZDCCalibList = (TList*)wlist->Clone();}
   TList* GetCRCZDCCalibList() const {return this->fCRCZDCCalibList;}
+  void SetCRCVZEROCalibList(TList* const wlist) {this->fCRCVZEROCalibList = (TList*)wlist->Clone();}
+  TList* GetCRCVZEROCalibList() const {return this->fCRCVZEROCalibList;}
   void SetCRCZDCResList(TList* const wlist) {this->fCRCZDCResList = (TList*)wlist->Clone();}
   TList* GetCRCZDCResList() const {return this->fCRCZDCResList;}
   void SetnCenBin(Int_t const n) {this->fnCenBin = n;};
@@ -223,10 +226,16 @@ public:
   TString GetInteractionRate() const {return this->fInteractionRate;}
   void SetSelectCharge(TString const n) {this->fSelectCharge = n;};
   TString GetSelectCharge() const {return this->fSelectCharge;}
+  void SetPOIExtraWeights(TString const n) {this->fPOIExtraWeights = n;};
+  TString GetPOIExtraWeights() const {return this->fPOIExtraWeights;}
   void SetCorrWeight(TString const n) {this->fCorrWeight = n;};
   TString GetCorrWeight() const {return this->fCorrWeight;};
   void SetCenWeightsHist(TH1D* const n) {this->fCenWeightsHist = n;};
   TH1D* GetCenWeightsHist() const {return this->fCenWeightsHist;};
+  void SetRefMultRbRPro(TProfile2D* const n) {this->fRefMultRbRPro = n;};
+  void SetAvEZDCRbRPro(TProfile2D* const A, TProfile2D* const B) {this->fAvEZDCCRbRPro = A; this->fAvEZDCARbRPro = B;};
+  void SetPhiExclZoneHist(TH2D* const n) {this->fPhiExclZoneHist = n;};
+  TH2D* GetPhiExclZoneHist() const {return this->fPhiExclZoneHist;};
   void SetPtWeightsHist(TH1D* const n, Int_t c) {this->fPtWeightsHist[c] = n;};
   TH1D* GetPtWeightsHist(Int_t c) const {return this->fPtWeightsHist[c];};
   void SetEtaWeightsHist(TH1D* const n, Int_t h, Int_t b, Int_t c) {this->fEtaWeightsHist[h][b][c] = n;};
@@ -244,6 +253,7 @@ public:
   void SetMaxDevZN(Float_t weights) {this->fMaxDevZN = weights;};
   Float_t GetMaxDevZN() const {return this->fMaxDevZN;};
   void SetZDCGainAlpha( Float_t a ) { fZDCGainAlpha = a; }
+  void SetUseTracklets(Bool_t const cCRC) {this->fUseTracklets = cCRC;};
   
 private:
   AliAnalysisTaskCRC(const AliAnalysisTaskCRC& aatqc);
@@ -292,8 +302,6 @@ private:
   Bool_t fUseZDCESEMulWeights;        // use ZDC-ESE mult. weights
   Bool_t fUseZDCESESpecWeights;       // use ZDC-ESE mult. weights
   TList *fWeightsList;                // list with weights
-  TList *fWeightsListChDep;           // list with weights ch dep
-  TList *fWeightsListVtxDep;          // list with weights vtx dep
   // Event weights:
   TString *fMultiplicityWeight;       // event-by-event weights for multiparticle correlations ("combinations","unit" or "multiplicity")
   AliFlowCommonConstants::ERefMultSource fMultiplicityIs;           // by default "#RPs", other supported options are "RefMultFromESD" = ref. mult. from ESD, and "#POIs"
@@ -313,6 +321,7 @@ private:
   Bool_t fCalculateCRC; // calculate CRC quantities
   Bool_t fCalculateCRCPt;
   Bool_t fCalculateCME;
+  Bool_t fCalculateCRCInt;
   Bool_t fCalculateCRC2;
   Bool_t fCalculateCRCVZ;
   Bool_t fCalculateCRCZDC;
@@ -328,6 +337,7 @@ private:
   Bool_t fDivSigma;
   Bool_t fInvertZDC;
   Bool_t fCRCTestSin;
+  Bool_t fVtxRbR;
   Bool_t fUseNUAforCRC;
   Bool_t fUseCRCRecenter;
   Double_t fCRCEtaMin;
@@ -339,23 +349,30 @@ private:
   TString fDataSet;
   TString fInteractionRate;
   TString fSelectCharge;
+  TString fPOIExtraWeights;
   TString fCorrWeight;
   TList *fQVecList;       // list with weights
   TList *fCRCZDCCalibList; // ZDC calibration
+  TList *fCRCVZEROCalibList; // ZDC calibration
   TList *fCRCZDCResList; // ZDC rescaling
   TList *fZDCESEList;       // list with weights
   TH1D* fCenWeightsHist;
+  TProfile2D *fRefMultRbRPro;
+  TProfile2D *fAvEZDCCRbRPro;
+  TProfile2D *fAvEZDCARbRPro;
   TH1D* fPtWeightsHist[10];
   TH1D* fEtaWeightsHist[10][21][2];
   TH1D* fNvsCenCut[2][2]; //! ZDC mult cuts
   TH2F* fZDCESEMultWeightsHist[5];
   TH2F* fZDCESESpecWeightsHist[5];
+  TH2D* fPhiExclZoneHist;
   Bool_t fQAZDCCuts;
   Int_t fMinMulZN;
   Float_t fMaxDevZN;
   Float_t fZDCGainAlpha;
+  Bool_t fUseTracklets;
   
-  ClassDef(AliAnalysisTaskCRC, 9);
+  ClassDef(AliAnalysisTaskCRC,11);
 };
 
 //================================================================================================================

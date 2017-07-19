@@ -1,10 +1,11 @@
 /// \file AddTaskGammaJetCorrelation.C
+/// \ingroup CaloTrackCorrMacros
 /// \brief gamma-jet correlation configuration.
 ///
 /// Configuration of the gamma-jet correlation analysis
 /// based on AddTaskIsoPhoton by Gustavo Conesa & Marie Germain.
 ///
-/// \author : Adam Matyja <Adam.Matyja@cern.ch>, INP-PAN-Krakow.
+/// \author Adam Matyja <Adam.Matyja@cern.ch>, INP-PAN-Krakow.
 ///
 
 /// Global name to be composed of the settings, used to set the AOD branch name
@@ -236,18 +237,6 @@ AliCaloTrackReader * ConfigureReader(TString inputDataType = "AOD",TString calor
   //Delta AOD?
   //reader->SetDeltaAODFileName("");
   //if(kOutputAOD) reader->SwitchOnWriteDeltaAOD()  ;
-  
-  // MC settings
-  if(useKinematics){
-    if(inputDataType == "ESD"){
-      reader->SwitchOnStack();          
-      reader->SwitchOffAODMCParticles(); 
-    }
-    else if(inputDataType == "AOD"){
-      reader->SwitchOffStack();          
-      reader->SwitchOnAODMCParticles(); 
-    }
-  }  
   
   //------------------------
   // Detector input filling

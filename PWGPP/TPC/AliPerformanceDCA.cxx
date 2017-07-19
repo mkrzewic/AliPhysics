@@ -52,7 +52,6 @@
 #include "AliMathBase.h"
 #include "AliRecInfoCuts.h" 
 #include "AliMCInfoCuts.h" 
-#include "AliStack.h" 
 #include "AliMCEvent.h" 
 #include "AliTracker.h"   
 #include "AliHeader.h"   
@@ -134,7 +133,7 @@ void AliPerformanceDCA::Init()
 }
 
 //_____________________________________________________________________________
-void AliPerformanceDCA::ProcessTPC(AliStack* const stack, AliVTrack *const vTrack, AliVEvent* const vEvent)
+void AliPerformanceDCA::ProcessTPC(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent* const vEvent)
 {
   // Fill DCA comparison information
   if(!vEvent || !vTrack) return;
@@ -173,12 +172,12 @@ void AliPerformanceDCA::ProcessTPC(AliStack* const stack, AliVTrack *const vTrac
   //
   // Fill rec vs MC information
   //
-  if(!stack) return;
+  return;
 
 }
 
 //_____________________________________________________________________________
-void AliPerformanceDCA::ProcessTPCITS(AliStack* const stack, AliVTrack *const vTrack, AliVEvent* const vEvent)
+void AliPerformanceDCA::ProcessTPCITS(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent* const vEvent)
 {
   // Fill DCA comparison information
   if(!vTrack) return;
@@ -215,11 +214,11 @@ void AliPerformanceDCA::ProcessTPCITS(AliStack* const stack, AliVTrack *const vT
   //
   // Fill rec vs MC information
   //
-  if(!stack) return;
+  return;
 
 }
 
-void AliPerformanceDCA::ProcessConstrained(AliStack* const /*stack*/, AliVTrack *const /*vTrack*/)
+void AliPerformanceDCA::ProcessConstrained(AliMCEvent* const /*mcev*/, AliVTrack *const /*vTrack*/)
 {
   // Fill DCA comparison information
   
@@ -266,7 +265,6 @@ void AliPerformanceDCA::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent,
   }
   AliHeader* header = 0;
   AliGenEventHeader* genHeader = 0;
-  AliStack* stack = 0;
   TArrayF vtxMC(3);
   
   if(bUseMC)
@@ -279,12 +277,6 @@ void AliPerformanceDCA::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent,
     header = mcEvent->Header();
     if (!header) {
       Error("Exec","Header not available");
-      return;
-    }
-    // MC particle stack
-    stack = mcEvent->Stack();
-    if (!stack) {
-      Error("Exec","Stack not available");
       return;
     }
     // get MC vertex
@@ -304,7 +296,7 @@ void AliPerformanceDCA::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent,
   }
 
   // trigger
-  if(!bUseMC && !GetTriggerClass().IsNull()) {
+  if(!bUseMC &&GetTriggerClass()) {
     Bool_t isEventTriggered = vEvent->IsTriggerClassFired(GetTriggerClass());
     if(!isEventTriggered) return; 
   }
@@ -327,9 +319,9 @@ void AliPerformanceDCA::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent,
   { 
     AliVTrack *track = dynamic_cast<AliVTrack*>(vEvent->GetTrack(iTrack));
     if(!track) continue;
-    if(GetAnalysisMode() == 0) ProcessTPC(stack,track,vEvent);
-    else if(GetAnalysisMode() == 1) ProcessTPCITS(stack,track,vEvent);
-    else if(GetAnalysisMode() == 2) ProcessConstrained(stack,track);
+    if(GetAnalysisMode() == 0) ProcessTPC(mcEvent,track,vEvent);
+    else if(GetAnalysisMode() == 1) ProcessTPCITS(mcEvent,track,vEvent);
+    else if(GetAnalysisMode() == 2) ProcessConstrained(mcEvent,track);
     else {
       printf("ERROR: AnalysisMode %d \n",fAnalysisMode);
       return;

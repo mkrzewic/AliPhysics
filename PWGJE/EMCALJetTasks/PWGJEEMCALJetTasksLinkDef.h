@@ -1,9 +1,11 @@
 #ifdef __CINT__
- 
+
 #pragma link off all globals;
 #pragma link off all classes;
 #pragma link off all functions;
 
+#pragma link C++ class AliAnalysisTaskJetUE+;
+#pragma link C++ class AliAnalysisTaskJetUEStudies+;
 #pragma link C++ class AliAnalysisTaskRhoBase+;
 #pragma link C++ class AliAnalysisTaskRho+;
 #pragma link C++ class AliAnalysisTaskRhoFlow+;
@@ -13,6 +15,9 @@
 #pragma link C++ class AliAnalysisTaskRhoSparse+;
 #pragma link C++ class AliAnalysisTaskRhoMassSparse+;
 #pragma link C++ class AliAnalysisTaskLocalRho+;
+#pragma link C++ class AliAnalysisTaskRhoBaseDev+;
+#pragma link C++ class AliAnalysisTaskRhoDev+;
+#pragma link C++ class AliAnalysisTaskRhoTransDev+;
 #pragma link C++ class AliAnalysisTaskDeltaPt+;
 #pragma link C++ class AliAnalysisTaskScale+;
 #pragma link C++ class AliEmcalJetByJetCorrection+;
@@ -90,7 +95,6 @@
 #pragma link C++ class AliAnalysisTaskEmcalQGTagging+;
 #pragma link C++ class AliAnalysisTaskEmcalRun2QA+;
 #pragma link C++ class AliAnalysisTaskFakeJets+;
-#pragma link C++ class AliAnalysisTaskEmcalJetShapesMC+;
 #pragma link C++ class AliAnalysisTaskEmcalMissingEnergy+;
 #pragma link C++ class AliAnalysisTaskEmcalTriggerPatchJetMatch+;
 #pragma link C++ class AliAnalysisTaskEmcalTriggerInfoQA+;
@@ -199,6 +203,8 @@
 #pragma link C++ class HighPtTracks::AliReducedJetParticle+;
 #pragma link C++ class HighPtTracks::AliReducedJetConstituent+;
 #pragma link C++ class HighPtTracks::AliReducedMatchedTrack+;
+#pragma link C++ namespace EmcalTriggerJets+;
+#pragma link C++ class EmcalTriggerJets::AliAnalysisTaskEmcalTriggerJets+;
 #pragma link C++ class AliAnalysisTaskJetsEvshape+;
 #pragma link C++ class AliJetEmbeddingSelRhoTask+;
 #pragma link C++ class Cumulants+;
@@ -214,6 +220,7 @@
 #pragma link C++ class AliEmcalJetFinder+;
 #pragma link C++ class AliJetEmbeddingFromAODTask+;
 #pragma link C++ class AliJetEmbeddingFromPYTHIATask+;
+#pragma link C++ class AliAnalysisTaskEmcalJetShapesMC+;
 #pragma link C++ class AliAnalysisTaskFullpAJets+;
 #pragma link C++ class AliAnalysisTaskFullppJet;
 #pragma link C++ class AliAnalysisTaskHJetDphi+;

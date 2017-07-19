@@ -57,6 +57,7 @@ set(SRCS
   LRC/AliLRCPtN.cxx
   LRC/AliLRCPtPt.cxx
   LRC/AliLRCProcess.cxx
+  LRC/AliForwardBackwardAnalysis.cxx
   Fluctuations/AliEbyEFluctuationAnalysisTask.cxx
   Fluctuations/AliAnalysisTaskChargeFluctuations.cxx
   Fluctuations/AliEbyEHigherMomentsTask.cxx
@@ -64,6 +65,7 @@ set(SRCS
   Fluctuations/AliHigherMomentsToyModel.cxx
   Fluctuations/AliEbyEMultFluctuationTask.cxx
   Fluctuations/AliEbyEHigherMomentsTaskPID.cxx
+  Fluctuations/AliEbyEPidEfficiencyContamination.cxx
   MeanPtFluctuations/AliAnalysisTaskPtFluc.cxx
   MeanPtFluctuations/AliAnalysisTaskPtFlucPbPb.cxx
   PIDFluctuation/task/AliAnalysisTaskPIDFluctuation.cxx

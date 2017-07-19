@@ -73,8 +73,8 @@ Clusterizer:                                        # Clusterizer component
     enabled: false                                  # Whether to enable the task
     createHistos: false                             # Whether the task should create output histograms
     clusterizer: kClusterizerv2                     # Type of clusterizer to use. Possible options are defined in the header of the clusterizer
-    cellE: 0.05                                     # Minimum cell energy
-    seedE: 0.1                                      # Seed energy threshold
+    cellE: 0.05                                     # Minimum cell energy (GeV)
+    seedE: 0.1                                      # Seed energy threshold (GeV)
     cellTimeMin: -1                                 # Min cell time (s)
     cellTimeMax: +1                                 # Max cell time (s)
     clusterTimeLength: 1                            # Maximum time difference between the digits inside EMC cluster (s)
@@ -90,7 +90,6 @@ Clusterizer:                                        # Clusterizer component
     setCellMCLabelFromCluster: 0                    # Enables setting the cell MC label from the cluster. There are different modes depending on the value
     diffEAggregation: 0.03                          # difference E in aggregation of cells (i.e. stop aggregation if E_{new} > E_{prev} + diffEAggregation)
     useTestPatternForInput: false                   # Use test pattern for input instead of cells. Intended for testing and debugging.
-    embeddedCellEnergyType: kNonEmbedded            # Select which part of the embedded energy to use for clusterization. Disabled by default.
     cellsNames:                                     # Names of the cells input objects which should be attached to the correction
         - defaultCells                              # This object is defined above in the cells section of the input objects
     clusterContainersNames:                         # Names of the cluster input objects which should be attached to the correction
@@ -98,6 +97,9 @@ Clusterizer:                                        # Clusterizer component
 ClusterExotics:                                     # Cluster exotics identification component (actual removal is handled by the cluster container)
     enabled: false                                  # Whether to enable the task
     createHistos: false                             # Whether the task should create output histograms
+    fExoticMinCellAmplitude: 4.                     # Min energy of leading cell in order for exotic cut to be attempted
+    fMaxFcross: 0.97                                # Max value of Fcross = 1-Ecross/ecell allowed for clusters to pass exotic cut
+    fCellCrossMaxTimeDiff: 1e6                      # Max time difference allowed between leading cell and cross cells (in ns)
     cellsNames:                                     # Names of the cells input objects which should be attached to the correction
         - defaultCells                              # This object is defined above in the cells section of the input objects
     clusterContainersNames:                         # Names of the cluster input objects which should be attached to the correction

@@ -13,6 +13,8 @@
 #pragma link C++ class AliAnalysisTaskNOmegaLPK+;
 #pragma link C++ class AliAnalysisTaskOmegaOmegaOX+;
 #pragma link C++ class AliAnalysisTaskNOmegaLX+;
+/// * Ps
+#pragma link C++ class AliAnalysisTaskPsEfficiency+;
 
 /// Nuclei
 /// * DeltaMasses
@@ -30,8 +32,7 @@
 /// * EventCuts
 #pragma link C++ class AliNuclexEventCuts+;
 #pragma link C++ class AliNuclexEventCutsContainer+;
-/// * EventCutsValidation
-#pragma link C++ class AliAnalysisTaskEventCutsValidation+;
+
 /// * Nucleipp
 #pragma link C++ class AliLnID+;
 #pragma link C++ class AliLnHistoMap+;
@@ -41,6 +42,8 @@
 /// * v2
 #pragma link C++ class AliAnalysisTaskNucleiv2+;
 #pragma link C++ class AliAnalysisTaskNucleiv2SP+;
+#pragma link C++ class AliAnalysisTaskNucleiv2pPb+;
+#pragma link C++ class AliAnalysisTaskAllPtcv2+;
 /// * NucleiKine
 #pragma link C++ class AliAnalysisTaskNucleiKine+;
 
@@ -57,6 +60,7 @@
 
 /// * Hyp3body
 #pragma link C++ class AliAnalysisTaskHypertriton3+;
+#pragma link C++ class AliAnalysisTaskHypertriton3Dev+;
 #pragma link C++ class AliAnalysisTaskHypertriton3AOD+;
 
 /// Utils

@@ -5,6 +5,7 @@
 
 //_________________________________________________________________________
 /// \class AliAnaParticleIsolation
+/// \ingroup CaloTrackCorrelationsAnalysis 
 /// \brief Select clusters/tracks with low particle environment in their vecinity,
 /// isolated within a cone.
 ///
@@ -61,7 +62,7 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
 
   void         CalculateNormalizeUEBandPerUnitArea(AliAODPWG4ParticleCorrelation * pCandidate, Float_t coneptsumCluster,
                                                    Float_t coneptsumCell,  Float_t coneptsumTrack,
-                                                   Float_t &coneptsumSubEtaBand, Float_t &coneptsumSubPhiBand ) ;
+                                                   Float_t &coneptsumSubEtaBand, Float_t &coneptsumSubPhiBand, Int_t mcIndex ) ;
   
   TObjString * GetAnalysisCuts() ;
   
@@ -84,7 +85,8 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
   void         FillAcceptanceHistograms();
  
   void         FillTrackMatchingShowerShapeControlHistograms(AliAODPWG4ParticleCorrelation  * pCandidate,
-                                                             Float_t coneptsum, Float_t coneleadpt, Int_t mcIndex) ;
+                                                             Float_t coneptsum,  Float_t coneptsumTrack, Float_t coneptsumCluster, 
+                                                             Float_t coneleadpt, Int_t mcIndex) ;
   
   Bool_t       IsTriggerTheNearSideEventLeadingParticle(Int_t & idLeading);
   
@@ -145,8 +147,8 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
   void         SwitchOnCheckNeutralClustersForLeading() { fCheckLeadingWithNeutralClusters = kTRUE  ; }
   void         SwitchOffCheckNeutralClustersForLeading(){ fCheckLeadingWithNeutralClusters = kFALSE ; }
   
-  void         SwitchOnUEBandSubtractionHistoFill()  { fFillUEBandSubtractHistograms = kTRUE    ; }
-  void         SwitchOffUEBandSubtractionHistoFill() { fFillUEBandSubtractHistograms = kFALSE   ; }
+  void         SwitchOnUEBandSubtractionHistoFill(Int_t lev = 1)  { fFillUEBandSubtractHistograms = lev ; }
+  void         SwitchOffUEBandSubtractionHistoFill() { fFillUEBandSubtractHistograms = 0   ; }
 
   void         SwitchOnCellHistoFill()               { fFillCellHistograms = kTRUE ; }
   void         SwitchOffCellHistoFill()              { fFillCellHistograms = kFALSE; }
@@ -189,6 +191,9 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
   void         SwitchOnStudyExoticTrigger()          { fStudyExoticTrigger = kTRUE  ; }
   void         SwitchOffStudyExoticTrigger()         { fStudyExoticTrigger = kFALSE ; }
 
+  void         SwitchOnStudyNCellsCut()              { fStudyNCellsCut     = kTRUE  ; }
+  void         SwitchOffStudyNCellsCut()             { fStudyNCellsCut     = kFALSE ; }
+  
   // Study of pT cut in cone
   void         SwitchOnStudyPtCutInCone()            { fStudyPtCutInCone = kTRUE ; }
   void         SwitchOffStudyPtCutInCone()           { fStudyPtCutInCone = kFALSE; }
@@ -239,12 +244,11 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
   Bool_t   fFillTMHisto;                              ///<  Fill track matching plots.
   Bool_t   fFillSSHisto;                              ///<  Fill Shower shape plots.
   Bool_t   fFillEMCALRegionHistograms ;               ///<  Fill histograms in EMCal slices
-  Bool_t   fFillUEBandSubtractHistograms;             ///<  Fill histograms working on the UE subtraction.
+  Int_t    fFillUEBandSubtractHistograms;             ///<  Fill histograms working on the UE subtraction. 1 fill basic histograms, 2 more detailed
   Bool_t   fFillCellHistograms;                       ///<  Fill cell histograms.
   Bool_t   fFillOverlapHistograms;                    ///<  Fill histograms that depend on number of overlaps
   Bool_t   fStudyTracksInCone;                        ///<  Study tracks depending on different track info
   Bool_t   fStudyMCConversionRadius;                  ///<  Study shower shape depending the conversion radius
-  Bool_t   fStudyExoticTrigger;                       ///<  Fill histograms with track and cluster pT when the trigger is exotic
   
   Bool_t   fFillTaggedDecayHistograms;                ///<  Fill histograms for clusters tagged as decay.
   Int_t    fNDecayBits ;                              ///<  In case of study of decay triggers, select the decay bit.
@@ -289,9 +293,13 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
   Int_t    fNRCutsInCone;                             ///<  Number of track/cluster max R cut to test in cone for sum pT calculation.
   Float_t  fRCutInCone[10];                           ///<  List of track/cluster max R cut to test in cone for sum pT calculation.
 
+  Bool_t   fStudyNCellsCut;                           ///<  Fill histograms with track and cluster pT depending n cells in cluster
   Int_t    fNNCellsInCandidate;                       ///<  Number of cells in cluster selection to test in cone for sum pT calculation.
   Int_t    fNCellsInCandidate[20];                    ///<  List of Number of cells in cluster selection to test in cone for sum pT calculation.
-
+  Int_t    fNCellsWithWeight;                         ///<  number of cells in cluster with enough energy for shower shape, internal
+  Int_t    fTrigSupMod;                               ///<  super module number of trigger cluster
+ 
+  Bool_t   fStudyExoticTrigger;                       ///<  Fill histograms with track and cluster pT when the trigger is exotic
   Int_t    fNExoCutInCandidate;                       ///<  Number of exoticity cuts in cluster selection to test in cone for sum pT calculation.
   Float_t  fExoCutInCandidate[20];                    ///<  List of exoticity cuts in cluster selection to test in cone for sum pT calculation.
   
@@ -304,6 +312,7 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
  
   AliVCluster*   fCluster;                            //!<! Temporary vcluster, avoid creation per event.
   TObjArray  *   fClustersArr;                        //!<! Temporary ClustersArray, avoid creation per event.
+  AliVCaloCells* fCaloCells;                          //!<! Temporary AliVCaloCells pointer for selected calorimeter candidate, avoid creation per event.
   Bool_t         fIsExoticTrigger;                    //!<! Trigger cluster considered as exotic
   Float_t        fClusterExoticity;                   //!<! Temporary container or currently analyzed cluster exoticity
 
@@ -541,8 +550,8 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
   TH2F *   fhPtLambda0MCWith1Overlap    [fgkNmcTypes][2];           //!<! Shower shape of (non) isolated candidates originated by mcTypes particle (do not apply SS cut previously). At least one overlap from other particles.
   TH2F *   fhPtLambda0MCConvWith1Overlap[fgkNmcTypes][2];           //!<! Shower shape of (non) isolated candidates originated by mcTypes particle that converted (do not apply SS cut previously). At least one overlap from other particles.
 
-  TH2F *   fhPtLambda0MCWithNOverlap    [fgkNmcTypes][2];           //!<! Shower shape of (non) isolated candidates originated by mcTypes particle (do not apply SS cut previously). More tha one overlap from other particles.
-  TH2F *   fhPtLambda0MCConvWithNOverlap[fgkNmcTypes][2];           //!<! Shower shape of (non) isolated candidates originated by mcTypes particle that converted (do not apply SS cut previously). More tha one overlap from other particles.
+  TH2F *   fhPtLambda0MCWithNoOverlap    [fgkNmcTypes][2];          //!<! Shower shape of (non) isolated candidates originated by mcTypes particle (do not apply SS cut previously). More tha one overlap from other particles.
+  TH2F *   fhPtLambda0MCConvWithNoOverlap[fgkNmcTypes][2];          //!<! Shower shape of (non) isolated candidates originated by mcTypes particle that converted (do not apply SS cut previously). More tha one overlap from other particles.
   
   TH2F *   fhPtNOverlap    [fgkNmcTypes][2];                        //!<! Number of overlaps of (non) isolated candidates originated by mcTypes (do not apply SS cut previously). More tha one overlap from other particles.
   TH2F *   fhPtNOverlapConv[fgkNmcTypes][2];                        //!<! Number of overlaps of (non) isolated candidates originated by mcTypes particle that converted (do not apply SS cut previously). More tha one overlap from other particles.
@@ -609,10 +618,16 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
     
   /// Candidate Pt distribution depending on bin of cone sum pt.
   TH1F **  fhSumPtConeBin  ;                           //![fNBkgBin]
+  
+  /// Candidate Pt distribution depending on bin of cone sum pt after ue subtraction from eta band.
+  TH1F **  fhSumPtConeAfterEtaBandUESubBin  ;          //![fNBkgBin]
     
   /// Candidate Pt distribution depending on bin of cone leading particle, per MC particle.
   TH1F **  fhPtLeadConeBinMC ;                         //![fNBkgBin*fgkNmcTypes]
     
+  /// Candidate Pt distribution depending on bin of cone sum pt after ue subtraction from eta band, per MC particle.
+  TH1F **  fhSumPtConeAfterEtaBandUESubBinMC  ;        //![fNBkgBin*fgkNmcTypes]
+  
   /// Candidate Pt distribution depending on bin of cone sum pt, per MC particle.
   TH1F **  fhSumPtConeBinMC  ;                         //![fNBkgBin*fgkNmcTypes]
 
@@ -627,9 +642,15 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
     
   /// Candidate shower shape distribution depending on bin of cone sum pt.
   TH2F **  fhSumPtConeBinLambda0  ;                    //![fNBkgBin]
+  
+  /// Candidate shower shape distribution depending on bin of cone sum pt after UE subtraction from eta band.
+  TH2F **  fhSumPtConeAfterEtaBandUESubBinLambda0  ;   //![fNBkgBin]
     
   /// Candidate shower shape distribution depending on bin of cone leading particle, per MC particle.
   TH2F **  fhPtLeadConeBinLambda0MC ;                  //![fNBkgBin*fgkNmcTypes]
+  
+  /// Candidate shower shape distribution depending on bin of cone leading particle after UE subtraction from eta band, per MC particle.
+  TH2F **  fhSumPtConeAfterEtaBandUESubBinLambda0MC ;  //![fNBkgBin*fgkNmcTypes]
     
   /// Candidate shower shape distribution depending on bin of cone sum pt, per MC particle.
   TH2F **  fhSumPtConeBinLambda0MC  ;                  //![fNBkgBin*fgkNmcTypes]
@@ -639,31 +660,66 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
     
   /// Candidate pt bin, distribution of cone sum particle pt.
   TH1F **  fhPtTrigBinSumPtCone  ;                     //![fNPtTrigBin]
+  /// Candidate pt bin, distribution of cone sum track pt.
+  TH1F **  fhPtTrigBinSumPtTrackCone  ;                //![fNPtTrigBin]
+  /// Candidate pt bin, distribution of cone sum cluster pt.
+  TH1F **  fhPtTrigBinSumPtClusterCone  ;              //![fNPtTrigBin]
 
   /// Candidate pt bin, distribution of cone leading particle pt, per MC particle.
   TH1F **  fhPtTrigBinPtLeadConeMC ;                   //![fNPtTrigBin*fgkNmcTypes]
     
   /// Candidate pt bin, distribution of cone sum particle pt, per MC particle.
   TH1F **  fhPtTrigBinSumPtConeMC  ;                   //![fNPtTrigBin*fgkNmcTypes]
+  /// Candidate pt bin, distribution of cone sum track pt, per MC particle.
+  TH1F **  fhPtTrigBinSumPtTrackConeMC  ;              //![fNPtTrigBin*fgkNmcTypes]
+  /// Candidate pt bin, distribution of cone sum cluster pt, per MC particle.
+  TH1F **  fhPtTrigBinSumPtClusterConeMC  ;            //![fNPtTrigBin*fgkNmcTypes]
   
   /// Candidate pt bin, distribution of cone leading particle pt, tagged as decay.
   TH1F **  fhPtTrigBinPtLeadConeDecay ;                //![fNBkgBin*fNDecayBits]
   
   /// Candidate pt bin, distribution of cone sum particle pt, tagged as decay.
   TH1F **  fhPtTrigBinSumPtConeDecay  ;                //![fNBkgBin*fNDecayBits]
+  /// Candidate pt bin, distribution of cone sum track pt, tagged as decay.
+  TH1F **  fhPtTrigBinSumPtTrackConeDecay  ;           //![fNBkgBin*fNDecayBits]
+  /// Candidate pt bin, distribution of cone sum cluster pt, tagged as decay.
+  TH1F **  fhPtTrigBinSumPtClusterConeDecay  ;         //![fNBkgBin*fNDecayBits]
 
   /// Candidate shower shape distribution depending vs cone leading particle in pT trigger bins.
   TH2F **  fhPtTrigBinLambda0vsPtLeadCone ;            //![fNPtTrigBin]
     
   /// Candidate shower shape distribution depending vs of cone sum pt in pT trigger bins.
   TH2F **  fhPtTrigBinLambda0vsSumPtCone  ;            //![fNPtTrigBin]
-    
+  /// Candidate shower shape distribution depending vs of cone sum track pt in pT trigger bins.
+  TH2F **  fhPtTrigBinLambda0vsSumPtTrackCone  ;       //![fNPtTrigBin]
+  /// Candidate shower shape distribution depending vs of cone sum cluster pt in pT trigger bins.
+  TH2F **  fhPtTrigBinLambda0vsSumPtClusterCone  ;     //![fNPtTrigBin]
+
+  
   /// Candidate shower shape distribution depending vs cone leading particle in pT trigger bins, per MC particle.
   TH2F **  fhPtTrigBinLambda0vsPtLeadConeMC ;          //![fNPtTrigBin*fgkNmcTypes]
     
   /// Candidate shower shape distribution depending vs cone sum pt in pT trigger bins, per MC particle.
   TH2F **  fhPtTrigBinLambda0vsSumPtConeMC  ;          //![fNPtTrigBin*fgkNmcTypes]
+  /// Candidate shower shape distribution depending vs cone sum pt track in pT trigger bins, per MC particle.
+  TH2F **  fhPtTrigBinLambda0vsSumPtTrackConeMC  ;     //![fNPtTrigBin*fgkNmcTypes]
+  /// Candidate shower shape distribution depending vs cone sum pt cluster in pT trigger bins, per MC particle.
+  TH2F **  fhPtTrigBinLambda0vsSumPtClusterConeMC  ;   //![fNPtTrigBin*fgkNmcTypes]
 
+  /// Candidate shower shape distribution depending vs cone sum pt in pT trigger bins, per MC particle, candidate without overlaps
+  TH2F **  fhPtTrigBinLambda0vsSumPtConeMCNoOverlap  ;          //![fNPtTrigBin*fgkNmcTypes]
+  /// Candidate shower shape distribution depending vs cone sum pt track in pT trigger bins, per MC particle,, candidate without overlaps
+  TH2F **  fhPtTrigBinLambda0vsSumPtTrackConeMCNoOverlap  ;     //![fNPtTrigBin*fgkNmcTypes]
+  /// Candidate shower shape distribution depending vs cone sum pt cluster in pT trigger bins, per MC particle, candidate without overlaps
+  TH2F **  fhPtTrigBinLambda0vsSumPtClusterConeMCNoOverlap  ;   //![fNPtTrigBin*fgkNmcTypes]
+
+  /// Candidate shower shape distribution depending vs cone sum pt in pT trigger bins, per MC particle, candidate with at least 1 overlap
+  TH2F **  fhPtTrigBinLambda0vsSumPtConeMC1Overlap  ;          //![fNPtTrigBin*fgkNmcTypes]
+  /// Candidate shower shape distribution depending vs cone sum pt track in pT trigger bins, per MC particle, candidate with at least 1 overlap
+  TH2F **  fhPtTrigBinLambda0vsSumPtTrackConeMC1Overlap  ;     //![fNPtTrigBin*fgkNmcTypes]
+  /// Candidate shower shape distribution depending vs cone sum pt cluster in pT trigger bins, per MC particle, candidate with at least 1 overlap
+  TH2F **  fhPtTrigBinLambda0vsSumPtClusterConeMC1Overlap  ;   //![fNPtTrigBin*fgkNmcTypes]
+  
   // Local maxima
   TH2F *   fhNLocMax[2];                               //!<! Number of maxima in selected clusters.
   TH2F *   fhELambda0LocMax1[2] ;                      //!<! E vs lambda0 of selected cluster, 1 local maxima in cluster.
@@ -710,10 +766,21 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
   TH2F *   fhConeSumPtClusterPerRCutLargePtTrig;         //!<! Clusters Sum Pt in the cone for different cone sizes, x axis. Trigger pT > 10 GeV fixed
   TH2F *   fhConeSumPtTrackPerRCut;                      //!<! Tracks Sum Pt in the cone for different cone sizes, x axis.
   TH2F *   fhConeSumPtTrackPerRCutLargePtTrig;           //!<! Tracks Sum Pt in the cone for different cone sizes, x axis. Trigger pT > 10 GeV fixed
+
+  TH2F *   fhConeNClusterPerMinPtCut;                    //!<! N Clusters in the cone for different min pT cuts, x axis.
+  TH2F *   fhConeNClusterPerMinPtCutLargePtTrig;         //!<! N Clusters in the cone for different min pT cuts, x axis. Trigger pT > 10 GeV fixed
+  TH2F *   fhConeNTrackPerMinPtCut;                      //!<! N Tracks in the cone for different min pT cuts, x axis.
+  TH2F *   fhConeNTrackPerMinPtCutLargePtTrig;           //!<! N Tracks in the cone for different min pT cuts, x axis. Trigger pT > 10 GeV fixed
+  TH2F *   fhPerpConeNTrackPerMinPtCut;                  //!<! N Tracks in the perpendicular cone for different min pT cuts, x axis.
+  TH2F *   fhPerpConeNTrackPerMinPtCutLargePtTrig;       //!<! N Tracks in the perpendicular cone for different min pT cuts, x axis. Trigger pT > 10 GeV fixed
+
   TH2F *   fhConeSumPtClusterPerMinPtCut;                //!<! Clusters Sum Pt in the cone for different min pT cuts, x axis.
   TH2F *   fhConeSumPtClusterPerMinPtCutLargePtTrig;     //!<! Clusters Sum Pt in the cone for different min pT cuts, x axis. Trigger pT > 10 GeV fixed
   TH2F *   fhConeSumPtTrackPerMinPtCut;                  //!<! Tracks Sum Pt in the cone for different min pT cuts, x axis.
   TH2F *   fhConeSumPtTrackPerMinPtCutLargePtTrig;       //!<! Tracks Sum Pt in the cone for different min pT cuts, x axis. Trigger pT > 10 GeV fixed
+  TH2F *   fhPerpConeSumPtTrackPerMinPtCut;              //!<! Tracks Sum Pt in the perpendicular cone for different min pT cuts, x axis.
+  TH2F *   fhPerpConeSumPtTrackPerMinPtCutLargePtTrig;   //!<! Tracks Sum Pt in the perpendicular cone for different min pT cuts, x axis. Trigger pT > 10 GeV fixed
+  
   TH2F *   fhConeSumPtClusterPerMaxPtCut;                //!<! Clusters Sum Pt in the cone for different max pT cuts, x axis.
   TH2F *   fhConeSumPtClusterPerMaxPtCutLargePtTrig;     //!<! Clusters Sum Pt in the cone for different max pT cuts, x axis. Trigger pT > 10 GeV fixed
   TH2F *   fhConeSumPtTrackPerMaxPtCut;                  //!<! Tracks Sum Pt in the cone for different max pT cuts, x axis.
@@ -725,15 +792,22 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
   TH2F *   fhPtClusterInConePerNCellCutLargePtTrig;      //!<! Clusters Pt in the cone for different min cluster n cell cut, x axis. Trigger pT > 10 GeV fixed
   TH2F *   fhPtTrackInConePerNCellCut;                   //!<! Tracks Pt in the cone for different min cluster n cell cut, x axis.
   TH2F *   fhPtTrackInConePerNCellCutLargePtTrig;        //!<! Tracks Pt in the cone for different min cluster n cell cut, x axis. Trigger pT > 10 GeV fixed
+
   TH2F *   fhConeSumPtClusterPerNCellCut;                //!<! Clusters Sum Pt in the cone for different min cluster n cell cut, x axis.
   TH2F *   fhConeSumPtClusterPerNCellCutLargePtTrig;     //!<! Clusters Sum Pt in the cone for different min cluster n cell cut, x axis. Trigger pT > 10 GeV fixed
   TH2F *   fhConeSumPtTrackPerNCellCut;                  //!<! Tracks Sum Pt in the cone for different min cluster n cell cut, x axis.
   TH2F *   fhConeSumPtTrackPerNCellCutLargePtTrig;       //!<! Tracks Sum Pt in the cone for different min cluster n cell cut, x axis. Trigger pT > 10 GeV fixed
+  
+  TH3F *   fhPtClusterInConePerNCellPerSM [4];           //!<! Clusters Pt in the cone for different min cluster n cell cut, x axis vs SM number, 8<E<12 GeV, 3 shower bins
+  TH3F *   fhPtTrackInConePerNCellPerSM   [4];           //!<! Tracks Pt in the cone for different min cluster n cell cut, x axis, vs SM number, 8<E<12 GeV, 3 shower bins
+  TH3F *   fhConeSumPtClusterPerNCellPerSM[4];           //!<! Clusters Sum Pt in the cone for different min cluster n cell cut, x axis, vs SM number, 8<E<12 GeV, 3 shower bins
+  TH3F *   fhConeSumPtTrackPerNCellPerSM  [4];           //!<! Tracks Sum Pt in the cone for different min cluster n cell cut, x axis, vs SM number, 8<E<12 GeV, 3 shower bins
 
   TH2F *   fhPtClusterInConePerExoCut;                   //!<! Clusters Pt in the cone for different exoticity cut, x axis.
   TH2F *   fhPtClusterInConePerExoCutLargePtTrig;        //!<! Clusters Pt in the cone for different exoticity cut, x axis. Trigger pT > 10 GeV fixed
   TH2F *   fhPtTrackInConePerExoCut;                     //!<! Tracks Pt in the cone for different exoticity cut, x axis.
   TH2F *   fhPtTrackInConePerExoCutLargePtTrig;          //!<! Tracks Pt in the cone for different exoticity cut, x axis. Trigger pT > 10 GeV fixed
+
   TH2F *   fhConeSumPtClusterPerExoCut;                  //!<! Clusters Sum Pt in the cone for different exoticity cut, x axis.
   TH2F *   fhConeSumPtClusterPerExoCutLargePtTrig;       //!<! Clusters Sum Pt in the cone for different exoticity cut, x axis. Trigger pT > 10 GeV fixed
   TH2F *   fhConeSumPtTrackPerExoCut;                    //!<! Tracks Sum Pt in the cone for different exoticity cut, x axis.
@@ -745,9 +819,11 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
   TH2F *   fhPtTrackInConeTOFBC0;                        //!<! track with TOF hit, pt, tof in BC0 
   TH2F *   fhPtTrackInConeTOFBCN;                        //!<! track with TOF hit, pt, tof not in BC0 
   TH2F *   fhPtTrackInConeTOFNo ;                        //!<! track without TOF hit, pt 
+
   TH2F *   fhPhiTrackInCone;                             //!<! track azhimuthal angle
   TH2F *   fhEtaTrackInCone;                             //!<! track pseudo-rapidity
   TH2F *   fhEtaPhiTrackInCone;                          //!<! track azhimuthal angle vs pseudo-rapidity
+  
   TH2F *   fhPhiTrackInConeTOFBC0;                       //!<! track with TOF hit, phi, tof in BC0 
   TH2F *   fhPhiTrackInConeTOFBCN;                       //!<! track with TOF hit, phi, tof not in BC0 
   TH2F *   fhPhiTrackInConeTOFNo ;                       //!<! track without TOF hit, phi 
@@ -791,6 +867,9 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
   TH2F *   fhPtInPerpConeTOFBC0ITSRefitOnSPDOn ;         //!<! track Pt  in cone at the perpendicular phi region to trigger axis  (phi +90), ITS Refit On, SPD On, TOF BC=0
   TH2F *   fhEtaPhiInPerpConeTOFBC0ITSRefitOnSPDOn ;     //!<! tracl eta vs phi in cone at the perpendicular phi region to trigger axis  (phi +90), ITS Refit On, SPD On, TOF BC=0
   
+  TH2F *   fhPtTrackInConeDCA[3];                        //!<! track DCAxy,z,constrained vs track pT, in cone with trigger pT > 10 GeV
+  TH2F *   fhPtTrackInPerpConeDCA[3];                    //!<! track DCAxy,z,constrained vs track pT, in perpendicular cone trigger pT > 10 GeV
+   
   /// Copy constructor not implemented.
   AliAnaParticleIsolation(              const AliAnaParticleIsolation & iso) ;
     
@@ -798,7 +877,7 @@ class AliAnaParticleIsolation : public AliAnaCaloTrackCorrBaseClass {
   AliAnaParticleIsolation & operator = (const AliAnaParticleIsolation & iso) ;
   
   /// \cond CLASSIMP
-  ClassDef(AliAnaParticleIsolation,39) ;
+  ClassDef(AliAnaParticleIsolation,40) ;
   /// \endcond
 
 } ;

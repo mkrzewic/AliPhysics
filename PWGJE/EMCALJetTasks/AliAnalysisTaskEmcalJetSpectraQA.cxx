@@ -19,6 +19,9 @@
 #include <THnSparse.h>
 #include <THashList.h>
 
+#include <AliAnalysisManager.h>
+#include <AliVEventHandler.h>
+
 #include "AliEmcalJet.h"
 #include "AliVCluster.h"
 #include "AliVParticle.h"
@@ -311,15 +314,25 @@ void AliAnalysisTaskEmcalJetSpectraQA::UserCreateOutputObjects()
 {
   AliAnalysisTaskEmcalJetLight::UserCreateOutputObjects();
 
+  Int_t maxTracks = 6000;
   Int_t constituentsNbins = 250;
   Double_t constituentsMax = 249.5;
-
-  Int_t nPtBins = TMath::CeilNint(fMaxPt / fPtBinWidth);
+  Double_t maxRho = 500;
 
   if (fForceBeamType == kpp) {
     constituentsNbins = 50;
     constituentsMax = 49.5;
+    maxRho = 50;
+    maxTracks = 200;
   }
+  else if (fForceBeamType == kpA) {
+    constituentsNbins = 100;
+    constituentsMax = 99.5;
+    maxRho = 200;
+    maxTracks = 500;
+  }
+
+  Int_t nPtBins = TMath::CeilNint(fMaxPt / fPtBinWidth);
 
   TString histname;
   TString title;
@@ -377,10 +390,26 @@ void AliAnalysisTaskEmcalJetSpectraQA::UserCreateOutputObjects()
       SetRejectionReasonLabels(hist->GetXaxis());
     }
 
+    histname = TString::Format("%s/fHistLeadJetPtVsCent", jets->GetArrayName().Data());
+    title = histname + ";Centrality (%);#it{p}_{T,jet} (GeV/#it{c});counts";
+    fHistManager.CreateTH2(histname.Data(), title.Data(), 100, 0, 100, nPtBins, 0, fMaxPt);
+
+    histname = TString::Format("%s/fHistLeadJetPtVsNTracks", jets->GetArrayName().Data());
+    title = histname + ";no. of tracks;#it{p}_{T,jet} (GeV/#it{c});counts";
+    fHistManager.CreateTH2(histname.Data(), title.Data(), 200, 0, maxTracks, nPtBins, 0, fMaxPt);
+
     if (!jets->GetRhoName().IsNull()) {
       histname = TString::Format("%s/fHistRhoVsCent", jets->GetArrayName().Data());
-      title = histname + ";Centrality (%);#rho (GeV/#it{c});counts";
-      fHistManager.CreateTH2(histname.Data(), title.Data(), 101, 0, 101, 100, 0, 500);
+      title = histname + ";Centrality (%);#rho (GeV/#it{c} rad^{-1});counts";
+      fHistManager.CreateTH2(histname.Data(), title.Data(), 100, 0, 100, 1000, 0, maxRho);
+
+      histname = TString::Format("%s/fHistRhoVsNTracks", jets->GetArrayName().Data());
+      title = histname + ";no. of tracks;#rho (GeV/#it{c} rad^{-1});counts";
+      fHistManager.CreateTH2(histname.Data(), title.Data(), 200, 0, maxTracks, 1000, 0, maxRho);
+
+      histname = TString::Format("%s/fHistRhoVsLeadJetPt", jets->GetArrayName().Data());
+      title = histname + ";#it{p}_{T,jet} (GeV/#it{c});#rho (GeV/#it{c} rad^{-1});counts";
+      fHistManager.CreateTH2(histname.Data(), title.Data(), nPtBins, 0, fMaxPt, 1000, 0, maxRho);
     }
   }
 
@@ -397,15 +426,17 @@ Bool_t AliAnalysisTaskEmcalJetSpectraQA::FillHistograms()
 {
   TString histname;
 
+  if (fCentBin < 0) {
+    AliError(Form("fCentBin is %d! fCent = %.3f. Fix the centrality bins to include all possible values of centrality.", fCentBin, fCent));
+    return kFALSE;
+  }
+
   for (auto cont_it : fJetCollArray) {
     AliJetContainer* jets = cont_it.second;
     Double_t rhoVal = 0;
-    if (jets->GetRhoParameter()) {
-      rhoVal = jets->GetRhoVal();
-      histname = TString::Format("%s/fHistRhoVsCent", jets->GetArrayName().Data());
-      fHistManager.FillTH2(histname.Data(), fCent, rhoVal);
-    }
+    if (jets->GetRhoParameter()) rhoVal = jets->GetRhoVal();
 
+    Double_t leadJetPt = 0;
     for (auto jet : jets->accepted()) {
 
       UInt_t rejectionReason = 0;
@@ -436,6 +467,8 @@ Bool_t AliAnalysisTaskEmcalJetSpectraQA::FillHistograms()
       jetInfo.fCorrPt = corrPt;
       jetInfo.fZ = z;
       jetInfo.fLeadingPt = ptLeading;
+
+      if (jet->Pt() > leadJetPt) leadJetPt = jet->Pt();
 
       FillJetHisto(jetInfo, jets);
 
@@ -490,6 +523,26 @@ Bool_t AliAnalysisTaskEmcalJetSpectraQA::FillHistograms()
         }
       }
     } //jet loop
+
+    Int_t ntracks = 0;
+    for (auto cont : this->fParticleCollArray) ntracks += cont.second->GetNAcceptEntries();
+
+    histname = TString::Format("%s/fHistLeadJetPtVsCent", jets->GetArrayName().Data());
+    fHistManager.FillTH2(histname.Data(), fCent, leadJetPt);
+
+    histname = TString::Format("%s/fHistLeadJetPtVsNTracks", jets->GetArrayName().Data());
+    fHistManager.FillTH2(histname.Data(), ntracks, leadJetPt);
+
+    if (jets->GetRhoParameter()) {
+      histname = TString::Format("%s/fHistRhoVsCent", jets->GetArrayName().Data());
+      fHistManager.FillTH2(histname.Data(), fCent, rhoVal);
+
+      histname = TString::Format("%s/fHistRhoVsNTracks", jets->GetArrayName().Data());
+      fHistManager.FillTH2(histname.Data(), ntracks, rhoVal);
+
+      histname = TString::Format("%s/fHistRhoVsLeadJetPt", jets->GetArrayName().Data());
+      fHistManager.FillTH2(histname.Data(), leadJetPt, rhoVal);
+    }
   }
   return kTRUE;
 }
@@ -630,4 +683,100 @@ void AliAnalysisTaskEmcalJetSpectraQA::FillJetHisto(const AliEmcalJetInfo& jet, 
     FillTTree(jet, jets);
     break;
   }
+}
+
+/// Create an instance of this class and add it to the analysis manager
+///
+/// \param ntracks name of the track collection
+/// \param nclusters name of the calorimeter cluster collection
+/// \param trackPtCut minimum transverse momentum of tracks
+/// \param clusECut minimum energy of calorimeter clusters
+/// \param suffix additional suffix that can be added at the end of the task name
+/// \return pointer to the new AddTaskEmcalJetSpectraQA task
+AliAnalysisTaskEmcalJetSpectraQA* AliAnalysisTaskEmcalJetSpectraQA::AddTaskEmcalJetSpectraQA(TString trackName, TString clusName,
+    Double_t trackPtCut, Double_t clusECut, TString suffix)
+{
+  // Get the pointer to the existing analysis manager via the static access method.
+  AliAnalysisManager *mgr = AliAnalysisManager::GetAnalysisManager();
+  if (!mgr) {
+    ::Error("AddTaskEmcalJetSpectraQA", "No analysis manager to connect to.");
+    return nullptr;
+  }
+
+  // Check the analysis type using the event handlers connected to the analysis manager.
+  AliVEventHandler* handler = mgr->GetInputEventHandler();
+  if (!handler) {
+    ::Error("AddTaskEmcalJetSpectraQA", "This task requires an input event handler");
+    return nullptr;
+  }
+
+  EDataType_t dataType = kUnknownDataType;
+
+  if (handler->InheritsFrom("AliESDInputHandler")) {
+    dataType = kESD;
+  }
+  else if (handler->InheritsFrom("AliAODInputHandler")) {
+    dataType = kAOD;
+  }
+
+  // Init the task and do settings
+
+  if (trackName == "usedefault") {
+    if (dataType == kESD) {
+      trackName = "Tracks";
+    }
+    else if (dataType == kAOD) {
+      trackName = "tracks";
+    }
+    else {
+      trackName = "";
+    }
+  }
+
+  if (clusName == "usedefault") {
+    if (dataType == kESD) {
+      clusName = "CaloClusters";
+    }
+    else if (dataType == kAOD) {
+      clusName = "caloClusters";
+    }
+    else {
+      clusName = "";
+    }
+  }
+
+  TString name("AliAnalysisTaskEmcalJetSpectraQA");
+  if (strcmp(suffix,"")) {
+    name += "_";
+    name += suffix;
+  }
+
+  AliAnalysisTaskEmcalJetSpectraQA* jetTask = new AliAnalysisTaskEmcalJetSpectraQA(name);
+  jetTask->SetVzRange(-10,10);
+  jetTask->SetNeedEmcalGeom(kFALSE);
+  AliParticleContainer *partCont = jetTask->AddParticleContainer(trackName.Data());
+  if (partCont) partCont->SetParticlePtCut(trackPtCut);
+
+  AliClusterContainer *clusterCont = jetTask->AddClusterContainer(clusName.Data());
+  if (clusterCont) {
+    clusterCont->SetClusECut(0.);
+    clusterCont->SetClusPtCut(0.);
+    clusterCont->SetClusHadCorrEnergyCut(clusECut);
+    clusterCont->SetDefaultClusterEnergy(AliVCluster::kHadCorr);
+  }
+
+  // Final settings, pass to manager and set the containers
+  mgr->AddTask(jetTask);
+
+  // Create containers for input/output
+  AliAnalysisDataContainer *cinput1  = mgr->GetCommonInputContainer()  ;
+  TString contname(name);
+  contname += "_histos";
+  AliAnalysisDataContainer *coutput1 = mgr->CreateContainer(contname.Data(),
+                  TList::Class(),AliAnalysisManager::kOutputContainer,
+                  Form("%s", AliAnalysisManager::GetCommonFileName()));
+  mgr->ConnectInput  (jetTask, 0,  cinput1 );
+  mgr->ConnectOutput (jetTask, 1, coutput1 );
+
+  return jetTask;
 }

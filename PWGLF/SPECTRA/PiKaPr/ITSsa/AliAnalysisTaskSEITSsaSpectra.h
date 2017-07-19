@@ -28,7 +28,7 @@ class AliESDEvent;
 class AliESDVertex;
 class AliITSPidParams;
 class AliITSPIDResponse;
-class AliStack;
+class AliMCEvent;
 class AliVTrack;
 
 #include "AliEventCuts.h"
@@ -46,14 +46,15 @@ public:
   enum EPileup_Type    {kNoPileup, kPileupSPD, kPileupMV};
   enum EEvtCut_Type {
     kIsReadable = 1,
-    kPassTrig,
-    kIsSDDIn,
-    kPassMultSel,
     kIsNotIncDAQ,
-    kPassSPDclsVsTCut,
+    kPassTrig,
+    kPassMultSel,
     kIsNotPileup,
+    kPassSPDclsVsTCut,
+		kCorrelation,
     kHasRecVtx,
     kHasGoodVtxZ,
+    kIsSDDIn,
     kNEvtCuts
   };// event selection criteria
   enum ETrkCut_Type {
@@ -164,7 +165,7 @@ protected:
   Double_t CookdEdx(Double_t* s) const;
   Double_t Eta2y(Double_t pt, Double_t m, Double_t eta) const;
 
-  void     AnalyseMCParticles(AliStack* lMCstack, EEvtCut_Type step, bool lHasGoodVtxGen);
+  void     AnalyseMCParticles(AliMCEvent* lMCevent, EEvtCut_Type step, bool lHasGoodVtxGen);
   void     CreateDCAcutFunctions();
   void     PostAllData();
 

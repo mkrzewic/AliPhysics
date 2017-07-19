@@ -5,6 +5,7 @@
 
 //_________________________________________________________________________
 /// \class AliCaloTrackESDReader
+/// \ingroup CaloTrackCorrelationsBase
 /// \brief Class for event, clusters and tracks filtering and preparation for the ESD analysis.
 ///
 /// Class for accessing/filtering ESD data. Most of the job is done in the mother class
@@ -32,6 +33,8 @@ public:
   
   void             Init();
   
+  AliGenEventHeader* GetGenEventHeader()   const ;
+
   Bool_t           SelectTrack(AliVTrack* track, Double_t* pTrack);
   
   AliESDtrackCuts* GetTrackCuts()                    const { return fESDtrackCuts     ; }

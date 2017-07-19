@@ -26,7 +26,7 @@ class TRootIOCtor;
 #include "AliRecInfoCuts.h"
 #include "AliMCInfoCuts.h"
 
-class AliPerformanceObject : public AliMergeable, public TNamed {
+class AliPerformanceObject : public TNamed, public AliMergeable {
 public :
   AliPerformanceObject(TRootIOCtor*); 
   AliPerformanceObject(const char* name="AliPerformanceObject", const char* title="AliPerformanceObject", Int_t run=-1, Bool_t highMult=kFALSE); 
@@ -88,8 +88,8 @@ public :
   Double_t *CreateLogAxis(Int_t nbins, Double_t xmin, Double_t xmax); 
 
   // trigger class selection
-  void SetTriggerClass(const Char_t *triggerClass);
-  TString GetTriggerClass() const { return fTriggerClass; }
+  void SetTriggerClass(const Char_t *triggerClass) { fTriggerClass = triggerClass; }
+  const Char_t* GetTriggerClass() const { return fTriggerClass.IsNull()?NULL:fTriggerClass.Data(); }
 
   // use track vertex
   void SetUseTrackVertex(Bool_t trackVtx = kTRUE) { fUseTrackVertex = trackVtx; }
@@ -155,7 +155,7 @@ protected:
   AliRecInfoCuts fCutsRC;  // selection cuts for reconstructed tracks
   AliMCInfoCuts  fCutsMC;  // selection cuts for MC tracks
 
-  ClassDef(AliPerformanceObject,10);
+  ClassDef(AliPerformanceObject,11);
 };
 
 #endif

@@ -42,7 +42,6 @@
 #include <TDatabasePDG.h>
 #include <AliAnalysisDataSlot.h>
 #include <AliAnalysisDataContainer.h>
-#include "AliStack.h"
 #include "AliMCEvent.h"
 #include "AliAnalysisManager.h"
 #include "AliAODMCHeader.h"
@@ -1253,7 +1252,7 @@ void AliAnalysisTaskSEXic2eleXifromAODtracks::MakeAnalysis
 	fHistonElevsRunNumber->Fill(runnumber-runnumber_offset,nSeleTrks);
 	fHistonXivsRunNumber->Fill(runnumber-runnumber_offset,nSeleCasc);
 
-  if(nSeleTrks==0 || nSeleCasc==0) return;
+  //if(nSeleTrks==0 && nSeleCasc==0) return;
 
   //------------------------------------------------
   // Fill pool and single tree

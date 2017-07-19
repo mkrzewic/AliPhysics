@@ -2016,6 +2016,25 @@ void AliAnalysisTaskStrangenessVsMultiplicityRsnLikeBgSub::UserExec(Option_t *)
             }
             //========================================================================
             
+            //========================================================================
+            //Setting up: Variable BB CosPA
+            Float_t lBBCosPACut = lCascadeResult -> GetCutBachBaryonCosPA();
+            Float_t lVarBBCosPApar[5];
+            lVarBBCosPApar[0] = lCascadeResult->GetCutVarBBCosPAExp0Const();
+            lVarBBCosPApar[1] = lCascadeResult->GetCutVarBBCosPAExp0Slope();
+            lVarBBCosPApar[2] = lCascadeResult->GetCutVarBBCosPAExp1Const();
+            lVarBBCosPApar[3] = lCascadeResult->GetCutVarBBCosPAExp1Slope();
+            lVarBBCosPApar[4] = lCascadeResult->GetCutVarBBCosPAConst();
+            Float_t lVarBBCosPA = TMath::Cos(
+                                             lVarBBCosPApar[0]*TMath::Exp(lVarBBCosPApar[1]*fTreeCascVarPt) +
+                                             lVarBBCosPApar[2]*TMath::Exp(lVarBBCosPApar[3]*fTreeCascVarPt) +
+                                             lVarBBCosPApar[4]);
+            if( lCascadeResult->GetCutUseVarBBCosPA() ){
+                //Only use if looser than the non-variable cut (WARNING: BEWARE INVERSE LOGIC)
+                if( lVarBBCosPA > lBBCosPACut ) lBBCosPACut = lVarBBCosPA;
+            }
+            //========================================================================
+            
             if ( lCascadeResult->GetMassHypothesis() == AliCascadeResult::kXiMinus     ){
                 lCharge  = -1;
                 if ( lCascadeResult->GetSwapBachelorCharge() ) lCharge = +1;
@@ -2163,7 +2182,7 @@ void AliAnalysisTaskStrangenessVsMultiplicityRsnLikeBgSub::UserExec(Option_t *)
                 ( fTreeCascVarDCABachToBaryon > lCascadeResult->GetCutDCABachToBaryon() ) &&
                 
                 //Check 7: Experimental Bach Baryon CosPA
-                ( fTreeCascVarWrongCosPA < lCascadeResult->GetCutBachBaryonCosPA()  ) &&
+                ( fTreeCascVarWrongCosPA < lBBCosPACut  ) &&
                 
                 //Check 8: Min/Max V0 Lifetime cut
                 ( ( fTreeCascVarV0Lifetime > lCascadeResult->GetCutMinV0Lifetime() ) &&
@@ -3210,6 +3229,76 @@ void AliAnalysisTaskStrangenessVsMultiplicityRsnLikeBgSub::AddStandardCascadeCon
     
     cout<<"Added "<<lN<<" Cascade configurations to output."<<endl;
 }
+
+
+//________________________________________________________________________
+void AliAnalysisTaskStrangenessVsMultiplicityRsnLikeBgSub::AddCascadeConfiguration276TeV()
+//Adds 2.76 TeV cascade analysis configuration
+{
+    // STEP 1: Decide on binning (needed to improve on memory consumption)
+    
+    // pT binning
+    Double_t lPtbinlimits[] = {0.4, 0.5, 0.6, 0.7,0.8,.9,1.0,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,
+        2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,3.0,3.2,3.4,3.6,3.8,4.0,4.2,4.4,4.6,4.8,5.0,5.5,6.0,7.0,8.0,9.0,10.,11.,12.};
+    Long_t lPtbinnumb = sizeof(lPtbinlimits)/sizeof(Double_t) - 1;
+    
+    // centrality binning
+    Double_t lCentbinlimits[] = {0, 1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 85, 90};
+    Long_t lCentbinnumb = sizeof(lCentbinlimits)/sizeof(Double_t) - 1;
+    
+    // TStrings for output names
+    TString lParticleName[] = {"XiMinus", "XiPlus",  "OmegaMinus", "OmegaPlus"};
+    
+    //Just a counter and one array, please. Nothing else needed
+    AliCascadeResult *lCascadeResult[4];
+    Long_t lN = 0;
+    
+    //Map to mass hypothesis
+    AliCascadeResult::EMassHypo lMassHypo[4];
+    lMassHypo[0] = AliCascadeResult::kXiMinus;
+    lMassHypo[1] = AliCascadeResult::kXiPlus;
+    lMassHypo[2] = AliCascadeResult::kOmegaMinus;
+    lMassHypo[3] = AliCascadeResult::kOmegaPlus;
+    
+    for(Int_t i = 0 ; i < 4 ; i ++){
+        //2.76 Config result, customized binning: the one to use, usually
+        lCascadeResult[lN] = new AliCascadeResult( Form("%s_276TeV",lParticleName[i].Data() ),lMassHypo[i],"",lCentbinnumb,lCentbinlimits, lPtbinnumb,lPtbinlimits);
+        
+        //Setters for V0 Cuts
+        lCascadeResult[lN]->SetCutDCANegToPV            ( 0.1    ) ;
+        lCascadeResult[lN]->SetCutDCAPosToPV            ( 0.1    ) ;
+        lCascadeResult[lN]->SetCutDCAV0Daughters        ( 0.8    ) ;
+        lCascadeResult[lN]->SetCutV0CosPA               ( 0.998  ) ;
+        lCascadeResult[lN]->SetCutV0Radius              ( 3.0    ) ;
+        //Setters for Cascade Cuts
+        lCascadeResult[lN]->SetCutDCAV0ToPV             ( 0.1    ) ;
+        lCascadeResult[lN]->SetCutV0Mass                ( 0.005  ) ;
+        lCascadeResult[lN]->SetCutDCABachToPV           ( 0.03   ) ;
+        lCascadeResult[lN]->SetCutDCACascDaughters      ( 0.3    ) ;
+        lCascadeResult[lN]->SetCutCascRadius            ( 1.5    ) ;
+        lCascadeResult[lN]->SetCutCascCosPA             ( 0.9992 ) ;
+        //Miscellaneous
+        lCascadeResult[lN]->SetCutProperLifetime        ( 15.0   ) ;
+        lCascadeResult[lN]->SetCutLeastNumberOfClusters ( 70     ) ;
+        lCascadeResult[lN]->SetCutTPCdEdx               ( 4      ) ;
+        lCascadeResult[lN]->SetCutXiRejection           ( 0.008  ) ;
+        lCascadeResult[lN]->SetCutDCABachToBaryon       ( 0      ) ;
+        
+        if(i > 1){
+            lCascadeResult[lN]->SetCutCascRadius            ( 1.0 ) ;
+            lCascadeResult[lN]->SetCutProperLifetime        ( 8.0 ) ;
+        }
+        
+        //Add result to pool
+        lN++;
+    }
+    
+    for (Int_t iconf = 0; iconf<lN; iconf++)
+        AddConfiguration(lCascadeResult[iconf]);
+    
+    cout<<"Added "<<lN<<" cascade configurations to output (corresponding to 2.76 TeV analysis cuts)"<<endl;
+}
+
 
 //________________________________________________________________________
 Float_t AliAnalysisTaskStrangenessVsMultiplicityRsnLikeBgSub::GetDCAz(AliESDtrack *lTrack)

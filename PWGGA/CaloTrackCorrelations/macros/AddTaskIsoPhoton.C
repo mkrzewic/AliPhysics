@@ -1,11 +1,12 @@
 /// \file AddTaskIsoPhoton.C
+/// \ingroup CaloTrackCorrMacros
 /// \brief Isolated photon spectra configuration.
 ///
 /// Configuration of the isolated photon analysis analysis
 /// based on AddTaskIsoPhoton by Gustavo Conesa & Marie Germain.
 ///
-/// \author : Marie Germain <Marie.Germain@cern.ch>, SUBATECH, main author.
-/// \author : Gustavo Conesa Balbastre <Gustavo.Conesa.Balbastre@cern.ch>, (LPSC-CNRS)
+/// \author Marie Germain <Marie.Germain@cern.ch>, SUBATECH, main author.
+/// \author Gustavo Conesa Balbastre <Gustavo.Conesa.Balbastre@cern.ch>, (LPSC-CNRS)
 ///
 
 TString kAnaIsoPhotonName = "";   /// Global name to be composed of the settings, used to set the AOD branch name
@@ -49,6 +50,8 @@ Bool_t  kPrint = 0  ;             /// Global bool for print option
 /// \param print : A bool to enable the print of the settings per task
 /// \param tmInCone : A bool to enable the CPV in cone (to reject charged clusters in Eiso calculation)
 /// \param SSsmearing : An integer to enable the shower shape smearing, 0: no smearing, 1: Smearing with Gustavo's settings, 2: Smearing with Astrid's settings
+/// \param clustListName: name of list with clusters
+///
 AliAnalysisTaskCaloTrackCorrelation *AddTaskIsoPhoton(const Float_t  cone          = 0.4,
                                                       const Float_t  pth           = 2.,
                                                       const Bool_t   leading       = kFALSE,
@@ -76,7 +79,7 @@ AliAnalysisTaskCaloTrackCorrelation *AddTaskIsoPhoton(const Float_t  cone       
                                                       const Int_t    debug         = -1,
                                                       const Bool_t   print         = kFALSE,
                                                       const Bool_t   tmInCone      = kTRUE,
-                                                      const Int_t   SSsmearing    = 0,
+                                                      const Int_t    SSsmearing    = 0,
                                                       const TString  clustListName = ""
                                                       )
 {
@@ -236,9 +239,9 @@ AliCaloTrackReader * ConfigureReader(TString inputDataType = "AOD", Bool_t useKi
 
   reader->SwitchOffWriteDeltaAOD()  ;
 
-if(SSsmearing != 0)
-{
-  reader->SwitchOnShowerShapeSmearing();
+  if(SSsmearing != 0)
+  {
+    reader->SwitchOnShowerShapeSmearing();
     if(SSsmearing == 1) //Gustavo's settings
     { 
       reader->SetSmearingFunction(AliCaloTrackReader::kSmearingLandau);
@@ -248,20 +251,6 @@ if(SSsmearing != 0)
     { 
       reader->SetSmearingFunction(AliCaloTrackReader::kSmearingLandauShift);
       reader->SetShowerShapeSmearWidth(0.035);
-    }
-}
-  // MC settings
-  if(useKinematics)
-  {
-    if(inputDataType == "ESD")
-    {
-      reader->SwitchOnStack();
-      reader->SwitchOffAODMCParticles();
-    }
-    else if(inputDataType == "AOD")
-    {
-      reader->SwitchOffStack();
-      reader->SwitchOnAODMCParticles();
     }
   }
 
@@ -688,17 +677,12 @@ AliAnaCalorimeterQA* ConfigureQAAnalysis(TString calorimeter = "EMCAL", Bool_t s
   // Study exotic clusters PHOS and EMCAL
   ana->SwitchOffStudyBadClusters() ;
 
-
   ana->SwitchOffFiducialCut();
   ana->SwitchOffFillAllTH3Histogram();
   ana->SwitchOffFillAllPositionHistogram();
   ana->SwitchOffFillAllPositionHistogram2();
-  ana->SwitchOffStudyBadClusters();
-  ana->SwitchOffStudyClustersAsymmetry();
-  ana->SwitchOffStudyWeight();
   ana->SwitchOnFillAllTrackMatchingHistogram();
   ana->SwitchOnFillAllCellTimeHisto() ;
-
 
   ana->AddToHistogramsName("QA_"); //Begining of histograms name
   SetHistoRangeAndNBins(ana->GetHistogramRanges(),calorimeter); // see method below

@@ -46,9 +46,7 @@
 #include "AliMCParticle.h" 
 #include "AliHeader.h" 
 #include "AliGenEventHeader.h" 
-#include "AliStack.h" 
-#include "AliPerformanceEff.h"
-#include <iostream>
+#include "AliPerformanceEff.h" 
 
 using namespace std;
 
@@ -175,12 +173,6 @@ void AliPerformanceEff::ProcessTPC(AliMCEvent* const mcEvent, AliVEvent *const v
   if(!vEvent) return;
   if(!mcEvent) return;
 
-  AliStack *stack = mcEvent->Stack();
-  if (!stack) {
-    AliDebug(AliLog::kError, "Stack not available");
-    return;
-  }
-
   Int_t *labelsRec =  NULL;
   labelsRec =  new Int_t[vEvent->GetNumberOfTracks()];
   if(!labelsRec) 
@@ -193,9 +185,9 @@ void AliPerformanceEff::ProcessTPC(AliMCEvent* const mcEvent, AliVEvent *const v
   Int_t *labelsAllRec =  NULL;
   labelsAllRec =  new Int_t[vEvent->GetNumberOfTracks()];
   if(!labelsAllRec) { 
-     delete  [] labelsRec;
-     Printf("Cannot create labelsAllRec");
-     return;
+    delete  [] labelsRec;
+    Printf("Cannot create labelsAllRec");
+    return;
   }
   for(Int_t i=0;i<vEvent->GetNumberOfTracks();i++) { labelsAllRec[i] = 0; }
 
@@ -213,42 +205,45 @@ void AliPerformanceEff::ProcessTPC(AliMCEvent* const mcEvent, AliVEvent *const v
     //Int_t label = TMath::Abs(vTrack->GetLabel()); 
     Int_t label = vTrack->GetTPCLabel(); //Use TPC-only label for TPC-only efficiency analysis 
     labelsAllRec[iTrack]=label;
-
+    
     // TPC only
     if(IsRecTPC(vTrack) != 0) { 
       labelsRec[iTrack]=label;
     }
-
+    
   }
   
   // 
   // MC histograms for efficiency studies
   //
-  Int_t nPart = mcEvent->GetNumberOfTracks();
-  for (Int_t iMc = 0; iMc < nPart; ++iMc) 
-  {
-    if (iMc == 0) continue; //Cannot distinguish between track or fake track
-    TParticle *mcPart = stack->Particle(iMc);
-    if (!mcPart) continue;
-    if (!mcPart->GetPDG()) continue; 
-    if (mcPart->GetPDG()->Charge() == 0.0/* || mcPart->Charge() == -99*/) continue;
-      
-    // check for physical primary
-    if(!stack->IsPhysicalPrimary(iMc)) continue;
-
+  Int_t nPart  = mcEvent->GetNumberOfTracks();
+  Int_t nPrim  = mcEvent->GetNumberOfPrimaries();
+  //Int_t nPart  = stack->GetNprimary();
+  for (Int_t iMc = 0; iMc < nPart; ++iMc) {
+    if (iMc == 0) continue;		//Cannot distinguish between track or fake track
+    TParticle* particle = ((AliMCParticle*)mcEvent->GetTrack(iMc))->Particle();
+    if (!particle) continue;
+    if (!particle->GetPDG()) continue; 
+    if (particle->GetPDG()->Charge() == 0.0) continue;
+    
+    // physical primary
+    Bool_t prim = mcEvent->IsPhysicalPrimary(iMc);
+    if(!prim) continue;
+    
     // --- check for double filling in stack
     // use only particles with no daughters in the list of primaries
     Int_t nDaughters = 0;// particle->GetNDaughters();
     
-    for( Int_t iDaught=0; iDaught < mcPart->GetNDaughters(); iDaught++ ) {
-      if( mcPart->GetDaughter(iDaught) < stack->GetNprimary() )
+    for( Int_t iDaught=particle->GetFirstDaughter(); iDaught < particle->GetNDaughters(); iDaught++ ) {
+      if (iDaught<nPrim) {
+	//      if( particle->GetDaughter(iDaught) < stack->GetNprimary() )
 	nDaughters++;
+	break; //RS we just need to know if there are prim. daughters
+      }
     }
-
-    if( nDaughters > 0 ) 
-      continue;
+    if( nDaughters > 0 ) continue;
     // --- check for double filling in stack
-
+    
     /*Bool_t findable = kFALSE;
     for(Int_t iRec=0; iRec<esdEvent->GetNumberOfTracks(); ++iRec) 
     {
@@ -266,29 +261,29 @@ void AliPerformanceEff::ProcessTPC(AliMCEvent* const mcEvent, AliVEvent *const v
     for(Int_t iRec=0; iRec<vEvent->GetNumberOfTracks(); ++iRec) 
     {
       // check reconstructed
-      if(iMc == labelsRec[iRec]) 
-      {
+      if(iMc == labelsRec[iRec]) {
         if (recStatus && nClones < fgkMaxClones) nClones++;
         recStatus = kTRUE;
       }
-	  //In order to relate the fake track to track parameters, we assign it to the best matching ESD track.
-	  if (labelsRec[iRec] < 0 && -labelsRec[iRec] == iMc && nFakes < fgkMaxFakes) nFakes++;
+      //In order to relate the fake track to track parameters, we assign it to the best matching ESD track.
+      if (labelsRec[iRec] < 0 && -labelsRec[iRec] == iMc && nFakes < fgkMaxFakes) nFakes++;
     }
 
     // Only 5 charged particle species (e,mu,pi,K,p)
-    if (fCutsMC.IsPdgParticle(TMath::Abs(mcPart->GetPdgCode())) == kFALSE) continue; 
+    if (fCutsMC.IsPdgParticle(TMath::Abs(particle->GetPdgCode())) == kFALSE) continue; 
 
 
     
     // transform Pdg to Pid
-    Int_t pid = TransformToPID(mcPart);
-    Float_t mceta =  mcPart->Eta();
-    Float_t mcphi =  mcPart->Phi();
+    Int_t pid = TransformToPID(particle);
+    
+    Float_t mceta =  particle->Eta();
+    Float_t mcphi =  particle->Phi();
     if(mcphi<0) mcphi += 2.*TMath::Pi();
-    Float_t mcpt = mcPart->Pt();
+    Float_t mcpt = particle->Pt();
     Float_t charge = 0.;
-    if (mcPart->GetPDG()->Charge() < 0)  charge = -1.;    
-    else if (mcPart->GetPDG()->Charge() > 0)  charge = 1.;
+    if (particle->GetPDG()->Charge() < 0)  charge = -1.;    
+    else if (particle->GetPDG()->Charge() > 0)  charge = 1.;
 
     // Fill histograms
     Double_t vEffHisto[9] = {mceta, mcphi, mcpt, static_cast<Double_t>(pid), static_cast<Double_t>(recStatus), static_cast<Double_t>(findable), static_cast<Double_t>(charge), static_cast<Double_t>(nClones), static_cast<Double_t>(nFakes)}; 
@@ -358,72 +353,92 @@ void AliPerformanceEff::ProcessTPCSec(AliMCEvent* const mcEvent, AliVEvent *cons
   // 
   // MC histograms for efficiency studies
   //
-  // **********************************************************
-  Int_t nPart  = mcEvent->GetNumberOfTracks();
-  //Int_t nPart  = stack->GetNprimary(); //can't use this, since we need secondary
-  for (Int_t iMc = 0; iMc < nPart; ++iMc) 
-  {
-    if (iMc == 0) continue; //Cannot distinguish between track or fake track
-    TParticle* mcPart = stack->Particle(iMc);
-    if (!mcPart) continue;
-    if (!mcPart->GetPdgCode()) continue; 
-    if (mcPart->GetPDG()->Charge() == 0.0) continue;
-      
-    // only accept secondaries which can be reconstructed at TPC
-    if(stack->IsPhysicalPrimary(iMc)) continue;
-
-    Bool_t findable = IsFindable(mcEvent,iMc);
-
-    Bool_t recStatus = kFALSE;
-	Int_t nClones = 0, nFakes = 0;
-    for(Int_t iRec=0; iRec<multRec; ++iRec) 
-    {
-      // check reconstructed
-      if(iMc == labelsRecSec[iRec]) 
+  if(mcEvent)  { 
+ 
+    Int_t nPart  = mcEvent->GetNumberOfTracks();
+    //Int_t nPart  = stack->GetNprimary();
+    for (Int_t iMc = 0; iMc < nPart; ++iMc) 
       {
-        if (recStatus && nClones < fgkMaxClones) nClones++;
+	if (iMc == 0) continue;		//Cannot distinguish between track or fake track
+	TParticle* particle = ((AliMCParticle*)mcEvent->GetTrack(iMc))->Particle();
+	if (!particle) continue;
+	if (!particle->GetPDG()) continue; 
+	if (particle->GetPDG()->Charge() == 0.0) continue;
+	
+	// physical primary
+	Bool_t prim = mcEvent->IsPhysicalPrimary(iMc);
+	
+	// only secondaries which can be reconstructed at TPC
+	if(prim) continue;
+	
+	//Float_t radius = TMath::Sqrt(particle->Vx()*particle->Vx()+particle->Vy()*particle->Vy()+particle->Vz()*particle->Vz());
+	//if(radius > fCutsMC->GetMaxR()) continue;
+	
+	// only secondary electrons from gamma conversion
+	//if( TMath::Abs(particle->GetPdgCode())!=fCutsMC->GetEM() ||   particle->GetUniqueID() != 5) continue;
+	
+	/*Bool_t findable = kFALSE;
+	  for(Int_t iRec=0; iRec<multAll; ++iRec) 
+	  {
+	  // check findable
+	  if(iMc == labelsAllRecSec[iRec]) 
+	  {
+	  findable = IsFindable(mcEvent,iMc);
+	  break;
+	  }
+	  }*/
+	Bool_t findable = IsFindable(mcEvent,iMc);
+	
+	Bool_t recStatus = kFALSE;
+	Int_t nClones = 0, nFakes = 0;
+	for(Int_t iRec=0; iRec<multRec; ++iRec) 
+	  {
+	    // check reconstructed
+	    if(iMc == labelsRecSec[iRec]) 
+	      {
+		if (recStatus && nClones < fgkMaxClones) nClones++;
 		recStatus = kTRUE;
+	      }
+	    //In order to relate the fake track to track parameters, we assign it to the best matching ESD track.
+	    if (labelsRecSec[iRec] < 0 && -labelsRecSec[iRec] == iMc && nFakes < fgkMaxFakes) nFakes++;
+	  }
+	
+	// Only 5 charged particle species (e,mu,pi,K,p)
+	if (fCutsMC.IsPdgParticle(TMath::Abs(particle->GetPdgCode())) == kFALSE) continue; 
+	
+	// transform Pdg to Pid
+	Int_t pid = TransformToPID(particle);
+	
+	Float_t mceta =  particle->Eta();
+	Float_t mcphi =  particle->Phi();
+	if(mcphi<0) mcphi += 2.*TMath::Pi();
+	Float_t mcpt = particle->Pt();
+	Float_t mcR = particle->R();
+	
+	// get info about mother
+	Int_t motherLabel = particle->GetMother(0);
+	if(motherLabel < 0) continue;
+	TParticle *mother = ((AliMCParticle*)mcEvent->GetTrack(motherLabel))->Particle(); 
+	if(!mother) continue; 
+    
+	Float_t mother_eta = mother->Eta();
+	Float_t mother_phi = mother->Phi();
+	if(mother_phi<0) mother_phi += 2.*TMath::Pi();
+	
+	Float_t charge = 0.;
+	if (particle->GetPDG()->Charge() < 0)  charge = -1.;    
+	else if (particle->GetPDG()->Charge() > 0)  charge = 1.;
+	
+	// Fill histograms
+	Double_t vEffSecHisto[12] = { mceta, mcphi, mcpt, static_cast<Double_t>(pid), static_cast<Double_t>(recStatus), static_cast<Double_t>(findable), mcR, mother_phi, mother_eta, static_cast<Double_t>(charge), static_cast<Double_t>(nClones), static_cast<Double_t>(nFakes) }; 
+	  fEffSecHisto->Fill(vEffSecHisto);
       }
-	  //In order to relate the fake track to track parameters, we assign it to the best matching ESD track.
-	  if (labelsRecSec[iRec] < 0 && -labelsRecSec[iRec] == iMc && nFakes < fgkMaxFakes) nFakes++;
-    }
-
-    // Only 5 charged particle species (e,mu,pi,K,p)
-    if (fCutsMC.IsPdgParticle(TMath::Abs(mcPart->GetPdgCode())) == kFALSE) continue; 
-
-    // transform Pdg to Pid
-    Int_t pid = TransformToPID(mcPart);
-
-    Float_t mceta =  mcPart->Eta();
-    Float_t mcphi =  mcPart->Phi();
-    if(mcphi<0) mcphi += 2.*TMath::Pi();
-    Float_t mcpt = mcPart->Pt();
-    Float_t mcR = mcPart->R();
-
-    // get info about mother
-    Int_t motherLabel = mcPart->GetMother(0);
-    if(motherLabel < 0) continue;
-    TParticle *mother = stack->Particle(motherLabel);
-    if(!mother) continue; 
-
-    Float_t motherEta = mother->Eta();
-    Float_t motherPhi = mother->Phi();
-    if(motherPhi<0) motherPhi += 2.*TMath::Pi();
-
-    Float_t charge = 0.;
-    if (mcPart->GetPDG()->Charge() < 0)  charge = -1.;    
-    else if (mcPart->GetPDG()->Charge() > 0)  charge = 1.;
-
-    // Fill histograms
-    Double_t vEffSecHisto[12] = { mceta, mcphi, mcpt, static_cast<Double_t>(pid), static_cast<Double_t>(recStatus), static_cast<Double_t>(findable), mcR, motherPhi, motherEta, static_cast<Double_t>(charge), static_cast<Double_t>(nClones), static_cast<Double_t>(nFakes) }; 
-    fEffSecHisto->Fill(vEffSecHisto);
   }
-
-
+  
   if(labelsRecSec) delete [] labelsRecSec; labelsRecSec = 0;
   if(labelsAllRecSec) delete [] labelsAllRecSec; labelsAllRecSec = 0;
 }
-
+ 
 
 
 
@@ -434,12 +449,6 @@ void AliPerformanceEff::ProcessTPCITS(AliMCEvent* const mcEvent, AliVEvent *cons
 
   if(!vEvent) return;
   if(!mcEvent) return;
-
-  AliStack *stack = mcEvent->Stack();
-  if (!stack) {
-    AliDebug(AliLog::kError, "Stack not available for event");
-    return;
-  }
 
   Int_t *labelsRecTPCITS =  NULL;
   labelsRecTPCITS =  new Int_t[vEvent->GetNumberOfTracks()];
@@ -482,18 +491,19 @@ void AliPerformanceEff::ProcessTPCITS(AliMCEvent* const mcEvent, AliVEvent *cons
   // 
   // MC histograms for efficiency studies
   //
-  //Int_t nPart  = mcEvent->GetNumberOfTracks();
-  Int_t nPart = mcEvent->GetNumberOfPrimaries();
+  //Int_t nPart  = stack->GetNtrack();
+  Int_t nPart  = mcEvent->GetNumberOfPrimaries();
   for (Int_t iMc = 0; iMc < nPart; ++iMc) 
   {
-    if (iMc == 0) continue; //Cannot distinguish between track or fake track
-    TParticle *mcPart = stack->Particle(iMc);
-    if (!mcPart) continue;
-    if (!mcPart->GetPdgCode()) continue; 
-    if (mcPart->GetPDG()->Charge() == 0.0) continue;
+    if (iMc == 0) continue;		//Cannot distinguish between track or fake track
+    TParticle* particle =  ((AliMCParticle*)mcEvent->GetTrack(iMc))->Particle();
+    if (!particle) continue;
+    if (!particle->GetPDG()) continue; 
+    if (particle->GetPDG()->Charge() == 0.0) continue;
       
-    // check for physical primary
-    if(!stack->IsPhysicalPrimary(iMc)) continue;
+    // physical primary
+    Bool_t prim = mcEvent->IsPhysicalPrimary(iMc);
+    if(!prim) continue;
 
     Bool_t findable = IsFindable(mcEvent,iMc);
 
@@ -512,19 +522,19 @@ void AliPerformanceEff::ProcessTPCITS(AliMCEvent* const mcEvent, AliVEvent *cons
     }
 
     // Only 5 charged particle species (e,mu,pi,K,p)
-    if (fCutsMC.IsPdgParticle(TMath::Abs(mcPart->GetPdgCode())) == kFALSE) continue; 
+    if (fCutsMC.IsPdgParticle(TMath::Abs(particle->GetPdgCode())) == kFALSE) continue; 
 
     // transform Pdg to Pid
-    Int_t pid = TransformToPID(mcPart);
+    Int_t pid = TransformToPID(particle);
 
-    Float_t mceta =  mcPart->Eta();
-    Float_t mcphi =  mcPart->Phi();
+    Float_t mceta =  particle->Eta();
+    Float_t mcphi =  particle->Phi();
     if(mcphi<0) mcphi += 2.*TMath::Pi();
-    Float_t mcpt = mcPart->Pt();
+    Float_t mcpt = particle->Pt();
 
     Float_t charge = 0.;
-    if (mcPart->GetPDG()->Charge() < 0)  charge = -1.;    
-    else if (mcPart->GetPDG()->Charge() > 0)  charge = 1.;
+    if (particle->GetPDG()->Charge() < 0)  charge = -1.;    
+    else if (particle->GetPDG()->Charge() > 0)  charge = 1.;
     
     // Fill histograms
     Double_t vEffHisto[9] = { mceta, mcphi, mcpt, static_cast<Double_t>(pid), static_cast<Double_t>(recStatus), static_cast<Double_t>(findable), static_cast<Double_t>(charge), static_cast<Double_t>(nClones), static_cast<Double_t>(nFakes)}; 
@@ -542,12 +552,6 @@ void AliPerformanceEff::ProcessConstrained(AliMCEvent* const mcEvent, AliVEvent 
   // constrained to the primary vertex
   if(!vEvent) return;
   if(!mcEvent) return;
-
-  AliStack *stack = mcEvent->Stack();
-  if (!stack) {
-    AliDebug(AliLog::kError, "Stack not available for event");
-    return;
-  }
 
   Int_t *labelsRecConstrained =  NULL;
   labelsRecConstrained =  new Int_t[vEvent->GetNumberOfTracks()];
@@ -589,17 +593,21 @@ void AliPerformanceEff::ProcessConstrained(AliMCEvent* const mcEvent, AliVEvent 
   // 
   // MC histograms for efficiency studies
   //
-  Int_t nPart = mcEvent->GetNumberOfPrimaries();
+ 
+
+  //Int_t nPart  = stack->GetNtrack();
+  Int_t nPart  = mcEvent->GetNumberOfPrimaries();
   for (Int_t iMc = 0; iMc < nPart; ++iMc) 
   {
-    if (iMc == 0) continue; //Cannot distinguish between track or fake track
-    TParticle *mcPart = stack->Particle(iMc);
-    if (!mcPart) continue;
-    if (!mcPart->GetPdgCode()) continue; 
-    if (mcPart->GetPDG()->Charge() == 0.0) continue;
+    if (iMc == 0) continue;		//Cannot distinguish between track or fake track
+    TParticle* particle = ((AliMCParticle*)mcEvent->GetTrack(iMc))->Particle();
+    if (!particle) continue;
+    if (!particle->GetPDG()) continue; 
+    if (particle->GetPDG()->Charge() == 0.0) continue;
       
-    // check for physical primary
-    if(!stack->IsPhysicalPrimary(iMc)) continue;
+    // physical primary
+    Bool_t prim = mcEvent->IsPhysicalPrimary(iMc);
+    if(!prim) continue;
 
     Bool_t findable = IsFindable(mcEvent,iMc);
 
@@ -618,17 +626,17 @@ void AliPerformanceEff::ProcessConstrained(AliMCEvent* const mcEvent, AliVEvent 
     }
 
     // Only 5 charged particle species (e,mu,pi,K,p)
-    if (fCutsMC.IsPdgParticle(TMath::Abs(mcPart->GetPdgCode())) == kFALSE) continue; 
+    if (fCutsMC.IsPdgParticle(TMath::Abs(particle->GetPdgCode())) == kFALSE) continue; 
 
     // transform Pdg to Pid
-    Int_t pid = TransformToPID(mcPart);
-    Float_t mceta =  mcPart->Eta();
-    Float_t mcphi =  mcPart->Phi();
+    Int_t pid = TransformToPID(particle);
+    Float_t mceta =  particle->Eta();
+    Float_t mcphi =  particle->Phi();
     if(mcphi<0) mcphi += 2.*TMath::Pi();
-    Float_t mcpt = mcPart->Pt();
+    Float_t mcpt = particle->Pt();
     Float_t charge = 0.;
-    if (mcPart->GetPDG()->Charge() < 0)  charge = -1.;    
-    else if (mcPart->GetPDG()->Charge() > 0)  charge = 1.;
+    if (particle->GetPDG()->Charge() < 0)  charge = -1.;    
+    else if (particle->GetPDG()->Charge() > 0)  charge = 1.;
 
     // Fill histograms
     Double_t vEffHisto[9] = { mceta, mcphi, mcpt, static_cast<Double_t>(pid), static_cast<Double_t>(recStatus), static_cast<Double_t>(findable), static_cast<Double_t>(charge), static_cast<Double_t>(nClones), static_cast<Double_t>(nFakes) }; 
@@ -651,7 +659,6 @@ void AliPerformanceEff::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent,
   }
   AliHeader* header = 0;
   AliGenEventHeader* genHeader = 0;
-  AliStack* stack = 0;
   TArrayF vtxMC(3);
   
   if(bUseMC)
@@ -664,12 +671,6 @@ void AliPerformanceEff::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent,
     header = mcEvent->Header();
     if (!header) {
       Error("Exec","Header not available");
-      return;
-    }
-    // MC particle stack
-    stack = mcEvent->Stack();
-    if (!stack) {
-      Error("Exec","Stack not available");
       return;
     }
     // get MC vertex
@@ -707,7 +708,7 @@ void AliPerformanceEff::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent,
 }
 
 //_____________________________________________________________________________
-Int_t AliPerformanceEff::TransformToPID(TParticle *mcPart) 
+Int_t AliPerformanceEff::TransformToPID(TParticle *particle) 
 {
 
   
@@ -716,11 +717,11 @@ Int_t AliPerformanceEff::TransformToPID(TParticle *mcPart)
 // (e.g. K+/K- = 321/-321; e+/e- = -11/11 ) 
 
   Int_t pid = -1;
-  if( TMath::Abs(mcPart->GetPdgCode())==fCutsMC.GetEM() ) pid = 0; 
-  if( TMath::Abs(mcPart->GetPdgCode())==fCutsMC.GetMuM() ) pid = 1; 
-  if( TMath::Abs(mcPart->GetPdgCode())==fCutsMC.GetPiP() ) pid = 2; 
-  if( TMath::Abs(mcPart->GetPdgCode())==fCutsMC.GetKP() ) pid = 3; 
-  if( TMath::Abs(mcPart->GetPdgCode())==fCutsMC.GetProt() ) pid = 4; 
+  if( TMath::Abs(particle->GetPdgCode())==fCutsMC.GetEM() ) pid = 0; 
+  if( TMath::Abs(particle->GetPdgCode())==fCutsMC.GetMuM() ) pid = 1; 
+  if( TMath::Abs(particle->GetPdgCode())==fCutsMC.GetPiP() ) pid = 2; 
+  if( TMath::Abs(particle->GetPdgCode())==fCutsMC.GetKP() ) pid = 3; 
+  if( TMath::Abs(particle->GetPdgCode())==fCutsMC.GetProt() ) pid = 4; 
 
 return pid;
 }

@@ -5,6 +5,7 @@
 
 //_________________________________________________________________________
 /// \class AliAnaPi0
+/// \ingroup CaloTrackCorrelationsAnalysis 
 /// \brief Selected photon clusters invariant mass analysis.
 ///
 /// Class to collect two-photon invariant mass distributions for
@@ -183,8 +184,6 @@ class AliAnaPi0 : public AliAnaCaloTrackCorrBaseClass {
 
   /// Containers for photons in stored events
   TList ** fEventsList ;               //![GetNCentrBin()*GetNZvertBin()*GetNRPBin()]
-
-  Int_t    fNModules ;                 ///<  Number of EMCAL/PHOS modules, set as many histogras as modules 
   
   Bool_t   fUseAngleCut ;              ///<  Select pairs depending on their opening angle
   Bool_t   fUseAngleEDepCut ;          ///<  Select pairs depending on their opening angle
@@ -518,6 +517,10 @@ class AliAnaPi0 : public AliAnaCaloTrackCorrBaseClass {
   TH2F *   fhMCEtaProdVertex;          //!<! Spectrum of selected eta vs production vertex
   TH2F *   fhPrimPi0ProdVertex;        //!<! Spectrum of primary pi0 vs production vertex
   TH2F *   fhPrimEtaProdVertex;        //!<! Spectrum of primary eta vs production vertex
+
+  TH2F *   fhMCPi0Radius[10] ;         //!<! reconstructed Pi0 production vertex vs pT for mother origin
+  TH2F *   fhMCEtaRadius[6] ;          //!<! reconstructed Eta production vertex vs pT for mother origin
+
   
   TH2F *   fhReMCFromConversion ;      //!<! Invariant mass of 2 clusters originated in conversions
   TH2F *   fhReMCFromNotConversion ;   //!<! Invariant mass of 2 clusters not originated in conversions

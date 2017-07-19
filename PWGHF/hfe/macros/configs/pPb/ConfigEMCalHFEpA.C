@@ -127,16 +127,16 @@ Bool_t isTOFdet 		= kFALSE
 		task->SetUseTrigger();
 		task->SetUseShowerShapeCut(kTRUE);
 				
-		if(configIndex==120)task->SetM20Cut(0.0,0.2);
-		else if(configIndex==121)task->SetM20Cut(0.0,0.4);
+		if(configIndex==120)task->SetM20Cut(0.0,0.25);
+		else if(configIndex==121)task->SetM20Cut(0.0,0.35);
 		else if(configIndex==122)task->SetM20Cut(0.01,0.3);
 		else if(configIndex==123)task->SetM20Cut(0.0,2);
 		else task->SetM20Cut(0.0,0.3);
 		
-		if(configIndex==124)task->SetM02Cut(0.0,0.2);
-		else if(configIndex==125)task->SetM02Cut(0.0,0.4);
-		else if(configIndex==126)task->SetM02Cut(0.0,0.5);
-		else if(configIndex==127)task->SetM02Cut(0.0,0.6);
+		if(configIndex==124)task->SetM02Cut(0.0,0.25);
+		else if(configIndex==125)task->SetM02Cut(0.0,0.3);
+		else if(configIndex==126)task->SetM02Cut(0.0,0.35);
+		else if(configIndex==127)task->SetM02Cut(0.01,0.3);
 		else task->SetM02Cut(0.0,2);
 			
 		
@@ -157,7 +157,7 @@ Bool_t isTOFdet 		= kFALSE
 			
 	}
 	
-	if((period == "b" || period == "c") && !isEMCal){
+	if((period == "b" || period == "c") && !isEMCal && !isTOFdet){
 		
 		printf("======================================================================================\n ");
 		printf("\n\n Running on 13b or 13c period!!! WITH CALIBRATION for TPCnsigma mean and width      \n\n  \n\n ");
@@ -289,7 +289,7 @@ Bool_t isTOFdet 		= kFALSE
 	if(centralityIndex==2) task->SetCentrality(40,60);
 	if(centralityIndex==3) task->SetCentrality(60,80);
 	if(centralityIndex==4) task->SetCentrality(80,100);
-		//if(centralityIndex==5) task->SetCentrality(0,100);
+	if(centralityIndex==5) task->SetCentrality(0,100);
 	
 	if(centralityIndex==6) task->SetCentrality(0,10);
 	if(centralityIndex==7) task->SetCentrality(10,20);
@@ -407,6 +407,10 @@ Bool_t isTOFdet 		= kFALSE
 		
 	
 	}
+	if(isTOFdet){	
+		params[0] = -1;
+
+	}
 
 	
 		//=========================================
@@ -450,7 +454,7 @@ Bool_t isTOFdet 		= kFALSE
 				task->SetTPCcal_cut_max(3);
 		}
 		
-		if((period == "b" || period =="c") && !isEMCal){
+		if((period == "b" || period =="c") && !isEMCal && !isTOFdet){
 			Double_t max=5;//looser cut for hfe package. Real cut inside the task.
 			task->SetTPCcal_cut_max(3);
 		}

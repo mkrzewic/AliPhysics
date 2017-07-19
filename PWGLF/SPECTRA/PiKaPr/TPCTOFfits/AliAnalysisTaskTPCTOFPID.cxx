@@ -10,6 +10,7 @@
 #include "TList.h"
 #include "TH1F.h"
 #include "TH2F.h"
+#include "TH1D.h"
 #include "AliCDBManager.h"
 #include "AliLog.h"
 #include "AliESDtrack.h"
@@ -29,9 +30,18 @@
 #include "AliInputEventHandler.h"
 #include "AliVEvent.h"
 #include "AliPIDResponse.h"
-#include "AliPPVsMultUtils.h"
+#include "AliAnalysisUtils.h"
+#include "AliMultSelection.h"
 #include "TRandom.h"
-
+#include "AliESDVertex.h"
+#include "AliESDv0.h"
+#include "AliAnalysisPIDV0.h"
+#include "AliAODVertex.h"
+#include "AliKFParticle.h"
+#include "AliKFVertex.h"
+#include "AliVVZERO.h"
+#include "AliVCluster.h"
+#include "TMath.h"
 
 ClassImp(AliAnalysisTaskTPCTOFPID)
   
@@ -39,7 +49,6 @@ ClassImp(AliAnalysisTaskTPCTOFPID)
   
 AliAnalysisTaskTPCTOFPID::AliAnalysisTaskTPCTOFPID() :
   AliAnalysisTaskSE("AnalysisResults"),
-  fESDtrackCuts(0),
   fInitFlag(kFALSE),
   fMCFlag(kFALSE),
   fMCTuneFlag(kFALSE),
@@ -47,15 +56,19 @@ AliAnalysisTaskTPCTOFPID::AliAnalysisTaskTPCTOFPID() :
   fVertexSelectionFlag(kFALSE),
   fPrimaryDCASelectionFlag(kFALSE),
   fPIDTree(0),
+  fEvHist(0),
   fPIDResponse(0),
-  fMultiUtils(0),
+  fAnUtils(0),
   fRunNumber(0),
   fStartTime(0),
   fEndTime(0),
   fESDEvent(NULL),
   fMCEvent(NULL),
   fMCStack(NULL),
-  fTrackCuts(NULL),
+  fTrackCuts2010(NULL),
+  fTrackCuts2011(NULL),
+  fTrackCutsTPCRefit(NULL),
+  fTrackCuts2011Sys(NULL),
   fESDpid(new AliESDpid()),
   fIsCollisionCandidate(kFALSE),
   fIsEventSelected(0),
@@ -69,6 +82,8 @@ AliAnalysisTaskTPCTOFPID::AliAnalysisTaskTPCTOFPID() :
   fAnalysisTrack(new AliAnalysisPIDTrack()),
   fAnalysisParticleArray(new TClonesArray("AliAnalysisPIDParticle")),
   fAnalysisParticle(new AliAnalysisPIDParticle()),
+  fAnalysisV0TrackArray(new TClonesArray("AliAnalysisPIDV0")),
+  fAnalysisV0Track(new AliAnalysisPIDV0()),
   fTOFcalib(new AliTOFcalib()),
   fTOFT0maker(new AliTOFT0maker(fESDpid)),
   fTimeResolution(80.),
@@ -81,9 +96,23 @@ AliAnalysisTaskTPCTOFPID::AliAnalysisTaskTPCTOFPID() :
   /* 
    * default constructor 
    */
-  fTrackCuts = new AliESDtrackCuts("AliESDtrackCuts","AliESDtrackCuts");
-  fTrackCuts = AliESDtrackCuts::GetStandardITSTPCTrackCuts2010(kFALSE); //If not running, set to kFALSE;
-  fTrackCuts->SetEtaRange(-0.9,0.9);
+  fTrackCuts2010 = new AliESDtrackCuts("AliESDtrackCuts2010","AliESDtrackCuts2010");
+  fTrackCuts2010 = AliESDtrackCuts::GetStandardITSTPCTrackCuts2010(kFALSE); //If not running, set to kFALSE;
+  fTrackCuts2010->SetEtaRange(-0.8,0.8);
+  fTrackCuts2011 = new AliESDtrackCuts("AliESDtrackCuts2011","AliESDtrackCuts2011");
+  fTrackCuts2011 = AliESDtrackCuts::GetStandardITSTPCTrackCuts2011(kFALSE); //If not running, set to kFALSE;
+  fTrackCuts2011->SetEtaRange(-0.8,0.8);
+  fTrackCutsTPCRefit = new AliESDtrackCuts("AliESDtrackCutsTPCRefit","AliESDtrackCutsTPCRefit");
+  fTrackCutsTPCRefit = AliESDtrackCuts::GetStandardTPCOnlyTrackCuts(); //If not running, set to kFALSE;
+  fTrackCutsTPCRefit->SetRequireTPCRefit(kTRUE);
+  fTrackCutsTPCRefit->SetEtaRange(-0.8,0.8);
+  //Following is TC for systematics estimation. To compensate, once should probably reduce gamma DeltaM even further :)
+  fTrackCuts2011Sys = new AliESDtrackCuts("AliESDtrackCuts2011Sys","AliESDtrackCuts2011Sys");
+  fTrackCuts2011Sys = AliESDtrackCuts::GetStandardITSTPCTrackCuts2011(kFALSE); //If not running, set to kFALSE;                                                                                            
+  fTrackCuts2011Sys->SetEtaRange(-0.8,0.8);
+  fTrackCuts2011Sys->SetMinNCrossedRowsTPC(60);
+  fTrackCuts2011Sys->SetMaxChi2PerClusterTPC(5);
+  fTrackCuts2011Sys->SetMaxDCAToVertexZ(3);
 
 }
 
@@ -92,7 +121,6 @@ AliAnalysisTaskTPCTOFPID::AliAnalysisTaskTPCTOFPID() :
 
 AliAnalysisTaskTPCTOFPID::AliAnalysisTaskTPCTOFPID(Bool_t isMC) :
   AliAnalysisTaskSE("AnalysisResults"),
-  fESDtrackCuts(0),
   fInitFlag(kFALSE),
   fMCFlag(kFALSE),
   fMCTuneFlag(kFALSE),
@@ -100,15 +128,19 @@ AliAnalysisTaskTPCTOFPID::AliAnalysisTaskTPCTOFPID(Bool_t isMC) :
   fVertexSelectionFlag(kFALSE),
   fPrimaryDCASelectionFlag(kFALSE),
   fPIDTree(0),
+  fEvHist(0),
   fPIDResponse(0),
-  fMultiUtils(0),
+  fAnUtils(0),
   fRunNumber(0),
   fStartTime(0),
   fEndTime(0),
   fESDEvent(NULL),
   fMCEvent(NULL),
   fMCStack(NULL),
-  fTrackCuts(NULL),
+  fTrackCuts2010(NULL),
+  fTrackCuts2011(NULL),
+  fTrackCutsTPCRefit(NULL),
+  fTrackCuts2011Sys(NULL),
   fESDpid(new AliESDpid()),
   fIsCollisionCandidate(kFALSE),
   fIsEventSelected(0),
@@ -122,6 +154,8 @@ AliAnalysisTaskTPCTOFPID::AliAnalysisTaskTPCTOFPID(Bool_t isMC) :
   fAnalysisTrack(new AliAnalysisPIDTrack()),
   fAnalysisParticleArray(new TClonesArray("AliAnalysisPIDParticle")),
   fAnalysisParticle(new AliAnalysisPIDParticle()),
+  fAnalysisV0TrackArray(new TClonesArray("AliAnalysisPIDV0")),
+  fAnalysisV0Track(new AliAnalysisPIDV0()),
   fTOFcalib(new AliTOFcalib()),
   fTOFT0maker(new AliTOFT0maker(fESDpid)),
   fTimeResolution(80.),
@@ -134,11 +168,27 @@ AliAnalysisTaskTPCTOFPID::AliAnalysisTaskTPCTOFPID(Bool_t isMC) :
   /* 
    * default constructor 
    */
-  fTrackCuts = new AliESDtrackCuts("AliESDtrackCuts","AliESDtrackCuts");
-  fTrackCuts = AliESDtrackCuts::GetStandardITSTPCTrackCuts2010(kFALSE); //If not running, set to false
-  fTrackCuts->SetEtaRange(-0.9,0.9);
+  fTrackCuts2010 = new AliESDtrackCuts("AliESDtrackCuts2010","AliESDtrackCuts2010");
+  fTrackCuts2010 = AliESDtrackCuts::GetStandardITSTPCTrackCuts2010(kFALSE); //If not running, set to kFALSE;
+  fTrackCuts2010->SetEtaRange(-0.8,0.8);
+  fTrackCuts2011 = new AliESDtrackCuts("AliESDtrackCuts2011","AliESDtrackCuts2011");
+  fTrackCuts2011 = AliESDtrackCuts::GetStandardITSTPCTrackCuts2011(kFALSE); //If not running, set to kFALSE;
+  fTrackCuts2011->SetEtaRange(-0.8,0.8);
+  fTrackCutsTPCRefit = new AliESDtrackCuts("AliESDtrackCutsTPCRefit","AliESDtrackCutsTPCRefit");
+  fTrackCutsTPCRefit = AliESDtrackCuts::GetStandardTPCOnlyTrackCuts(); //If not running, set to kFALSE;
+  fTrackCutsTPCRefit->SetRequireTPCRefit(kTRUE);
+  fTrackCutsTPCRefit->SetEtaRange(-0.8,0.8);
+  //Following is TC for systematics estimation. To compensate, once should probably reduce gamma DeltaM even further :)                                                                                    
+  fTrackCuts2011Sys = new AliESDtrackCuts("AliESDtrackCuts2011Sys","AliESDtrackCuts2011Sys");
+  fTrackCuts2011Sys = AliESDtrackCuts::GetStandardITSTPCTrackCuts2011(kFALSE); //If not running, set to kFALSE;                                                                                            
+  fTrackCuts2011Sys->SetEtaRange(-0.8,0.8);
+  fTrackCuts2011Sys->SetMinNCrossedRowsTPC(60);
+  fTrackCuts2011Sys->SetMaxChi2PerClusterTPC(5);
+  fTrackCuts2011Sys->SetMaxDCAToVertexZ(3);
+
   fMCFlag = isMC;
   DefineOutput(1, TTree::Class());
+  DefineOutput(2, TH1D::Class());
 }
 
 
@@ -161,7 +211,10 @@ AliAnalysisTaskTPCTOFPID::~AliAnalysisTaskTPCTOFPID()
    * default destructor
    */
 
-  if (fTrackCuts) delete fTrackCuts;
+  if (fTrackCuts2010) delete fTrackCuts2010;
+  if (fTrackCuts2011) delete fTrackCuts2011;
+  if (fTrackCutsTPCRefit) delete fTrackCutsTPCRefit;
+  if (fTrackCuts2011Sys) delete fTrackCuts2011Sys;
   delete fESDpid;
   delete fTOFcalib;
   delete fTOFT0maker;
@@ -179,10 +232,12 @@ AliAnalysisTaskTPCTOFPID::UserCreateOutputObjects()
    * user create output objects
    */
   OpenFile(1);
+  OpenFile(2);
   /* output tree */
   fPIDTree = new TTree("PIDTree","PIDTree");
   fPIDTree->Branch("AnalysisEvent", "AliAnalysisPIDEvent", &fAnalysisEvent);  
-  fPIDTree->Branch("AnalysisTrack", "TClonesArray", &fAnalysisTrackArray);  
+  fPIDTree->Branch("AnalysisTrack", "TClonesArray", &fAnalysisTrackArray); 
+  fPIDTree->Branch("AnalysisV0Track","TClonesArray",&fAnalysisV0TrackArray);
   if (fMCFlag)
     fPIDTree->Branch("AnalysisParticle", "TClonesArray", &fAnalysisParticleArray);
 
@@ -190,10 +245,13 @@ AliAnalysisTaskTPCTOFPID::UserCreateOutputObjects()
   AliAnalysisManager *man=AliAnalysisManager::GetAnalysisManager();
   AliInputEventHandler* inputHandler = (AliInputEventHandler*) (man->GetInputEventHandler());
   fPIDResponse = inputHandler->GetPIDResponse(); 
-  fMultiUtils = new AliPPVsMultUtils();
+  fAnUtils = new AliAnalysisUtils();
   Double_t V0MbinsDefault[13] = {0, 0.01, 0.1, 1, 5, 10, 15, 20, 30, 40, 50, 70, 100};
   V0MBinCount = new TH1F("V0MBinCount","V0MBinCount",12,V0MbinsDefault);
+
+  fEvHist = new TH1D("StatHist","StatHist",10,-0.5,9.5);
   PostData(1,fPIDTree);
+  PostData(2,fEvHist);
 }
 
 //_______________________________________________________
@@ -229,6 +287,8 @@ AliAnalysisTaskTPCTOFPID::InitRun()
     AliError("cannot init TOF calib");
     return kFALSE;
   }
+  if(fAnUtils->IsSPDClusterVsTrackletBG(fESDEvent)) return kFALSE;
+  if(fESDEvent->IsIncompleteDAQ()) return kFALSE;
   AliInfo(Form("initialized for run %d", runNb));
   fInitFlag = kTRUE;
   fRunNumber = runNb;
@@ -236,7 +296,9 @@ AliAnalysisTaskTPCTOFPID::InitRun()
 }
 
 //_______________________________________________________
-
+void AliAnalysisTaskTPCTOFPID::FillHist(Double_t myflag) {
+  fEvHist->Fill(myflag);
+};
 Bool_t
 AliAnalysisTaskTPCTOFPID::InitEvent()
 {
@@ -246,17 +308,21 @@ AliAnalysisTaskTPCTOFPID::InitEvent()
 
   /* get ESD event */
   fESDEvent = dynamic_cast<AliESDEvent *>(InputEvent());
+  FillHist(0);
   if (!fESDEvent) return kFALSE;
   /* get MC event */
+  FillHist(1);
   if (fMCFlag) {
     fMCEvent = dynamic_cast<AliMCEvent *>(MCEvent());
     if (!fMCEvent) return kFALSE;
   }
+  FillHist(2);
   /* get stack */
   if (fMCFlag) {
     fMCStack = fMCEvent->Stack();
     if (!fMCStack) return kFALSE;
   }
+  FillHist(3);
   /* event selection */
   fIsCollisionCandidate = (((AliInputEventHandler*)(AliAnalysisManager::GetAnalysisManager()->GetInputEventHandler()))->IsEventSelected() & AliVEvent::kAny);
   fIsEventSelected = ((AliInputEventHandler*)(AliAnalysisManager::GetAnalysisManager()->GetInputEventHandler()))->IsEventSelected();
@@ -302,7 +368,7 @@ AliAnalysisTaskTPCTOFPID::InitEvent()
   fTOFT0maker->ComputeT0TOF(fESDEvent);
   fESDpid->MakePID(fESDEvent, kFALSE, 0.);
 #endif
-
+  
   return kTRUE;
 }
 
@@ -331,8 +397,103 @@ AliAnalysisTaskTPCTOFPID::HasPrimaryDCA(AliESDtrack *track)
   /* primary DCA ok */
   return kTRUE;
 }
-
+Int_t AliAnalysisTaskTPCTOFPID::GetTrackCutsFlag(AliESDtrack *LocalTrack) {
+  Int_t ReturnFlag = 0;
+  if(fTrackCuts2010->AcceptTrack(LocalTrack)) ReturnFlag+=1;
+  if(fTrackCuts2011->AcceptTrack(LocalTrack)) ReturnFlag+=2;
+  if(fTrackCutsTPCRefit->AcceptTrack(LocalTrack)) ReturnFlag+=4;
+  if(fTrackCuts2011Sys->AcceptTrack(LocalTrack)) ReturnFlag+=8;
+  return ReturnFlag;
+};
 //_______________________________________________________
+void AliAnalysisTaskTPCTOFPID::ProcessV0s() {
+  Int_t NV0s = fESDEvent->GetNumberOfV0s();
+  if(NV0s<1) return;
+  const AliESDVertex *BestPrimaryVertex = fESDEvent->GetPrimaryVertex();
+  if(!BestPrimaryVertex) return;
+  if(!(BestPrimaryVertex->GetStatus())) return;
+  Double_t IPrimaryVtxPosition[3];
+  BestPrimaryVertex->GetXYZ(IPrimaryVtxPosition);
+  Double_t IPrimaryVtxCov[6];
+  BestPrimaryVertex->GetCovMatrix(IPrimaryVtxCov);
+  Double_t IPrimaryVtxChi2 = BestPrimaryVertex->GetChi2toNDF();
+  AliAODVertex *PrimaryVertex = new AliAODVertex(IPrimaryVtxPosition,IPrimaryVtxCov,IPrimaryVtxChi2,NULL,-1,AliAODVertex::kPrimary);
+
+
+  Double_t InvMasses[4];
+  fAnalysisV0TrackArray->Clear();
+  for(Int_t iV0=0;iV0<NV0s;iV0++) {
+    AliESDv0 *V0Vertex = fESDEvent->GetV0(iV0);
+    if(!V0Vertex) continue;
+    //fAnalysisTrack->Update(track, fMCStack, fMCEvent,fPIDResponse, fTrackCuts->AcceptTrack(track));
+    AliAnalysisPIDTrack *pTrack = new AliAnalysisPIDTrack();
+    AliAnalysisPIDTrack *nTrack = new AliAnalysisPIDTrack();
+    AliESDtrack *temptrack = fESDEvent->GetTrack((UInt_t)TMath::Abs(V0Vertex->GetPindex()));
+    pTrack->Update(temptrack,fMCStack, fMCEvent,fPIDResponse, GetTrackCutsFlag(temptrack));
+    temptrack = fESDEvent->GetTrack((UInt_t)TMath::Abs(V0Vertex->GetNindex()));
+    nTrack->Update(temptrack,fMCStack, fMCEvent,fPIDResponse, GetTrackCutsFlag(temptrack));
+    
+    //    AliESDtrack *nTrack = fESDEvent->GetTrack((UInt_t)TMath::Abs(V0Vertex->GetNindex()));
+    if(!pTrack||!nTrack) continue;
+    if(pTrack->GetSign()==nTrack->GetSign()) continue; //Remove like-sign
+    //if(TMath::Abs(pTrack->GetEta())>0.8 || TMath::Abs(nTrack->GetEta())>0.8) continue; //Eta cut
+    //if(pTrack->GetPt()<2) continue; //pT cut on decay product
+    //if(nTrack->GetPt()<2) continue; //pT cut on decay product
+    Bool_t ChargesSwitched=kFALSE;
+    if(pTrack->GetSign()<0) {
+      AliAnalysisPIDTrack *ttr = nTrack;
+      nTrack = pTrack;//fESDEvent->GetTrack((UInt_t)TMath::Abs(V0Vertex->GetPindex()));
+      pTrack = ttr;//nTrack;//fESDEvent->GetTrack((UInt_t)TMath::Abs(V0Vertex->GetNindex()));
+      ChargesSwitched=kTRUE;
+    };
+    Double_t alpha = V0Vertex->AlphaV0(); //Probably save these
+    Double_t ptarm = V0Vertex->PtArmV0(); //Probably save these
+    Double_t IV0Position[3];
+    V0Vertex->GetXYZ(IV0Position[0],IV0Position[1],IV0Position[2]);
+    Double_t IV0Radius = TMath::Sqrt(IV0Position[0]*IV0Position[0]+IV0Position[1]*IV0Position[1]);
+    if(IV0Radius>100||IV0Radius<5) continue;
+    AliKFVertex PrimaryVtxKF(*PrimaryVertex);
+    AliKFParticle::SetField(fESDEvent->GetMagneticField());
+
+
+    Int_t indecies[2] = {211,2212}; //pi,p
+    Double_t myMasses[] = {0.498,1.116,1.116}; //K0s, lambda, anti-lambda
+    AliKFParticle *negKF[2] = {0,0}; //-pi, -p
+    AliKFParticle *posKF[2] = {0,0}; // pi,  p
+    if(ChargesSwitched)
+      for(Int_t i=0;i<2;i++) {
+	negKF[i] = new AliKFParticle(*(V0Vertex->GetParamP()), -indecies[i]);
+	posKF[i] = new AliKFParticle(*(V0Vertex->GetParamN()), indecies[i]);
+      } else
+      for(Int_t i=0;i<2;i++) {
+	negKF[i] = new AliKFParticle(*(V0Vertex->GetParamN()), -indecies[i]);
+	posKF[i] = new AliKFParticle(*(V0Vertex->GetParamP()), indecies[i]);
+      };
+    AliKFParticle V0KFs[3];
+    Bool_t TrashTracks=kTRUE; //Trash tracks if all below inv. mass
+    for(Int_t i=0;i<3;i++) {
+      V0KFs[i]+=(*posKF[(i==1)?1:0]);
+      V0KFs[i]+=(*negKF[(i==2)?1:0]);
+      V0KFs[i].SetProductionVertex(PrimaryVtxKF);
+      InvMasses[i] = V0KFs[i].GetMass()-myMasses[i];
+	TrashTracks = TrashTracks&&(TMath::Abs(InvMasses[i])>0.06);
+    };
+    if(TrashTracks) continue;
+    Double_t lpT = V0Vertex->Pt();
+    Double_t lEta = V0Vertex->Eta();
+    // Int_t lMCPDG = 0;
+    // if(fMCFlag) {
+    //   if(pTrack->GetMCMotherPdgCode()==nTrack->GetMCMotherPdgCode())
+    // 	if(pTrack->GetMCMotherLabel()==nTrack->GetMCMotherLabel())
+    // 	  lMCPDG = pTrack->GetMCMotherPdgCode();
+    // };
+    fAnalysisV0Track->Update(pTrack,nTrack,InvMasses,IV0Radius,V0Vertex->GetDcaV0Daughters(), V0Vertex->GetV0CosineOfPointingAngle(),lpT,lEta);
+    new ((*fAnalysisV0TrackArray)[fAnalysisV0TrackArray->GetEntries()]) AliAnalysisPIDV0(*fAnalysisV0Track);
+    
+  };
+
+};
+
 
 void
 AliAnalysisTaskTPCTOFPID::UserExec(Option_t *option)
@@ -345,18 +506,31 @@ AliAnalysisTaskTPCTOFPID::UserExec(Option_t *option)
 
   /* init run */
   if (!InitRun()) return;
+  FillHist(4);
   /* init event */
   if (!InitEvent()) return;
+  FillHist(5);
+  fAnalysisEvent->Reset();
+  Int_t EventSelectionFlag = 0;
+  Float_t V0MPercentile = -1000;
+  AliMultSelection *ams = (AliMultSelection*)fESDEvent->FindListObject("MultSelection");
+  if(!ams)
+    V0MPercentile = -999;
+  else {
+    V0MPercentile = ams->GetMultiplicityPercentile("V0M");
+    if(ams->GetThisEventIsNotPileup()) EventSelectionFlag += AliAnalysisPIDEvent::kNotPileupInSPD;
+    if(ams->GetThisEventIsNotPileupMV()) EventSelectionFlag += AliAnalysisPIDEvent::kNotPileupInMV;
+    if(ams->GetThisEventIsNotPileupInMultBins()) EventSelectionFlag += AliAnalysisPIDEvent::kNotPileupInMB;
+    if(ams->GetThisEventINELgtZERO()) EventSelectionFlag+=AliAnalysisPIDEvent::kINELgtZERO;
+    if(ams->GetThisEventHasNoInconsistentVertices()) EventSelectionFlag+=AliAnalysisPIDEvent::kNoInconsistentVtx;
+    if(ams->GetThisEventIsNotAsymmetricInVZERO()) EventSelectionFlag+=AliAnalysisPIDEvent::kNoV0Asym;
+  };
+  fAnalysisEvent->SetV0Mmultiplicity(V0MPercentile);
+  fAnalysisEvent->SetEventFlags(EventSelectionFlag);
+  AliVVZERO *v0 = fESDEvent->GetVZEROData();
+  for(Int_t i=0;i<32;i++) fAnalysisEvent->SetV0CellAmplitude(i,v0->GetMultiplicityV0A(i));
+  for(Int_t i=32;i<64;i++) fAnalysisEvent->SetV0CellAmplitude(i,v0->GetMultiplicityV0C(i-32));
   
-  
-  Float_t V0MPercentile = fMultiUtils->GetMultiplicityPercentile(fESDEvent, "V0M");
-  Bool_t IsNotPileUpFromSPDInMultBins=fMultiUtils->IsNotPileupSPDInMultBins(fESDEvent);
-  Bool_t IsINELgtZERO = fMultiUtils->IsINELgtZERO(fESDEvent);
-  Bool_t IsAcceptedVertexPosition=fMultiUtils->IsAcceptedVertexPosition(fESDEvent);
-  Bool_t HasNoInconsistentSPDandTrackVertices=fMultiUtils->HasNoInconsistentSPDandTrackVertices(fESDEvent);
-  Bool_t IsMinimumBias=fMultiUtils->IsMinimumBias(fESDEvent);
-
-
 
   /*** MC PRIMARY PARTICLES ***/
 
@@ -372,16 +546,21 @@ AliAnalysisTaskTPCTOFPID::UserExec(Option_t *option)
     TParticlePDG *particlePDG;
     /* loop over primary particles */
     for (Int_t ipart = 0; ipart < nPrimaries; ipart++) {
-      /* check primary */
-      if (!fMCStack->IsPhysicalPrimary(ipart)) continue;
+      Bool_t OWSave=kFALSE; //Overwrite save -- used to add other particle than primaries
       /* get particle */
       particle = fMCStack->Particle(ipart);
       if (!particle) continue;
       /* get particlePDG */
       particlePDG = particle->GetPDG();
+      Int_t pdgcode = TMath::Abs(particle->GetPdgCode());
       if (!particlePDG) continue;
+      OWSave = ((pdgcode==333)||(pdgcode==310)||(pdgcode==3122)||(pdgcode==11));
+
+      /* check primary */
+      if ((!fMCStack->IsPhysicalPrimary(ipart))&&(!OWSave)) continue;
+
       /* check charged */
-      if (particlePDG->Charge() == 0.) continue;
+      if ((particlePDG->Charge()==0.)&&(!OWSave)) continue;
       mcmulti++;
       /* check rapidity and pt cuts */
       if (TMath::Abs(particle->Y()) > fRapidityCut) continue;
@@ -396,7 +575,7 @@ AliAnalysisTaskTPCTOFPID::UserExec(Option_t *option)
 
   /*** GLOBAL EVENT INFORMATION ***/
 
-  fAnalysisEvent->Reset();
+  //  fAnalysisEvent->Reset(); // Moved up
   /* update global event info */
   fAnalysisEvent->SetIsCollisionCandidate(fIsCollisionCandidate);
   fAnalysisEvent->SetIsEventSelected(fIsEventSelected);
@@ -404,7 +583,8 @@ AliAnalysisTaskTPCTOFPID::UserExec(Option_t *option)
   fAnalysisEvent->SetHasVertex(fHasVertex);
   fAnalysisEvent->SetVertexZ(fVertexZ);
   fAnalysisEvent->SetMCTimeZero(fMCTimeZero);
-  fAnalysisEvent->SetPPVsMultFlags(IsNotPileUpFromSPDInMultBins,IsINELgtZERO,IsAcceptedVertexPosition,HasNoInconsistentSPDandTrackVertices,IsMinimumBias);
+  fAnalysisEvent->SetRunNumber(fRunNumber);
+  fAnalysisEvent->SetMagneticField(fESDEvent->GetMagneticField());
 				
   /* update TOF event info */
   for (Int_t i = 0; i < 10; i++) {
@@ -420,12 +600,11 @@ AliAnalysisTaskTPCTOFPID::UserExec(Option_t *option)
   refmulti = AliESDtrackCuts::GetReferenceMultiplicity(fESDEvent, AliESDtrackCuts::kTrackletsITSTPC,0.8);  
   fAnalysisEvent->SetReferenceMultiplicity(refmulti);
   fAnalysisEvent->SetMCMultiplicity(mcmulti);
-  fAnalysisEvent->SetV0Mmultiplicity(fMultiUtils->GetMultiplicityPercentile(fESDEvent, "V0M"));
   /*** RECONSTRUCTED TRACKS ***/
 
   /* reset track array */
   fAnalysisTrackArray->Clear();
-
+  // fAnalysisV0TrackArray->Clear();
   /* loop over ESD tracks */
   Int_t nTracks = fESDEvent->GetNumberOfTracks();
   AliESDtrack *track;
@@ -434,15 +613,28 @@ AliAnalysisTaskTPCTOFPID::UserExec(Option_t *option)
     track = fESDEvent->GetTrack(itrk);
     if (!track) continue;
     /* check accept track */
+    Int_t trflag = GetTrackCutsFlag(track);
+    if(!trflag) continue;
     
     /* update and add analysis track */
-    fAnalysisTrack->Update(track, fMCStack, fMCEvent,fPIDResponse, fTrackCuts->AcceptTrack(track));
+    fAnalysisTrack->Update(track, fMCStack, fMCEvent,fPIDResponse, trflag);
+    if(track->IsEMCAL()) {
+      AliVCluster *lvcl = fESDEvent->GetCaloCluster(track->GetEMCALcluster());
+      if(lvcl)
+	fAnalysisTrack->SetEMCalPars(lvcl->E(),track->GetTrackPOnEMCal());
+    };
     new ((*fAnalysisTrackArray)[fAnalysisTrackArray->GetEntries()]) AliAnalysisPIDTrack(*fAnalysisTrack);
+    //fAnalysisV0Track = (V0Track*)fAnalysisTrack;
+    /*fAnalysisV0Track->SetExtraParam(3);
+      new ((*fAnalysisV0TrackArray)[fAnalysisV0TrackArray->GetEntries()]) V0Track(*fAnalysisV0Track);*/
+    
 
   } /* end of loop over ESD tracks */
+  ProcessV0s();
   fPIDTree->Fill();
 
   PostData(1,fPIDTree);
+  PostData(2,fEvHist);
 }
 
 void AliAnalysisTaskTPCTOFPID::Terminate(Option_t *) {

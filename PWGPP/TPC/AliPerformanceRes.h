@@ -17,7 +17,6 @@ class TH2F;
 
 class AliVTrack;
 class AliMCEvent;
-class AliStack;
 class AliTrackReference;
 class AliVEvent; 
 class AliVfriendEvent; 
@@ -51,9 +50,9 @@ public :
   virtual TFolder* GetAnalysisFolder() const {return fAnalysisFolder;}
 
   // Process events
-  void ProcessConstrained(AliStack* const stack, AliVTrack *const vTrack, AliVEvent* const vEvent );
-  void ProcessTPC(AliStack* const stack, AliVTrack *const vTrack, AliVEvent* const vEvent);
-  void ProcessTPCITS(AliStack* const stack, AliVTrack *const vTrack, AliVEvent* const vEvent);
+  void ProcessConstrained(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent* const vEvent );
+  void ProcessTPC(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent* const vEvent);
+  void ProcessTPCITS(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent* const vEvent);
   void ProcessInnerTPC(AliMCEvent *const mcEvent, AliVTrack *const vTrack, AliVEvent* const vEvent);
   void ProcessOuterTPC(AliMCEvent *const mcEvent, AliVTrack *const vTrack, const AliVfriendTrack *const friendTrack, AliVEvent* const vEvent);
 

@@ -3,6 +3,7 @@
 
 //_________________________________________________________________________
 /// \class AliAnalysisTaskEMCALTimeCalib
+/// \ingroup EMCALPerformance 
 /// \brief Task to work on Time Calibration for EMCal/DCal.
 ///
 /// Derived from "Exercice with a task to work on T0 from TOF or T0" by Hugues Delagrange (SUBATECH)"
@@ -40,6 +41,7 @@
 /// 2016.02.02 added flag to fill heavy histograms
 /// 2016.02.03 added bad channel map
 /// 2016.02.08 added control histograms for low gain separatelly
+/// 2017.06.16 added correct triggers + calibratin on most ene cell in cluster
 ///
 /// \author Hugues Delagrange+, SUBATECH
 /// \author Marie Germain <marie.germain@subatech.in2p3.fr>, SUBATECH
@@ -89,6 +91,7 @@ class AliAnalysisTaskEMCALTimeCalib : public AliAnalysisTaskSE
     fPileupFromSPD(kFALSE),
     fMinTime(0),
     fMaxTime(0),
+    fMostEneCellOnly(kFALSE),
     fRawTimeNbins (0),
     fRawTimeMin   (0),
     fRawTimeMax   (0),
@@ -229,6 +232,9 @@ class AliAnalysisTaskEMCALTimeCalib : public AliAnalysisTaskSE
   void SwitchOnPileupFromSPD()  { fPileupFromSPD = kTRUE ; }
   void SwitchOffPileupFromSPD() { fPileupFromSPD = kFALSE ; }
 
+  void SwitchOnMostEneCellOnly()  { fMostEneCellOnly = kTRUE ; }
+  void SwitchOffMostEneCellOnly() { fMostEneCellOnly = kFALSE ; }
+  
   void SwitchOnBadReco()  { fBadReco = kTRUE ; }
   void SwitchOffBadReco() { fBadReco = kFALSE ; }
 
@@ -303,6 +309,8 @@ class AliAnalysisTaskEMCALTimeCalib : public AliAnalysisTaskSE
   Double_t       fMinTime ;             ///< minimum cluster time after correction
   Double_t       fMaxTime ;             ///< maximum cluster time after correction
 
+  Bool_t         fMostEneCellOnly ;     ///< flag to use calibration on most energetic cell in cluster only
+  
   //histogram settings
   Int_t          fRawTimeNbins ;        ///< number of bins of histo with raw time
   Double_t       fRawTimeMin   ;        ///< lower range of histo with raw time

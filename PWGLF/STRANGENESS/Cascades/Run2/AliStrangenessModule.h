@@ -55,6 +55,7 @@ public:
     void SetStandardMassFunctionsPbPb2015(); 
     
     void SetVerbose     ( Bool_t lVerb = kTRUE ) { lVerbose = lVerb; }
+    void SetUseGeant3FlukaCorrection ( Bool_t lg3f = kTRUE ) { lUseGeant3FlukaCorrection = lg3f; }
     void SetDoOnlyData  ( Bool_t lDoOnlyDataRec = kTRUE ) { lDoOnlyData = lDoOnlyDataRec; }
     
     //Option to use integrated multiplicity for very first fit (to get mean, sigma)  
@@ -73,10 +74,11 @@ public:
     Bool_t CheckCompatibleMultiplicity( TH3F *lHisto );
     Bool_t CheckCompatiblePt          ( TH3F *lHisto );
     Bool_t PerformInitialFit( TH1D *lHisto, Double_t &lMean, Double_t &lMeanErr, Double_t &lSigma, Double_t &lSigmaErr, TList *lControlList );
-    Bool_t PerformSignalExtraction( TH1D *lHisto, Double_t &lSignal, Double_t &lSignalErr, Double_t lMean, Double_t lSigma, TList *lControlList, TString lOption = "linear" );
+    Bool_t PerformSignalExtraction( TH1D *lHisto, Double_t &lSignal, Double_t &lSignalErr, Double_t &lBackground, Double_t &lBackgroundError, Double_t lMean, Double_t lSigma, TList *lControlList, TString lOption = "linear" );
     TString GetGoodFitOption( TH1D *lHisto, Int_t ilow, Int_t ihigh );
     Double_t BgPol1(const Double_t *x, const Double_t *par);
     Double_t BgPol2(const Double_t *x, const Double_t *par);
+    Double_t BgPol3(const Double_t *x, const Double_t *par);
     
 private:
     //Data holders (set via setters)
@@ -126,6 +128,9 @@ private:
 
     //Verbosity boolean
     Bool_t lVerbose;
+    
+    //G3/F correction (only meant for run 1 data!)
+    Bool_t lUseGeant3FlukaCorrection;
     
     //Other control booleans
     Bool_t lDoOnlyData; //process only the data part and break without using MC 

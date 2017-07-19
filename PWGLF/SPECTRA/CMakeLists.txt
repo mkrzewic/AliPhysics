@@ -27,8 +27,7 @@ include_directories(${ROOT_INCLUDE_DIRS}
                     ${AliPhysics_SOURCE_DIR}/OADB/COMMON/MULTIPLICITY
                     ${AliPhysics_SOURCE_DIR}/PWG/Tools
                     ${AliPhysics_SOURCE_DIR}/PWGLF/SPECTRA/XtAnalysis
-            		    ${AliPhysics_SOURCE_DIR}/PWGCF/Correlations/JCORRAN/Base
-            		    ${AliPhysics_SOURCE_DIR}/PWGLF/NUCLEX/Nuclei/NucleiPbPb
+            	    ${AliPhysics_SOURCE_DIR}/PWGCF/Correlations/JCORRAN/Base
                     ${AliPhysics_SOURCE_DIR}/PWGUD/base
                     ${AliPhysics_SOURCE_DIR}/EVENTMIX
 		    ${AliPhysics_SOURCE_DIR}/PWG/TRD
@@ -66,6 +65,7 @@ set(SRCS
   PiKaPr/TPCTOFfits/AliAnalysisPIDEvent.cxx
   PiKaPr/TPCTOFfits/AliAnalysisPIDParticle.cxx
   PiKaPr/TPCTOFfits/AliAnalysisPIDTrack.cxx
+  PiKaPr/TPCTOFfits/AliAnalysisPIDV0.cxx
   PiKaPr/TPCTOFfits/AliAnalysisTaskTPCTOFPID.cxx
   PiKaPr/TOF/pp7/TOFSpectrappAnalysis.cxx
   PiKaPr/TOF/pp7/AliAnalysisCombinedHadronSpectra2MC.cxx
@@ -86,6 +86,8 @@ set(SRCS
   Kinks/AliAnalysisTaskKinksFilimon.cxx
   Kinks/AliAnalysisKinkESDat13.cxx
   Kinks/AliAnalysisKinkESDMC13.cxx
+  Kinks/AliAnalysisTaskKinkpp5TeV.cxx
+  Kinks/AliAnalysisTaskKinkpp5TeVMC.cxx
   PiKaPr/TestAOD/AliSpectraBothTrackCuts.cxx
   PiKaPr/TestAOD/AliSpectraBothEventCuts.cxx
   PiKaPr/TestAOD/AliSpectraBothHistoManager.cxx
@@ -190,6 +192,8 @@ install(DIRECTORY PiKaPr/TestAOD DESTINATION PWGLF/SPECTRA/PiKaPr)
 install(DIRECTORY PiKaPr/ITSsa DESTINATION PWGLF/SPECTRA/PiKaPr)
 install(DIRECTORY PiKaPr/TPCTOFfits DESTINATION PWGLF/SPECTRA/PiKaPr)
 install(FILES PiKaPr/TOF/PbPb502/task/AddTaskTOFSpectra.C DESTINATION  PWGLF/SPECTRA/PiKaPr/TOF)
+install(FILES PiKaPr/TOF/PbPb502/task/AliUtilTOFParams.h DESTINATION  PWGLF/SPECTRA/PiKaPr/TOF/utilities)
+install(FILES PiKaPr/TOF/PbPb502/task/AliUtilTOFParams.cxx DESTINATION  PWGLF/SPECTRA/PiKaPr/TOF/utilities)
 install(FILES PiKaPr/TPCTOF/AddTaskCombinedHadronSpectra.C DESTINATION  PWGLF/SPECTRA/PiKaPr/TPCTOF)
 install(FILES PiKaPr/TPCTOFpA/AddTaskTPCTOFpA.C DESTINATION  PWGLF/SPECTRA/PiKaPr/TPCTOFpA)
 install(DIRECTORY XtAnalysis/macros DESTINATION PWGLF/SPECTRA/XtAnalysis)

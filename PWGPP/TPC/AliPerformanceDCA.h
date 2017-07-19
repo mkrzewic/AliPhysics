@@ -12,7 +12,6 @@
 
 class AliVEvent; 
 class AliVfriendEvent; 
-class AliStack; 
 class AliESDVertex;
 class AliVTrack;
 class TH3;
@@ -53,9 +52,9 @@ public :
   // Export objects to folder
   TFolder *ExportToFolder(TObjArray * array=0);
 
-  void ProcessConstrained(AliStack* const stack, AliVTrack *const vTrack);
-  void ProcessTPC(AliStack* const stack, AliVTrack *const vTrack, AliVEvent* const vEvent);
-  void ProcessTPCITS(AliStack* const stack, AliVTrack *const vTrack, AliVEvent* const vEvent);
+  void ProcessConstrained(AliMCEvent* const mcev, AliVTrack *const vTrack);
+  void ProcessTPC(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent* const vEvent);
+  void ProcessTPCITS(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent* const vEvent);
 
   // getters
   THnSparse* GetDCAHisto() const {return fDCAHisto;}

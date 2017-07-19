@@ -1,4 +1,5 @@
 /// \file runEMCALTimeCalibTask.C
+/// \ingroup EMCALPerformanceMacros
 /// \brief macro to run Time Calibration Task
 ///
 /// For Run1 data run in two iterations. 
@@ -155,6 +156,8 @@ void runEMCALTimeCalibTask(Int_t type=0, Bool_t isESD=kTRUE, Bool_t isPhysicsSel
   taskmbemcal->SetBadChannelMapSource(0);
   if(taskmbemcal->GetBadChannelMapSource()==2) taskmbemcal->SetBadChannelFileName("badMap.root");
 
+  //calibration with each cell
+  taskmbemcal->SwitchOffMostEneCellOnly();
 
   //taskmbemcal->SelectCollisionCandidates(AliVEvent::kAnyINT);
   //taskmbemcal->SetDebugLevel(10);

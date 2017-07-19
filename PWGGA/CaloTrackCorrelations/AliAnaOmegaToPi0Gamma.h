@@ -6,6 +6,7 @@
 
 //_________________________________________________________________________
 /// \class AliAnaOmegaToPi0Gamma
+/// \ingroup CaloTrackCorrelationsAnalysis 
 /// \brief omega(782)->pi0+gamma->3gamma
 ///
 /// Class to extract omega(782)->pi0+gamma->3gamma
@@ -23,7 +24,6 @@ class TLorentzVector;
 
 //Analysis
 #include "AliAnaCaloTrackCorrBaseClass.h"
-class TParticle;
 
 class AliAnaOmegaToPi0Gamma : public AliAnaCaloTrackCorrBaseClass {
   

@@ -3,6 +3,7 @@
 #include <TNamed.h>
 #include <TList.h>
 #include <TH3F.h>
+#include <TProfile.h>
 #include "AliVWeakResult.h"
 
 //+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -43,6 +44,10 @@ public:
     
     Long64_t Merge(TCollection *hlist);
     
+    //Acceptance
+    void SetCutMinRapidity      ( Double_t lCut ) { fCutMinRapidity       = lCut; }
+    void SetCutMaxRapidity      ( Double_t lCut ) { fCutMaxRapidity       = lCut; }
+    
     //Setters for V0 Cuts
     void SetCutDCANegToPV     ( Double_t lCut ) { fCutDCANegToPV       = lCut; }
     void SetCutDCAPosToPV     ( Double_t lCut ) { fCutDCAPosToPV       = lCut; }
@@ -53,6 +58,7 @@ public:
     //Setters for Cascade Cuts
     void SetCutDCAV0ToPV        ( Double_t lCut ) { fCutDCAV0ToPV         = lCut; }
     void SetCutV0Mass           ( Double_t lCut ) { fCutV0Mass            = lCut; }
+    void SetCutV0MassSigma      ( Double_t lCut ) { fCutV0MassSigma       = lCut; }
     void SetCutDCABachToPV      ( Double_t lCut ) { fCutDCABachToPV       = lCut; }
     void SetCutDCACascDaughters ( Double_t lCut ) { fCutDCACascDaughters  = lCut; }
     void SetCutCascCosPA        ( Double_t lCut ) { fCutCascCosPA         = lCut; }
@@ -73,11 +79,14 @@ public:
     void SetCutMCUseMCProperties    ( Bool_t lCut ) { fCutMCUseMCProperties    = lCut; }
     void SetCutMCSelectBump         ( Bool_t lCut ) { fCutMCSelectBump         = lCut; }
     
-    //Rsn-like bg subtraction (experimental
+    //Rsn-like bg subtraction (experimental)
     void SetSwapBachelorCharge         ( Bool_t lCut ) { fSwapBachCharge = lCut; }
     void SetSwapBaryon                 ( Bool_t lCut ) { fSwapBaryon        = lCut; }
     void SetSwapV0MesonCharge          ( Bool_t lCut ) { fSwapV0MesonCharge = lCut; }
     void SetSwapV0BaryonCharge         ( Bool_t lCut ) { fSwapV0BaryonCharge = lCut; }
+    
+    //2.76 TeV reanalysis cuts
+    void SetCutUse276TeVV0CosPA ( Bool_t lCut ) { fCutUse276TeVV0CosPA = lCut; }
     
     //Track Quality
     void SetCutUseITSRefitTracks    ( Bool_t lCut ) { fCutUseITSRefitTracks    = lCut; }
@@ -119,9 +128,29 @@ public:
         fCutVarV0CosPA_Const     = l5;
     }
     
+    //Variable BBCosPA
+    void SetCutUseVarBBCosPA      ( Bool_t lCut )   { fCutUseVariableBBCosPA     = lCut; }
+    void SetCutVarBBCosPAExp0Const( Double_t lCut ) { fCutVarBBCosPA_Exp0Const = lCut; }
+    void SetCutVarBBCosPAExp0Slope( Double_t lCut ) { fCutVarBBCosPA_Exp0Slope = lCut; }
+    void SetCutVarBBCosPAExp1Const( Double_t lCut ) { fCutVarBBCosPA_Exp1Const = lCut; }
+    void SetCutVarBBCosPAExp1Slope( Double_t lCut ) { fCutVarBBCosPA_Exp1Slope = lCut; }
+    void SetCutVarBBCosPAConst    ( Double_t lCut ) { fCutVarBBCosPA_Const     = lCut; }
+    void SetCutVarBBCosPA ( Double_t l1, Double_t l2, Double_t l3, Double_t l4, Double_t l5 ){
+        fCutUseVariableBBCosPA = kTRUE; //Automatically switch on!
+        fCutVarBBCosPA_Exp0Const = l1;
+        fCutVarBBCosPA_Exp0Slope = l2;
+        fCutVarBBCosPA_Exp1Const = l3;
+        fCutVarBBCosPA_Exp1Slope = l4;
+        fCutVarBBCosPA_Const     = l5;
+    }
+    
     AliCascadeResult::EMassHypo GetMassHypothesis () const { return fMassHypo; }
     Double_t GetMass() const;
     TString GetParticleName() const; 
+
+    //Getters for V0 Cuts
+    Double_t GetCutMinRapidity     () const { return fCutMinRapidity; }
+    Double_t GetCutMaxRapidity     () const { return fCutMaxRapidity; }
     
     //Getters for V0 Cuts
     Double_t GetCutDCANegToPV     () const { return fCutDCANegToPV; }
@@ -133,6 +162,7 @@ public:
     //Getters for Cascade Cuts
     Double_t GetCutDCAV0ToPV        () const { return fCutDCAV0ToPV; }
     Double_t GetCutV0Mass           () const { return fCutV0Mass; }
+    Double_t GetCutV0MassSigma      () const { return fCutV0MassSigma; }
     Double_t GetCutDCABachToPV      () const { return fCutDCABachToPV; }
     Double_t GetCutDCACascDaughters () const { return fCutDCACascDaughters; }
     Double_t GetCutCascCosPA        () const { return fCutCascCosPA; }
@@ -158,6 +188,9 @@ public:
     Bool_t GetSwapV0MesonCharge          () const { return fSwapV0MesonCharge;     }
     Bool_t GetSwapV0BaryonCharge         () const { return fSwapV0BaryonCharge;     }
     
+    //2.76 TeV reanalysis cuts
+    Bool_t GetCutUse276TeVV0CosPA () const { return fCutUse276TeVV0CosPA; }
+    
     //Track Quality
     Bool_t GetCutUseITSRefitTracks    () const { return fCutUseITSRefitTracks; }
     Double_t GetCutLeastNumberOfClusters () const { return fCutLeastNumberOfClusters; }
@@ -182,8 +215,20 @@ public:
     Double_t GetCutVarV0CosPAExp1Slope() const { return fCutVarV0CosPA_Exp1Slope; }
     Double_t GetCutVarV0CosPAConst    () const { return fCutVarV0CosPA_Const;     }
     
+    //Variable BBCosPA
+    Bool_t GetCutUseVarBBCosPA        () const { return fCutUseVariableBBCosPA;   }
+    Double_t GetCutVarBBCosPAExp0Const() const { return fCutVarBBCosPA_Exp0Const; }
+    Double_t GetCutVarBBCosPAExp0Slope() const { return fCutVarBBCosPA_Exp0Slope; }
+    Double_t GetCutVarBBCosPAExp1Const() const { return fCutVarBBCosPA_Exp1Const; }
+    Double_t GetCutVarBBCosPAExp1Slope() const { return fCutVarBBCosPA_Exp1Slope; }
+    Double_t GetCutVarBBCosPAConst    () const { return fCutVarBBCosPA_Const;     }
+    
     TH3F* GetHistogram       ()       { return fHisto; }
     TH3F* GetHistogramToCopy () const { return fHisto; }
+    
+    TProfile *GetProtonProfile       ()       { return fProtonProfile; }
+    TProfile *GetProtonProfileToCopy () const { return fProtonProfile; }
+    void InitializeProtonProfile(Long_t lNPtBins, Double_t *lPtBins); //Initialize profile, otherwise not stored
     
     //No such thing as feeddown corrections for this result
     //Kept to satisfy AliVWeakResult published interface, don't use in this case
@@ -198,6 +243,10 @@ private:
 
     AliCascadeResult::EMassHypo fMassHypo; //For determining invariant mass
 
+    //Basic acceptance criteria
+    Double_t fCutMinRapidity; //min rapidity
+    Double_t fCutMaxRapidity; //max rapidity
+    
     //V0 Selection Criteria
     Double_t fCutDCANegToPV;    //v0 vertexer 1
     Double_t fCutDCAPosToPV;    //v0 vertexer 2
@@ -208,6 +257,7 @@ private:
     //Cascade Selection Criteria
     Double_t fCutDCAV0ToPV;        //ca vertexer 1
     Double_t fCutV0Mass;           //ca vertexer 2
+    Double_t fCutV0MassSigma;           //ca vertexer 2bis
     Double_t fCutDCABachToPV;      //ca vertexer 3
     Double_t fCutDCACascDaughters; //ca vertexer 4
     Double_t fCutCascCosPA;        //ca vertexer 5
@@ -230,6 +280,8 @@ private:
     Bool_t fSwapBaryon; //select lambda/antilambda improperly for desired particle (bg)
     Bool_t fSwapV0MesonCharge; //swap V0 meson daughter charge
     Bool_t fSwapV0BaryonCharge; //swap V0 baryon daughter charge
+    
+    Bool_t fCutUse276TeVV0CosPA; //use 2.76 TeV-like variable V0 CosPA (experimental)
     
     //Track selections
     Bool_t fCutUseITSRefitTracks; //Use ITS refit tracks (will kill efficiency at high pT!)
@@ -257,9 +309,20 @@ private:
     Double_t fCutVarV0CosPA_Exp1Slope;
     Double_t fCutVarV0CosPA_Const;
     
+    //Experimental: pt-variable BB cosPA
+    //Warning: if this cut is tighter than fCutBachBaryonCosPA, this gets used instead!
+    Bool_t fCutUseVariableBBCosPA;
+    Double_t fCutVarBBCosPA_Exp0Const;
+    Double_t fCutVarBBCosPA_Exp0Slope;
+    Double_t fCutVarBBCosPA_Exp1Const;
+    Double_t fCutVarBBCosPA_Exp1Slope;
+    Double_t fCutVarBBCosPA_Const;
+    
     TH3F *fHisto; //Histogram for storing output with these configurations
     
-    ClassDef(AliCascadeResult, 22)
+    TProfile *fProtonProfile; //Histogram for bookkeeping proton momenta
+    
+    ClassDef(AliCascadeResult, 28)
     // 1 - original implementation
     // 2 - MC association implementation (disabled in real data analysis)
     // 3 - Variable binning constructor + re-order variables in main output for convenience
@@ -282,5 +345,11 @@ private:
     // 20 - Configuration flags for rsn-like bg estimation (experimental)
     // 21 - swap v0 meson charge addition
     // 22 - swap v0 baryon charge addition
+    // 23 - Parametric Bach Baryon CosPA
+    // 24 - addition of NSigma cut for Lambda mass (requires pre-configured task!)
+    // 25 - addition of rapidity selection (to enable 2.76 TeV re-analysis corrections)
+    // 26 - addition of proton momenta histogram (for G3/F correction, 2.76 TeV re-analysis corrections)
+    // 27 - bugfix
+    // 28 - implementation of 276TeVV0CosPA cut (variable with lambda p)
 };
 #endif

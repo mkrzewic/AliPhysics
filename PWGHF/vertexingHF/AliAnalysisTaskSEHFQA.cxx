@@ -139,6 +139,9 @@ AliAnalysisTaskSEHFQA::AliAnalysisTaskSEHFQA():AliAnalysisTaskSE()
   , fHisnClsITS(0)
   , fHisnClsITSselTr(0)
   , fHisnClsITSSA(0)
+  , fHisnClsITSSAspdAny(0)
+  , fHisnClsITSSAspdIn(0)
+  , fHisnClsITSSAspdOut(0)
   , fHisnLayerITS(0)
   , fHisnLayerITSselTr(0)
   , fHisnLayerITSsa(0)
@@ -233,6 +236,9 @@ AliAnalysisTaskSEHFQA::AliAnalysisTaskSEHFQA():AliAnalysisTaskSE()
   , fHiszvtxSelEv(0)
   , fHisWhichVert(0)
   , fHisWhichVertSelEv(0)
+  , fHisnClsITSvsNtrackletsSel(0)
+  , fHiszvtxvsSPDzvtx(0)
+  , fHiszvtxvsSPDzvtxSel(0)
   , fHisTrigCent(0)
   , fHisTrigMul(0)
   , fHisTrigCentSel(0)
@@ -314,6 +320,9 @@ AliAnalysisTaskSEHFQA::AliAnalysisTaskSEHFQA(const char *name, AliAnalysisTaskSE
   , fHisnClsITS(0)
   , fHisnClsITSselTr(0)
   , fHisnClsITSSA(0)
+  , fHisnClsITSSAspdAny(0)
+  , fHisnClsITSSAspdIn(0)
+  , fHisnClsITSSAspdOut(0)
   , fHisnLayerITS(0)
   , fHisnLayerITSselTr(0)
   , fHisnLayerITSsa(0)
@@ -408,6 +417,9 @@ AliAnalysisTaskSEHFQA::AliAnalysisTaskSEHFQA(const char *name, AliAnalysisTaskSE
   , fHiszvtxSelEv(0)
   , fHisWhichVert(0)
   , fHisWhichVertSelEv(0)
+  , fHisnClsITSvsNtrackletsSel(0)
+  , fHiszvtxvsSPDzvtx(0)
+  , fHiszvtxvsSPDzvtxSel(0)
   , fHisTrigCent(0)
   , fHisTrigMul(0)
   , fHisTrigCentSel(0)
@@ -789,6 +801,12 @@ void AliAnalysisTaskSEHFQA::UserCreateOutputObjects()
 
     hname="hnClsITS-SA";
     fHisnClsITSSA=new TH1F(hname.Data(),"Distribution of number of ITS clusters(ITS-SA);nITScls;Entries",7,-0.5,6.5);
+    hname="hnClsITS-SA-SPDAny";
+    fHisnClsITSSAspdAny=new TH1F(hname.Data(),"Distribution of number of ITS clusters(ITS-SA) - SPD kAny;nITScls;Entries",7,-0.5,6.5);
+    hname="hnClsITS-SA-SPDIn";
+    fHisnClsITSSAspdIn=new TH1F(hname.Data(),"Distribution of number of ITS clusters(ITS-SA) - SPDin;nITScls;Entries",7,-0.5,6.5);
+    hname="hnClsITS-SA-SPDOut";
+    fHisnClsITSSAspdOut=new TH1F(hname.Data(),"Distribution of number of ITS clusters(ITS-SA) - SPDout;nITScls;Entries",7,-0.5,6.5);
 
 
     hname="hnLayerITS";
@@ -1037,6 +1055,9 @@ void AliAnalysisTaskSEHFQA::UserCreateOutputObjects()
     fOutputTrack->Add(fHisnClsITS);
     fOutputTrack->Add(fHisnClsITSselTr);
     fOutputTrack->Add(fHisnClsITSSA);
+    fOutputTrack->Add(fHisnClsITSSAspdAny);
+    fOutputTrack->Add(fHisnClsITSSAspdIn);
+    fOutputTrack->Add(fHisnClsITSSAspdOut);
     fOutputTrack->Add(fHisnLayerITS);
     fOutputTrack->Add(fHisnLayerITSselTr);
     fOutputTrack->Add(fHisnLayerITSsa);
@@ -1253,7 +1274,8 @@ void AliAnalysisTaskSEHFQA::UserCreateOutputObjects()
     fHisWhichVertSelEv->GetXaxis()->SetBinLabel(4,"SPD-z");
 
     fHisnClsITSvsNtrackletsSel=new TH2F("hnClsITSvsNtrackletsSel","number of SPD clusters vs number of SPD tracklets; n. SPD clusters; Ntracklets",200,0,6000,500,0,20000); // max values should be changed for pp data to about 200 and 1000 respectively
-    fHiszvtxvsSPDzvtxSel=new TH2F("hzvtxvsSPDzvtxSel","event primary z-vertex vs SPD z-vertex; PV z-vertex [cm]; SPD z-vertex [cm]",800,-30,30,800,-30,30);
+    fHiszvtxvsSPDzvtx=new TH2F("hzvtxvsSPDzvtx","event primary z-vertex vs SPD z-vertex - before event selection; PV z-vertex [cm]; SPD z-vertex [cm]",800,-30,30,800,-30,30);
+    fHiszvtxvsSPDzvtxSel=new TH2F("hzvtxvsSPDzvtxSel","event primary z-vertex vs SPD z-vertex - after event selection; PV z-vertex [cm]; SPD z-vertex [cm]",800,-30,30,800,-30,30);
 
     fHisTrigCent=new TH2F("hTrigCent","Centrality vs. Trigger types",24,-1.5,22.5,12,-10,110);
     fHisTrigCent->GetXaxis()->SetBinLabel(1,"All");
@@ -1397,6 +1419,7 @@ void AliAnalysisTaskSEHFQA::UserCreateOutputObjects()
     fOutputEvSelection->Add(trigCounter2);
     fOutputEvSelection->Add(fHisWhyEvRejected);
     fOutputEvSelection->Add(fHisnClsITSvsNtrackletsSel);
+    fOutputEvSelection->Add(fHiszvtxvsSPDzvtx);
     fOutputEvSelection->Add(fHiszvtxvsSPDzvtxSel);
 
   }
@@ -2226,15 +2249,16 @@ void AliAnalysisTaskSEHFQA::UserExec(Option_t */*option*/)
     fHisyvtx->Fill(yvtx);
     fHiszvtx->Fill(zvtx);
     fHisWhichVert->Fill(vtxTyp);
+    const AliVVertex *vSPD = aod->GetPrimaryVertexSPD();
+    fHiszvtxvsSPDzvtx->Fill(vSPD->GetZ(),zvtx);
     if(evSelected){
       fHisxvtxSelEv->Fill(xvtx);
       fHisyvtxSelEv->Fill(yvtx);
       fHiszvtxSelEv->Fill(zvtx);
       fHisWhichVertSelEv->Fill(vtxTyp);
+      fHiszvtxvsSPDzvtxSel->Fill(vSPD->GetZ(),zvtx);
     }
 
-    const AliVVertex *vSPD = aod->GetPrimaryVertexSPD();
-    fHiszvtxvsSPDzvtxSel->Fill(vSPD->GetZ(),zvtx);
     Int_t nCls = aod->GetNumberOfITSClusters(0) + aod->GetNumberOfITSClusters(1);
     fHisnClsITSvsNtrackletsSel->Fill(nCls,aod->GetTracklets()->GetNumberOfTracklets());
 
@@ -2413,7 +2437,7 @@ void AliAnalysisTaskSEHFQA::UserExec(Option_t */*option*/)
 	    tofTime-=startTime;
 	    for (Int_t type=0;type<AliPID::kSPECIES;type++) tofRes[type]=tofResp.GetExpectedSigma(track->P(),times[type],AliPID::ParticleMassZ(type));
 	  }
-	  fHisTOFtime->Fill(times[AliPID::kProton]);
+	  fHisTOFtime->Fill(times[AliPID::kKaon]);
 	  fHisTOFtimeKaonHyptime->Fill(track->P(),tofTime-times[3]); //3 is kaon
 	  fHisTOFsig->Fill(tofTime);
 	  if (pid->GetTOFsignal()< 0) fHisTOFsig->Fill(-1);
@@ -2561,6 +2585,12 @@ void AliAnalysisTaskSEHFQA::UserExec(Option_t */*option*/)
 	}
 	if(!(track->GetStatus()&AliESDtrack::kTPCin) && track->GetStatus()&AliESDtrack::kITSrefit && !(track->GetStatus()&AliESDtrack::kITSpureSA)){//tracks retrieved in the ITS and not reconstructed in the TPC
 	  fHisnClsITSSA->Fill(nclsTot);
+     if(track->HasPointOnITSLayer(0) || track->HasPointOnITSLayer(1))
+       fHisnClsITSSAspdAny->Fill(nclsTot);
+     if(track->HasPointOnITSLayer(0))
+       fHisnClsITSSAspdIn->Fill(nclsTot);
+     if(track->HasPointOnITSLayer(1))
+       fHisnClsITSSAspdOut->Fill(nclsTot);
 	  fHisnLayerITSsa->Fill(-1);
 	  for(Int_t l=0;l<6;l++) {
 	    if(TESTBIT(track->GetITSClusterMap(),l)) {

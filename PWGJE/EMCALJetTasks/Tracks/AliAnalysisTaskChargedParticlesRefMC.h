@@ -149,6 +149,17 @@ public:
   void SetOfflineTriggerSelection(AliEmcalTriggerOfflineSelection *sel) { fTriggerSelection = sel; }
 
   /**
+   * @brief Require bunch crossing information of track obtained from TOF (if available)
+   * matches the bunch crossing ID of the event
+   *
+   * Pileup is not simulated in ALICE. This means on simulation level only the TOF matching is required
+   * in order to check the efficiency of the TOF matching
+   *
+   * @param[in] doRequire If true the track is only selected if it has a TOF match
+   */
+  void SetRequireTOFBunchCrossing(Bool_t doRequire) { fRequireTOFBunchCrossing = doRequire; }
+
+  /**
    * @brief Get the trigger offline selection.
    *
    * Providing access to the trigger offline selection. Note that
@@ -190,6 +201,12 @@ public:
    * @param[in] name Name of the OADB container with the trigger acceptance map
    */
   void SetTriggerAcceptanceOADB(const TString &name) { fNameAcceptanceOADB = name; }
+
+  /**
+   * @brief Add histograms for tracks pointing to EMCAL supermodules
+   * @param[in] doStudy If true histograms are added
+   */
+  void SetStudyEMCALgeo(Bool_t doStudy) { fStudyEMCALgeo = doStudy; }
 
   /**
    * Preconfigure task. Intended for subwagon configuration inside the train.
@@ -275,9 +292,10 @@ protected:
    * @param[in] etacent Track \f$ \eta \f$ in cms frame
    * @param[in] phi Track \f$ \eta \f$ in lab frame
    * @param[in] inEmcal Track in EMCAL \f$ \phi \f$ acceptance
+   * @param[in] isPrimary If true then the particle is a primary particle
    * @param[in] pid True particle species
    */
-  void FillTrackHistos(const TString &eventclass, Double_t weight, Bool_t posCharge, Double_t pt, Double_t eta, Double_t etacent, Double_t phi, Bool_t inEmcal, const TString &pid);
+  void FillTrackHistos(const TString &eventclass, Double_t weight, Bool_t posCharge, Double_t pt, Double_t eta, Double_t etacent, Double_t phi, Bool_t inEmcal, Bool_t isPrimary, const TString &pid);
 
   /**
    * Apply trigger selection using offline patches and trigger thresholds based on offline ADC Amplitude
@@ -340,6 +358,8 @@ private:
   Double_t                              fFracPtHard;                ///< Cut on the maximum fraction of pt hard of any trigger jet
   Bool_t                                fEnableSumw2;               ///< Enable sumw2 when filling histograms (by default off)
   Bool_t                                fStudyPID;                  ///< Fill kinematics histograms with information of true particle species (default: off)
+  Bool_t                                fStudyEMCALgeo;             ///< Add histograms for tracks pointing to the EMCAL acceptance
+  Bool_t                                fRequireTOFBunchCrossing;   ///< Require TOF bunch crossing information (reducing to simple TOF matching in simulation)
 
   TString                               fNameAcceptanceOADB;        ///< Name of the OADB container with trigger acceptance maps
 

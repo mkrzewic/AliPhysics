@@ -19,7 +19,6 @@ class AliVEvent;
 class AliVfriendEvent;
 class AliMCEvent;
 class AliVTrack;
-class AliStack;
 class TRootIOCtor;
 
 #include "THnSparse.h"
@@ -57,10 +56,10 @@ public :
   TFolder *ExportToFolder(TObjArray * array=0);
 
   // Process events
-    void  ProcessTPC(AliStack* const stack, AliVTrack *const vTrack); // not implemented
-    void  ProcessInnerTPC(AliStack* const stack, AliVTrack *const vTrack, AliVEvent *const vEvent);
-    void  ProcessTPCITS(AliStack* const stack, AliVTrack *const vTrack);      // not implemented
-    void  ProcessConstrained(AliStack* const stack, AliVTrack *const vTrack); // not implemented
+  void  ProcessTPC(AliMCEvent* const mcev, AliVTrack *const vTrack); // not implemented
+  void  ProcessInnerTPC(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent *const vEvent);
+  void  ProcessTPCITS(AliMCEvent* const mcev, AliVTrack *const vTrack);      // not implemented
+  void  ProcessConstrained(AliMCEvent* const mcev, AliVTrack *const vTrack); // not implemented
 
   
   // produce summary (currently not used)
@@ -73,7 +72,7 @@ public :
   //
   THnSparse* GetDeDxHisto() const {return fDeDxHisto;}
   TObjArray* GetHistos() const { return fFolderObj; }
-  TObjArray* GetListOfDrawableObjects() {TObjArray* tmp = fFolderObj; fFolderObj = NULL; return tmp;}
+  TCollection* GetListOfDrawableObjects();
     
   virtual void ResetOutputData();
 

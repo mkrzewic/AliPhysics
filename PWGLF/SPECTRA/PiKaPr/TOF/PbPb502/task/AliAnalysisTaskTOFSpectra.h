@@ -1,12 +1,15 @@
 #ifndef AliAnalysisTaskTOFSpectra_H
 #define AliAnalysisTaskTOFSpectra_H
 
-//////////////////////////////////////////////////////////////////////////////
-//                                                                          //
-// This analysis extracts pT-spectra of charged kaons, protons, and pions.  //
-// It is based on particles identifation via the TOF signal.                //
-//                                                                          //
-//////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///                                                                          //
+/// This analysis extracts pT-spectra of charged kaons, protons, and pions.  //
+/// It is based on particles identifation via the TOF signal.                //
+///                                                                          //
+///                                                                          //
+/// Authors:                                                                 //
+/// N. Jacazio,  nicolo.jacazio[AROBASe]bo.infn.it                           //
+///////////////////////////////////////////////////////////////////////////////
 
 class TH1;
 class TH1F;
@@ -31,7 +34,6 @@ class TClonesArray;
 #include "AliTOFT0v1.h"
 #include "AliTOFT0maker.h"
 #include "AliTOFcalib.h"
-#include "AliCDBManager.h"
 #include "AliMultSelection.h"
 #include <TTree.h>
 #include "AliAnalysisTask.h"
@@ -140,6 +142,16 @@ public:
   ///
   /// Method to obtain in a common way the vertex information, this also checks the vertex quality
   const AliESDVertex * ObtainVertex();
+  
+  // TOF calibration methods
+  
+  ///
+  /// Method to prepare to run with a new TOF calibratin, this initialize from the run, therefore should only once for each run
+  Bool_t TOFCalibInitRun();
+  
+  ///
+  /// Method to prepare to run with a new TOF calibratin, this initialize from the event, therefore should once for each event
+  Bool_t TOFCalibInitEvent();
   
   //
   //Mask
@@ -468,9 +480,15 @@ private:
   AliMCEvent* fMCEvt;                //!<! MC event
   AliStack* fMCStack;                //!<! Stack
   AliESDtrackCuts* fCutVar[nCutVars];//!<! basic cut variables cut variations
-  AliESDpid* fESDpid;                //!<! basic TPC object for n-sigma cuts
   AliMultSelection *fMultSel;        //!<! Multiplicity selection
+  
+  //TOF specific objects
   AliESDTOFCluster *fTOFcls;         //!<! TOF cluster object
+  AliTOFcalib *fTOFcalib;            //!<! TOF calibration object
+  AliTOFT0maker *fTOFT0maker;        //!<! TOF T0 maker object
+  
+  //TOF specific parameters
+  const Double_t fTimeResolution;    ///  TOF time resolutions expected
   
   //Output containers
   //TList
@@ -481,20 +499,25 @@ private:
   TTree* fTreeTrackMC;      //!<! TTree to store MC information of the single track
   
   //Configuration Flags
-  Bool_t fHImode;            ///<  Flag for the Heavy Ion Mode
-  Bool_t fMCmode;            ///<  Flag for the Monte Carlo Mode
-  Bool_t fTreemode;          ///<  Flag for the Tree analysis Mode
-  Bool_t fChannelmode;       ///<  Flag to set the analysis only on channel TOF
-  Bool_t fCutmode;           ///<  Flag to set the cut variation mode, cuts are not the standard cuts but are modified accordingly to the requirements
-  const Int_t fSimpleCutmode;///<  Index to set simple configuration of the track cuts
-  const Bool_t fBuilTPCTOF;  ///<  Flag to build the TPC TOF separation
-  const Bool_t fBuilDCAchi2; ///<  Flag to build the DCAxy distributions with the cut on the Golden Chi2
-  const Bool_t fUseTPCShift; ///<  Flag to use the Shift of the TPC nsigma
-  const Bool_t fPerformance; ///<  Flag to fill the performance plots
-  UInt_t fSelectBit;         ///<  Mask for Trigger selection
+  Bool_t fHImode;               ///<  Flag for the Heavy Ion Mode
+  Bool_t fMCmode;               ///<  Flag for the Monte Carlo Mode
+  Bool_t fTreemode;             ///<  Flag for the Tree analysis Mode
+  Bool_t fChannelmode;          ///<  Flag to set the analysis only on channel TOF
+  Bool_t fCutmode;              ///<  Flag to set the cut variation mode, cuts are not the standard cuts but are modified accordingly to the requirements
+  const Int_t fSimpleCutmode;   ///<  Index to set simple configuration of the track cuts
+  const Bool_t fUseAliEveCut;   ///<  Index to set the usage of the AliEventCuts class from OADB to select events
+  const Bool_t fBuilTPCTOF;     ///<  Flag to build the TPC TOF separation
+  const Bool_t fBuilDCAchi2;    ///<  Flag to build the DCAxy distributions with the cut on the Golden Chi2
+  const Bool_t fUseTPCShift;    ///<  Flag to use the Shift of the TPC nsigma
+  const Bool_t fPerformance;    ///<  Flag to fill the performance plots
+  const Bool_t fRecalibrateTOF; ///<  Flag to require to recalibrate the TOF signal
+  const Bool_t fFineTOFReso;    ///<  Flag to compute a finer TOF resolution as a function of the number of tracks with TOF signal
+  UInt_t fSelectBit;            ///<  Mask for Trigger selection
   
   //PID utilities
-  AliPIDResponse* fPIDResponse;   //!<! PID response object
+  AliPIDResponse* fPIDResponse;     //!<! PID response object
+  AliTOFPIDResponse fTOFPIDResponse;//!<! TOF PID response object
+  AliESDpid *fESDpid;               //!<! ESD PID
   
   //General Variables
   
@@ -537,11 +560,14 @@ private:
   TArrayF fMultiplicityBin;  ///<  Array of the Event Multiplicity bins
   
   //Cut values
+  const Double_t fVtxZCut;     ///<  Max Z displacement of the vertex position
   const Double_t fTOFmax;      ///<  Max TOF time mesured for tracks
   const Double_t fTOFmin;      ///<  Min TOF time mesured for tracks
   const Double_t fLengthmin;   ///<  Min length for tracks
   const Double_t fRapidityCut; ///<  Max rapidity for tracks
   
+  //Run variables
+  Int_t fRunNumber;        ///<  Run number under analysis
   
   //Event flags
   Bool_t fEvtPhysSelected; ///<  Event is selected by the Physics Selection
@@ -650,14 +676,19 @@ private:
   TH1F* hPerformanceCPUTime;                    ///<  Histogram with the CPU Time used
   
   //Event Info
-  TH1D* hNEvt;                                  ///<  Histogram with the number of events and all the events that passed each cut
-  TH1D* hEvtMult;                               ///<  Histogram with the event Multiplicity Before any physics selection
-  TH1D* hEvtMultAftEvSel;                       ///<  Histogram with the event Multiplicity After the physics selection
+  TH1F* hNEvt;                                  ///<  Histogram with the number of events and all the events that passed each cut
+  TH1F* hEvtMult;                               ///<  Histogram with the event Multiplicity Before any physics selection
+  TH1F* hEvtMultAftEvSel;                       ///<  Histogram with the event Multiplicity After the physics selection
+  TH1F* hEvtVtxXYBefSel;                        ///<  Histogram with the linear distance in the XY plane of the primary vertex before any selection on vertex position
+  TH1F* hEvtVtxZBefSel;                         ///<  Histogram with the linear distance along the Z axis of the primary vertex before any selection on vertex position
   TH1F* hEvtVtxXY;                              ///<  Histogram with the linear distance in the XY plane of the primary vertex
   TH1F* hEvtVtxZ;                               ///<  Histogram with the linear distance along the Z axis of the primary vertex
+  TH1F* hEvtVtxZMCGen;                          ///<  Histogram with the linear distance along the Z axis of the MC vertex of generated MC events
+  TH1F* hEvtVtxZMCPhysSel;                      ///<  Histogram with the linear distance along the Z axis of the MC vertex after physics selection
+  TH1F* hEvtVtxZMCReco;                         ///<  Histogram with the linear distance along the Z axis of the MC vertex of the events with reconstructed vertex
   
   //Track Info
-  TH1D* hNTrk;                                  ///<  Histogram with the number of tracks and all the tracks that passed each cut
+  TH1F* hNTrk;                                  ///<  Histogram with the number of tracks and all the tracks that passed each cut
   //->Track cuts information divided into before [0] and after [1] the cut
   TH1F* hTrkTPCCls[2];                          ///<  Histogram with the number of TPC crossed Rows of all not accepted and accepted tracks
   TH1F* hTrkTPCRows[2];                         ///<  Histogram with the number of TPC crossed Rows of all not accepted and accepted tracks
@@ -681,14 +712,17 @@ private:
   #endif
   TH1F* hCutVariation;                          ///<  Histogram with the number of tracks which pass each cut
   //->TOF information
-  TH1D* hTOFResidualX;                          ///<  Histogram with the Impact Residual X
-  TH1D* hTOFResidualZ;                          ///<  Histogram with the Impact Residual Z
-  TH1D* hTOFChannel;                            ///<  Histogram with the Channel in the TOF
-  TH1D* hT0Resolution;                          ///<  Histogram with the resolution on the T0
-  TH1D* hTimeOfFlightRes;                       ///<  Histogram with the Time Of Flight
-  TH1D* hTimeOfFlightTOFRes;                    ///<  Histogram with the Time Of Flight for events without the T0 Fill
-  TH1D* hTimeOfFlightGoodRes;                   ///<  Histogram with the Time Of Flight for tracks with good matching
-  TH1D* hTimeOfFlightResNoMismatch;             ///<  Histogram with the Time Of Flight for PID consistent with TPC for Pi K P
+  TH1F* hTOFResidualX;                          ///<  Histogram with the Impact Residual X
+  TH1F* hTOFResidualZ;                          ///<  Histogram with the Impact Residual Z
+  TH1F* hTOFChannel;                            ///<  Histogram with the Channel in the TOF
+  TH1F* hT0;                                    ///<  Histogram with the T0 used for each track
+  TH1F* hT0Resolution;                          ///<  Histogram with the resolution on the T0
+  TH1F* hTimeOfFlightRes;                       ///<  Histogram to compute the Time Of Flight resolution
+  TH1F* hTimeOfFlightTOFRes;                    ///<  Histogram to compute the Time Of Flight resolution for events without the T0 Fill
+  TH1F* hTimeOfFlightGoodRes;                   ///<  Histogram to compute the Time Of Flight resolution for tracks with good matching
+  TH1F* hTimeOfFlightResNoMismatch;             ///<  Histogram to compute the Time Of Flight resolution for PID consistent with TPC for Pi K P
+  TH2F* hTimeOfFlightResFine;                   ///<  Histogram to compute the Time Of Flight resolution as a function of the matched tracks to TOF
+  TH1F* hTimeOfFlightResFinePerEvent;           ///<  Histogram to compute the Time Of Flight resolution per event, this particular one should not be added to the output list as it yields no information but it is rather auxiliary to the computation of the TOF resolution as a function of the TOF tracks
   TH2F* hPadDist;                               ///<  Histogram with the Impact Residual X and Residual Z values
   TH2F* hTOFDist;                               ///<  Histogram with the distributions of the TOF strips and sectors
   TH2I* hBeta;                                  ///<  Histogram with the track beta vs the track momentum
@@ -735,8 +769,10 @@ private:
   TH1F* hDenMatchMultTrk[2][3][kEvtMultBins];                  ///<  Matching efficiency denominator with kTIME, kTRDOut flags and MC information on PID
   TH1F* hNumMatchMultTrkInc[2][kEvtMultBins];                  ///<  Matching efficiency numerator with kTIME, kTRDOut flags
   TH1F* hDenMatchMultTrkInc[2][kEvtMultBins];                  ///<  Matching efficiency denominator with kTIME, kTRDOut flags
-  TH1F* hDenTrkVertMultTrk[2][3];                              ///<  Matching efficiency denominator with MC truth for events that passed Vertex Cuts
-  TH1F* hDenTrkTriggerMultTrk[2][3];                           ///<  Matching efficiency denominator with MC truth for events that passed Physics Selection
+  TH1F* hDenTrkTrigger[2][3];                                  ///<  Generated particles with MC truth on PID for events that passed Physics Selection
+  TH1F* hDenTrkMCVertexZ[2][3];                                ///<  Generated particles with MC truth on PID for events that passed Physics Selection
+  TH1F* hDenTrkVertex[2][3];                                   ///<  Generated particles with MC truth on PID for events that passed Vertex Cuts
+  TH1F* hDenTrkVertexMCVertexZ[2][3];                          ///<  Generated particles with MC truth on PID for events that passed Vertex Cuts
   TH1F* hDenPrimMCYCut[2][3][kEvtMultBins];                    ///<  Pt Distribution of Primary Particles with MC Truth on PID, that passed Physics Selection and Event Selection with a cut on the max y
   TH1F* hDenPrimMCEtaCut[2][3][kEvtMultBins];                  ///<  Pt Distribution of Primary Particles with MC Truth on PID, that passed Physics Selection and Event Selection with a cut on the max eta
   TH1F* hDenPrimMCEtaYCut[2][3][kEvtMultBins];                 ///<  Pt Distribution of Primary Particles with MC Truth on PID, that passed Physics Selection and Event Selection with a cut on the max eta and max y
@@ -782,7 +818,7 @@ private:
   AliAnalysisTaskTOFSpectra (const AliAnalysisTaskTOFSpectra&);              //! Not implemented
   AliAnalysisTaskTOFSpectra & operator=(const AliAnalysisTaskTOFSpectra&);   //! Not implemented
   
-  ClassDef(AliAnalysisTaskTOFSpectra, 6);
+  ClassDef(AliAnalysisTaskTOFSpectra, 8); //AliAnalysisTaskTOFSpectra used for the Pi/K/p analysis with TOF
 };
 
 #endif

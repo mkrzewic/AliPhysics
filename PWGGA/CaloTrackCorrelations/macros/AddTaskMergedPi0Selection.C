@@ -1,10 +1,11 @@
 /// \file AddTaskMergedPi0Selection.C
+/// \ingroup CaloTrackCorrMacros
 /// \brief Configuration analysis identifying single EMCal clusters as merged decays
 ///
 /// Configuration macro for analysis of merged pi0 spectra analysis
 /// It does the tagging of EMCAL clusters as pi0 via shower shape and splitting criteria in AliAnaPi0EbE
 ///
-/// \author : Gustavo Conesa Balbastre <Gustavo.Conesa.Balbastre@cern.ch>, (LPSC-CNRS)
+/// \author Gustavo Conesa Balbastre <Gustavo.Conesa.Balbastre@cern.ch>, (LPSC-CNRS)
 
 /// Global name to be composed of the settings, used to set the AOD branch name
 TString kAnaMergedPi0 = "";
@@ -219,27 +220,13 @@ AliCaloTrackReader * ConfigureReader(TString col,           Bool_t simulation,
   // MC settings
   //
   // Check if kine stack is available, independent of request of simulation
-  Bool_t useKinematics = kFALSE;
-  useKinematics = (mgr->GetMCtruthEventHandler())?kTRUE:kFALSE;
-  
-  if(simulation)
-  {
-    if (!useKinematics && inputDataType=="AOD") useKinematics = kTRUE; //AOD primary should be available ...
-  }
-
-  if(useKinematics)
-  {
-    if(inputDataType == "ESD")
-    {
-      reader->SwitchOnStack();          
-      reader->SwitchOffAODMCParticles(); 
-    }
-    else if(inputDataType == "AOD")
-    {
-      reader->SwitchOffStack();          
-      reader->SwitchOnAODMCParticles(); 
-    }
-  }  
+//  Bool_t useKinematics = kFALSE;
+//  useKinematics = (mgr->GetMCtruthEventHandler())?kTRUE:kFALSE;
+//  
+//  if(simulation)
+//  {
+//    if (!useKinematics && inputDataType=="AOD") useKinematics = kTRUE; //AOD primary should be available ...
+//  }
   
   // In case of Pythia pt Hard bin simulations (jet-jet, gamma-jet)
   // reject some special events that bother the cross section

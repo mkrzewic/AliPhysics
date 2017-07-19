@@ -1,9 +1,10 @@
 /// \file AddTaskPi0.C
+/// \ingroup CaloTrackCorrMacros
 /// \brief Configuration of invariant mass analysis with calorimeters
 ///
 /// Configuration macro for analysis calorimeter clusters invariant mass.
 ///
-/// \author : Gustavo Conesa Balbastre <Gustavo.Conesa.Balbastre@cern.ch>, (LPSC-CNRS)
+/// \author Gustavo Conesa Balbastre <Gustavo.Conesa.Balbastre@cern.ch>, (LPSC-CNRS)
 
 /// Global name to be composed of the settings, used to set the AOD branch name
 TString kAnaPi0 = "";
@@ -19,6 +20,7 @@ TString kAnaPi0 = "";
 /// \param col: A string with the colliding system
 /// \param trigger : A string with the trigger class, abbreviated, defined in method belowSetTriggerMaskFromName()
 /// \param rejectEMCTrig : An int to reject EMCal triggered events with bad trigger: 0 no rejection, 1 old runs L1 bit, 2 newer runs L1 bit
+/// \param muonCaloPass: in case of muon_calo passes, deactivate some checks
 /// \param clustersArray : A string with the array of clusters not being the default (default is empty string)
 /// \param tender : A bool indicating if the tender was running before this analysis
 /// \param nonLinOn : A bool to set the use of the non linearity correction
@@ -247,28 +249,14 @@ AliCaloTrackReader * ConfigureReader(TString col,           Bool_t simulation,
   // MC settings
   //
   // Check if kine stack is available, independent of request of simulation
-  Bool_t useKinematics = kFALSE;
-  useKinematics = (mgr->GetMCtruthEventHandler())?kTRUE:kFALSE;
-  
-  if(simulation)
-  {
-    if (!useKinematics && inputDataType=="AOD") useKinematics = kTRUE; //AOD primary should be available ...
-  }
+//  Bool_t useKinematics = kFALSE;
+//  useKinematics = (mgr->GetMCtruthEventHandler())?kTRUE:kFALSE;
+//  
+//  if(simulation)
+//  {
+//    if (!useKinematics && inputDataType=="AOD") useKinematics = kTRUE; //AOD primary should be available ...
+//  }
 
-  if(useKinematics)
-  {
-    if(inputDataType == "ESD")
-    {
-      reader->SwitchOnStack();          
-      reader->SwitchOffAODMCParticles(); 
-    }
-    else if(inputDataType == "AOD")
-    {
-      reader->SwitchOffStack();          
-      reader->SwitchOnAODMCParticles(); 
-    }
-  }  
-  
   // In case of Pythia pt Hard bin simulations (jet-jet, gamma-jet)
   // reject some special events that bother the cross section
   if(simulation)
@@ -734,7 +722,7 @@ AliAnaPi0* ConfigurePi0Analysis(TString col,           Bool_t simulation,
   // Angle cut, avoid pairs with too large angle
   ana->SwitchOnAngleSelection(); 
   ana->SetAngleMaxCut(TMath::DegToRad()*80.); // EMCal: 4 SM in phi, 2 full SMs in eta
-  ana->SetAngleCut(0.014); // Minimum angle open, cell size
+  ana->SetAngleCut(0.016); // Minimum angle open, cell size
   
   //if(!bothCalo) ana->SwitchOnSMCombinations();
   ana->SwitchOnSMCombinations();

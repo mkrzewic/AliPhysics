@@ -64,10 +64,8 @@ AliPerformanceTask* AddTaskPerformanceTPCdEdxQA(Bool_t bUseMCInfo=kFALSE, Bool_t
     return NULL;
   }
   
-  AliMCEventHandler* mchandler = new AliMCEventHandler;
-    mchandler->SetReadTR(kFALSE);
-    mgr->SetMCtruthEventHandler(mchandler);
-  if (!mchandler && bUseMCInfo) {
+  AliMCEventHandler *mcH = (AliMCEventHandler*)mgr->GetMCtruthEventHandler();
+  if (!mcH && bUseMCInfo) {
     Error("AddTaskPerformanceTPCdEdxQA", "MC input handler needed!");
     return NULL;
   }
@@ -212,12 +210,12 @@ AliPerformanceTask* AddTaskPerformanceTPCdEdxQA(Bool_t bUseMCInfo=kFALSE, Bool_t
     Error("AddTaskPerformanceTPC", "Cannot create AliPerformanceEff");
   }
 
+  AliRecInfoCuts *pRecInfoCutsTPC2 = NULL;
   if (bTPCTrackingOnly)
   {
     //For low pt tracks, HLT finds only short track segments.
     //Hence, for the tpc-tracking only tracking-efficiency, we lower the minimum number of hits per reconstructed TPC track
-    AliRecInfoCuts *pRecInfoCutsTPC2 = new AliRecInfoCuts("pRecInfoCutsTPC2"); 
-    *pRecInfoCutsTPC2 = pRecInfoCutsTPC2;
+    pRecInfoCutsTPC2 = new AliRecInfoCuts(*pRecInfoCutsTPC); 
     pRecInfoCutsTPC2->SetMinNClustersTPC(20);
     pCompEff5->SetAliRecInfoCuts(pRecInfoCutsTPC2);
   }
@@ -237,7 +235,7 @@ AliPerformanceTask* AddTaskPerformanceTPCdEdxQA(Bool_t bUseMCInfo=kFALSE, Bool_t
 		  Error("AddTaskPerformanceTPC", "Cannot create AliPerformanceEff");
 	  }
 
-	  pCompEff5Sec->SetAliRecInfoCuts(pRecInfoCutsTPC);
+	  pCompEff5Sec->SetAliRecInfoCuts(bTPCTrackingOnly ? pRecInfoCutsTPC2 : pRecInfoCutsTPC);
 	  pCompEff5Sec->SetAliMCInfoCuts(pMCInfoCuts);
 	  pCompEff5Sec->SetUseTrackVertex(bTPCTrackingOnly == kTRUE ? kFALSE : kTRUE);
   }

@@ -18,6 +18,7 @@
 // --- Root ---
 #include <TObjArray.h>
 #include <TArrayI.h>
+#include <TStopwatch.h>
 
 // --- AliRoot ---
 #include "AliCDBEntry.h"
@@ -49,12 +50,6 @@ ClassImp(AliEmcalCorrectionClusterizer);
 
 // Actually registers the class with the base class
 RegisterCorrectionComponent<AliEmcalCorrectionClusterizer> AliEmcalCorrectionClusterizer::reg("AliEmcalCorrectionClusterizer");
-
-const std::map <std::string, AliEmcalCorrectionClusterizer::EmbeddedCellEnergyType> AliEmcalCorrectionClusterizer::fgkEmbeddedCellEnergyTypeMap = {
-  {"kNonEmbedded", EmbeddedCellEnergyType::kNonEmbedded },
-  {"kEmbeddedDataMCOnly", EmbeddedCellEnergyType::kEmbeddedDataMCOnly },
-  {"kEmbeddedDataExcludeMC", EmbeddedCellEnergyType::kEmbeddedDataExcludeMC }
-};
 
 const std::map <std::string, AliEMCALRecParam::AliEMCALClusterizerFlag> AliEmcalCorrectionClusterizer::fgkClusterizerTypeMap = {
   {"kClusterizerv1", AliEMCALRecParam::kClusterizerv1 },
@@ -88,7 +83,6 @@ AliEmcalCorrectionClusterizer::AliEmcalCorrectionClusterizer() :
   fShiftPhi(2),
   fShiftEta(2),
   fTRUShift(0),
-  fEmbeddedCellEnergyType(kNonEmbedded),
   fTestPatternInput(kFALSE),
   fSetCellMCLabelFromCluster(0),
   fSetCellMCLabelFromEdepFrac(0),
@@ -190,11 +184,6 @@ Bool_t AliEmcalCorrectionClusterizer::Initialize()
     }
   }
   
-  std::string embeddedCellEnergyTypeStr = "";
-  GetProperty("embeddedCellEnergyType", embeddedCellEnergyTypeStr);
-  fEmbeddedCellEnergyType = fgkEmbeddedCellEnergyTypeMap.at(embeddedCellEnergyTypeStr);
-  //Printf("embeddedCellEnergyType: %d",fEmbeddedCellEnergyType);
-
   // Only support one cluster container for the clusterizer!
   if (fClusterCollArray.GetEntries() > 1) {
     AliFatal("Passed more than one cluster container to the clusterizer, but the clusterizer only supports one cluster container!");
@@ -209,6 +198,16 @@ Bool_t AliEmcalCorrectionClusterizer::Initialize()
 void AliEmcalCorrectionClusterizer::UserCreateOutputObjects()
 {   
   AliEmcalCorrectionComponent::UserCreateOutputObjects();
+
+  if (fCreateHisto){
+    fHistCPUTime = new TH1F("hCPUTime","hCPUTime;CPU Time (ms)", 2000, 0, 1000);
+    fOutput->Add(fHistCPUTime);
+
+    fHistRealTime = new TH1F("hRealTime","hRealTime;Real Time (ms)", 2000, 0, 1000);
+    fOutput->Add(fHistRealTime);
+
+    fTimer = new TStopwatch();
+  }
 }
 
 /**
@@ -216,6 +215,11 @@ void AliEmcalCorrectionClusterizer::UserCreateOutputObjects()
  */
 Bool_t AliEmcalCorrectionClusterizer::Run()
 {
+  // Time the event loop if histogram creation is enabled
+  if (fCreateHisto) {
+    fTimer->Start(kTRUE);
+  }
+
   AliEmcalCorrectionComponent::Run();
   
   fEsd = dynamic_cast<AliESDEvent*>(fEvent);
@@ -276,6 +280,13 @@ Bool_t AliEmcalCorrectionClusterizer::Run()
   UpdateClusters();
   
   CalibrateClusters();
+
+  if (fCreateHisto) {
+    fTimer->Stop();
+    // Ensure that it is stored in ms
+    fHistCPUTime->Fill(fTimer->CpuTime() * 1000.);
+    fHistRealTime->Fill(fTimer->RealTime() * 1000.);
+  }
   
   return kTRUE;
 }
@@ -381,23 +392,6 @@ void AliEmcalCorrectionClusterizer::FillDigitsArray()
 
       if (cellAmplitude < 1e-6 || cellNumber < 0)
         continue;
-
-      if (fEmbeddedCellEnergyType == kEmbeddedDataMCOnly) {
-        if (cellMCLabel <= 0)
-          continue;
-        else {
-          cellAmplitude *= cellEFrac;
-          cellEFrac = 1;
-        }
-      }
-      else if (fEmbeddedCellEnergyType == kEmbeddedDataExcludeMC) {
-        if (cellMCLabel > 0)
-          continue;
-        else {
-          cellAmplitude *= 1 - cellEFrac;
-          cellEFrac = 0;
-        }
-      }
 
       // New way to set the cell MC labels,
       // valid only for MC productions with aliroot > v5-07-21
@@ -631,8 +625,12 @@ void AliEmcalCorrectionClusterizer::CalibrateClusters()
   Int_t nclusters = fCaloClusters->GetEntriesFast();
   for (Int_t icluster=0; icluster < nclusters; ++icluster) {
     AliVCluster *clust = static_cast<AliVCluster*>(fCaloClusters->At(icluster));
-    if (!clust)
+    if (!clust) {
       continue;
+    }
+    if (!clust->IsEMCAL()) {
+      continue;
+    }
     
     // SHOWER SHAPE -----------------------------------------------
     if (fRecalShowerShape)

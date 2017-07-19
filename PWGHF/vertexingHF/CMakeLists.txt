@@ -23,6 +23,7 @@ include_directories(${AliPhysics_SOURCE_DIR}/PWGHF/vertexingHF)
 # Additional includes - alphabetical order except ROOT
 include_directories(${ROOT_INCLUDE_DIRS}
                     ${AliPhysics_SOURCE_DIR}/CORRFW
+		    ${AliPhysics_SOURCE_DIR}/OADB
 		    ${AliPhysics_SOURCE_DIR}/OADB/COMMON/MULTIPLICITY
                     ${AliPhysics_SOURCE_DIR}/PWGPP/EVCHAR/FlowVectorCorrections/QnCorrections
 		    ${AliPhysics_SOURCE_DIR}/PWGPP/EVCHAR/FlowVectorCorrections/QnCorrectionsInterface/
@@ -34,6 +35,8 @@ include_directories(${ROOT_INCLUDE_DIRS}
 
 # Sources - alphabetical order
 set(SRCS
+  AliAnalysisTaskSEB0toDStarPi.cxx
+  AliRDHFCutsB0toDStarPi.cxx
   AliAODHFUtil.cxx
   AliAODRecoDecayHF.cxx
   AliAODRecoDecayHF2Prong.cxx
@@ -77,6 +80,7 @@ set(SRCS
   AliAnalysisTaskSELc2V0bachelor.cxx
   AliAnalysisTaskSEDvsMultiplicity.cxx
   AliAnalysisTaskCheckHFMCProd.cxx
+  AliAnalysisTaskDmesonMCPerform.cxx
   AliAnalysisTaskSELc2pK0sfromAODtracks.cxx
   AliAnalysisTaskSEXicPlus2XiPiPifromAODtracks.cxx
   AliCFVertexingHF.cxx
@@ -92,12 +96,14 @@ set(SRCS
   AliAnalysisTaskSEDStarCharmFraction.cxx
   AliAnalysisTaskSESignificance.cxx
   AliAnalysisTaskSEHFQA.cxx
+  AliAnalysisTaskTrackingSysPropagation.cxx
   AliMultiDimVector.cxx
   AliSignificanceCalculator.cxx
   AliHFMassFitter.cxx
   AliHFMassFitterVAR.cxx
   AliHFInvMassFitter.cxx
   AliHFMultiTrials.cxx
+  AliHFInvMassMultiTrialFit.cxx
   AliHFPtSpectrum.cxx
   AliHFsubtractBFDcuts.cxx
   AliNormalizationCounter.cxx
@@ -108,6 +114,7 @@ set(SRCS
   charmFlow/AliEventPlaneResolutionHandler.cxx
   charmFlow/AliAnalysisTaskSEHFv2.cxx
   charmFlow/AliAnalysisTaskSEHFvn.cxx
+  charmFlow/AliAnalysisTaskHFv1.cxx
   charmFlow/AliHFAfterBurner.cxx
   charmFlow/AliAnalysisTaskFlowD2H.cxx
   cutVarFDsub/AliHFCutVarFDsubAnalysisManager.cxx
@@ -125,8 +132,10 @@ set(SRCS
   AliAnalysisTaskSELc2V0bachelorTMVA.cxx
   AliAnalysisTaskSEOmegac2eleOmegafromAODtracks.cxx
   AliAnalysisTaskSEXic2eleXifromAODtracks.cxx
+  AliAnalysisTaskCharmBaryonsMC.cxx
   AliAnalysisTaskSEDvsEventShapes.cxx
   AliAnalysisTaskSEB0toDminuspi.cxx
+  AliAnalysisTaskSEDstoK0sK.cxx
   AliHFVnVsMassFitter.cxx
   )
 

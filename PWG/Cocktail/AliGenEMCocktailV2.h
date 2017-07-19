@@ -24,6 +24,7 @@
 #include "AliGenParam.h"
 #include "TF1.h"
 #include "TH1D.h"
+#include "TH2F.h"
 
 class AliGenCocktailEntry;
 
@@ -32,22 +33,29 @@ class AliGenEMCocktailV2 : public AliGenCocktail
 public:
   
   AliGenEMCocktailV2();
-  enum GeneratorIndex_t { kPizero=0, kEta, kRho0, kOmega, kEtaprime, kPhi, kJpsi, kSigma0, kK0s, kDeltaPlPl, kDeltaPl, kDeltaMi, kDeltaZero, kRhoPl, kRhoMi, kK0star, kK0l, kLambda, kDirectRealGamma, kDirectVirtGamma, kGENs };
-  enum ParticleGenerator_t { kGenPizero = 0x00001, kGenEta = 0x00002, kGenRho0 = 0x00004, kGenOmega = 0x00008,
-    kGenEtaprime = 0x00010, kGenPhi = 0x00020, kGenJpsi = 0x00040,
-    kGenSigma0 = 0x00080, kGenK0s = 0x00100,
-    kGenDeltaPlPl = 0x00200, kGenDeltaPl = 0x00400, kGenDeltaMi = 0x00800, kGenDeltaZero = 0x01000,
-    kGenRhoPl = 0x02000, kGenRhoMi = 0x04000, kGenK0star = 0x08000,
-    kGenK0l = 0x10000, kGenLambda = 0x20000,
-    kGenDirectRealGamma = 0x40000, kGenDirectVirtGamma = 0x80000,
-    kGenHadrons = 0x3FFFF, kGenGammas = 0xC0000};
+  enum GeneratorIndex_t { kPizero=0, kEta, kRho0, kOmega, kEtaprime, kPhi, kJpsi, kSigma0, kK0s,
+    kDeltaPlPl, kDeltaPl, kDeltaMi, kDeltaZero,
+    kRhoPl, kRhoMi, kK0star, kK0l, kLambda, kKPl, kKMi,
+    kOmegaPl, kOmegaMi, kXiPl, kXiMi, kSigmaPl, kSigmaMi,
+    kDirectRealGamma, kDirectVirtGamma, kGENs };
   
+  enum ParticleGenerator_t { kGenPizero = 0x00001, kGenEta = 0x00002, kGenRho0 = 0x00004, kGenOmega = 0x00008,
+    kGenEtaprime = 0x00010, kGenPhi = 0x00020, kGenJpsi = 0x00040, kGenSigma0 = 0x00080,
+    kGenK0s = 0x00100, kGenDeltaPlPl = 0x00200, kGenDeltaPl = 0x00400, kGenDeltaMi = 0x00800,
+    kGenDeltaZero = 0x01000, kGenRhoPl = 0x02000, kGenRhoMi = 0x04000, kGenK0star = 0x08000,
+    kGenK0l = 0x10000, kGenLambda = 0x20000, kGenKPl = 0x40000, kGenKMi = 0x80000,
+    kGenOmegaPl = 0x100000, kGenOmegaMi = 0x200000, kGenXiPl = 0x400000, kGenXiMi = 0x800000,
+    kGenSigmaPl = 0x1000000, kGenSigmaMi = 0x2000000, kGenDirectRealGamma = 0x4000000, kGenDirectVirtGamma = 0x8000000,
+    kGenHadrons = 0x3FFFFFF, kGenGammas = 0xC000000};
+
   virtual ~AliGenEMCocktailV2();
   virtual void Init();
   virtual void CreateCocktail();
   virtual void Generate();
   
   // setters
+  void    SetUseYWeighting(Bool_t useYWeighting)                      { fUseYWeighting = useYWeighting;   }
+  void    SetDynamicalPtRange(Bool_t dynamicalPtRange)                { fDynPtRange = dynamicalPtRange;   }
   void    SetParametrizationFile(TString paramFile)                   { fParametrizationFile = paramFile; }
   void    SetParametrizationFileDirectory(TString paramDir)           { fParametrizationDir = paramDir;   }
   void    SetDecayer(AliDecayer* const decayer)                       { fDecayer = decayer;               }
@@ -61,19 +69,25 @@ public:
   void    SetHeaviestHadron(ParticleGenerator_t part);
   static  Bool_t  SetPtParametrizations();
   static  void    SetMtScalingFactors();
+  static  Bool_t  SetPtYDistributions();
  
   // getters
-  Float_t GetDecayMode()                    const                     { return fDecayMode;                }
-  Float_t GetWeightingMode()                const                     { return fWeightingMode;            }
+  Bool_t    GetDynamicalPtRangeOption()       const                   { return fDynPtRange;               }
+  Bool_t    GetYWeightOption()                const                   { return fUseYWeighting;            }
+  Float_t   GetDecayMode()                    const                   { return fDecayMode;                }
+  Float_t   GetWeightingMode()                const                   { return fWeightingMode;            }
   AliGenEMlibV2::CollisionSystem_t  GetCollisionSystem()  const       { return fCollisionSystem;          }
   AliGenEMlibV2::Centrality_t       GetCentrality()       const       { return fCentrality;               }
-  UInt_t  GetSelectedMothers()              const                     { return fSelectedParticles;        }
-  TString GetParametrizationFile()          const                     { return fParametrizationFile;      }
-  TString GetParametrizationFileDirectory() const                     { return fParametrizationDir;       }
-  Int_t   GetNumberOfParticles()            const                     { return fNPart;                    }
-  void    GetPtRange(Double_t &ptMin, Double_t &ptMax);
-  static TF1*   GetPtParametrization(Int_t np);
-  static TH1D*  GetMtScalingFactors();
+  UInt_t    GetSelectedMothers()              const                   { return fSelectedParticles;        }
+  TString   GetParametrizationFile()          const                   { return fParametrizationFile;      }
+  TString   GetParametrizationFileDirectory() const                   { return fParametrizationDir;       }
+  Int_t     GetNumberOfParticles()            const                   { return fNPart;                    }
+  Double_t  GetMaxPtStretchFactor(Int_t pdgCode);
+  Double_t  GetYWeight(Int_t pdgCode, TParticle* part);
+  void      GetPtRange(Double_t &ptMin, Double_t &ptMax);
+  static    TF1*    GetPtParametrization(Int_t np);
+  static    TH1D*   GetMtScalingFactors();
+  static    TH2F*   GetPtYDistribution(Int_t np);
   
   //***********************************************************************************************
   // This function allows to select the particle which should be procude based on 1 Integer value
@@ -92,14 +106,14 @@ public:
   //    implies you want the binary number: 00 0000 0000 0011 1111 =
   //   which translates 63_10 (in decimal) and 3F_16 (in hexadecimal)
   //***********************************************************************************************
-  void    SelectMotherParticles(UInt_t part)       { fSelectedParticles=part ;}
+  void    SelectMotherParticles(UInt_t part)       { fSelectedParticles=part; }
   
 private:
   AliGenEMCocktailV2(const AliGenEMCocktailV2 &cocktail);
   AliGenEMCocktailV2 & operator=(const AliGenEMCocktailV2 &cocktail);
   
-  void AddSource2Generator(Char_t *nameReso, AliGenParam* const genReso);
-  
+  void AddSource2Generator(Char_t *nameReso, AliGenParam* const genReso, Double_t maxPtStretchFactor = 1.);
+
   AliDecayer*     fDecayer;                             // External decayer
   Decay_t         fDecayMode;                           // decay mode in which resonances are forced to decay, default: kAll
   Weighting_t     fWeightingMode;                       // weighting mode: kAnalog or kNonAnalog
@@ -108,18 +122,21 @@ private:
   TString         fParametrizationDir;                  // parametrization file directory
   Int_t           fNPart;                               // multiplicity of each source per event
   Double_t        fYieldArray[kGENs];                   // array of dN/dy for each source
-  static TF1*     fPtParametrization[18];               // pt paramtrizations
+  static TF1*     fPtParametrization[26];               // pt paramtrizations
   static TF1*     fParametrizationProton;               //
   static TH1D*    fMtScalingFactorHisto;                // mt scaling factors
+  static TH2F*    fPtYDistribution[26];                 // pt-y distribution
   
   AliGenEMlibV2::CollisionSystem_t  fCollisionSystem;   // selected collision system
   AliGenEMlibV2::Centrality_t       fCentrality;        // selected centrality
   AliGenEMlibV2::v2Sys_t            fV2Systematic;      // selected systematic error for v2 parameters
   
+  Bool_t        fUseYWeighting;                         // select if input pt-y distributions should be used for weighting in generation
+  Bool_t        fDynPtRange;                            // select if the pt range for the generation should be adapted to different mother particle weights dynamically
   Bool_t        fForceConv;                             // select whether you want to force all gammas to convert imidediately
   UInt_t        fSelectedParticles;                     // which particles to simulate, allows to switch on and off 32 different particles
   
-  ClassDef(AliGenEMCocktailV2,5)       // cocktail for EM physics
+  ClassDef(AliGenEMCocktailV2,8)                        // cocktail for EM physics
 };
 
 #endif

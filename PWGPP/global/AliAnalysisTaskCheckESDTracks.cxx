@@ -2,7 +2,6 @@
 #include "AliAnalysisManager.h"
 #include "AliAnalysisDataContainer.h"
 #include "AliESDEvent.h"
-#include "AliStack.h"
 #include "AliPID.h"
 #include "AliMCEventHandler.h"
 #include "AliMCEvent.h"
@@ -79,6 +78,9 @@ AliAnalysisTaskCheckESDTracks::AliAnalysisTaskCheckESDTracks() :
   fHistTPCchi2PerClusPhiPtTPCsel{nullptr},
   fHistTPCchi2PerClusPhiPtTPCselITSref{nullptr},
   fHistTPCchi2PerClusPhiPtTPCselSPDany{nullptr},
+  fHistTPCsig1ptPerClusPhiPtTPCsel{nullptr},
+  fHistTPCsig1ptPerClusPhiPtTPCselITSref{nullptr},
+  fHistTPCsig1ptPerClusPhiPtTPCselSPDany{nullptr},
   fHistEtaPhiPtGoodHypProtTPCsel{nullptr},
   fHistEtaPhiPtGoodHypProtTPCselITSref{nullptr},
   fHistEtaPhiPtGoodHypProtTPCselSPDany{nullptr},
@@ -200,6 +202,9 @@ AliAnalysisTaskCheckESDTracks::~AliAnalysisTaskCheckESDTracks(){
     delete fHistTPCchi2PerClusPhiPtTPCsel;
     delete fHistTPCchi2PerClusPhiPtTPCselITSref;
     delete fHistTPCchi2PerClusPhiPtTPCselSPDany;
+    delete fHistTPCsig1ptPerClusPhiPtTPCsel;
+    delete fHistTPCsig1ptPerClusPhiPtTPCselITSref;
+    delete fHistTPCsig1ptPerClusPhiPtTPCselSPDany;
     delete fHistEtaPhiPtGoodHypProtTPCsel;
     delete fHistEtaPhiPtGoodHypProtTPCselITSref;
     delete fHistEtaPhiPtGoodHypProtTPCselSPDany;
@@ -415,6 +420,13 @@ void AliAnalysisTaskCheckESDTracks::UserCreateOutputObjects() {
   fOutput->Add(fHistTPCchi2PerClusPhiPtTPCselITSref);
   fOutput->Add(fHistTPCchi2PerClusPhiPtTPCselSPDany);
   
+  fHistTPCsig1ptPerClusPhiPtTPCsel = new TH3F("hTPCsig1ptPerClusPhiPtTPCsel"," ; p_{T}*#sigma(1/p_{T}); p_{T} (GeV/c) ; #varphi",100, 0, 0.3, 100, 0, 10, 72, 0, 2*TMath::Pi());
+  fHistTPCsig1ptPerClusPhiPtTPCselITSref = new TH3F("hTPCsig1ptPerClusPhiPtTPCselITSref"," ; p_{T}*#sigma(1/p_{T}); p_{T} (GeV/c) ; #varphi",100, 0, 0.3, 100, 0, 10, 72, 0, 2*TMath::Pi());
+  fHistTPCsig1ptPerClusPhiPtTPCselSPDany = new TH3F("hTPCsig1ptPerClusPhiPtTPCselSPDany"," ; p_{T}*#sigma(1/p_{T}); p_{T} (GeV/c) ; #varphi",100, 0, 0.3, 100, 0, 10, 72, 0, 2*TMath::Pi());
+  fOutput->Add(fHistTPCsig1ptPerClusPhiPtTPCsel);
+  fOutput->Add(fHistTPCsig1ptPerClusPhiPtTPCselITSref);
+  fOutput->Add(fHistTPCsig1ptPerClusPhiPtTPCselSPDany);
+ 
   fHistEtaPhiPtGoodHypProtTPCsel = new TH3F("hEtaPhiPtGoodHypProtTPCsel"," ; #eta ; #varphi ; p_{T} (GeV/c)",20,-1.,1.,72,0.,2*TMath::Pi(),fNPtBins,fMinPt,fMaxPt);
   fHistEtaPhiPtGoodHypProtTPCselITSref = new TH3F("hEtaPhiPtGoodHypProtTPCselITSref"," ; #eta ; #varphi ; p_{T} (GeV/c)",20,-1.,1.,72,0.,2*TMath::Pi(),fNPtBins,fMinPt,fMaxPt);
   fHistEtaPhiPtGoodHypProtTPCselSPDany = new TH3F("hEtaPhiPtGoodHypProtTPCselSPDany"," ; #eta ; #varphi ; p_{T} (GeV/c)",20,-1.,1.,72,0.,2*TMath::Pi(),fNPtBins,fMinPt,fMaxPt);
@@ -525,7 +537,7 @@ void AliAnalysisTaskCheckESDTracks::UserExec(Option_t *)
   AliInputEventHandler *inputHandler=(AliInputEventHandler*)mgr->GetInputEventHandler();
   AliPIDResponse *pidResp=inputHandler->GetPIDResponse();
   
-  AliStack* stack=0;
+  AliMCEvent* mcEvent = nullptr;
 
   if(fReadMC){
     AliMCEventHandler* eventHandler = dynamic_cast<AliMCEventHandler*> (AliAnalysisManager::GetAnalysisManager()->GetMCtruthEventHandler());
@@ -533,14 +545,9 @@ void AliAnalysisTaskCheckESDTracks::UserExec(Option_t *)
       Printf("ERROR: Could not retrieve MC event handler");
       return;
     }
-    AliMCEvent* mcEvent = eventHandler->MCEvent();
+    mcEvent = eventHandler->MCEvent();
     if (!mcEvent) {
       Printf("ERROR: Could not retrieve MC event");
-      return;
-    }
-    stack = mcEvent->Stack();
-    if (!stack) {
-      Printf("ERROR: stack not available");
       return;
     }
   }
@@ -683,6 +690,7 @@ void AliAnalysisTaskCheckESDTracks::UserExec(Option_t *)
     if(statusTrack&AliESDtrack::kITSrefit) itsRefit=kTRUE; 
     UChar_t clumap=track->GetITSClusterMap();
     Double_t chi2clus=track->GetTPCchi2()/track->GetTPCNcls();
+    Double_t curvrelerr = TMath::Sqrt(track->GetSigma1Pt2())/track->OneOverPt();
     Bool_t spdAny=kFALSE;
     if(track->HasPointOnITSLayer(0) || track->HasPointOnITSLayer(1)) spdAny=kTRUE;
     Int_t nTPCclus=track->GetNcls(1);
@@ -743,7 +751,7 @@ void AliAnalysisTaskCheckESDTracks::UserExec(Option_t *)
     Int_t hadronSpecies=-1;
     Float_t invptgen=-999.;
     if(fReadMC){
-      TParticle* part = stack->Particle(TMath::Abs(trlabel));
+      TParticle* part = mcEvent->Particle(TMath::Abs(trlabel));
       ptgen=part->Pt();
       pgen=part->P();
       pxgen=part->Px();
@@ -819,11 +827,14 @@ void AliAnalysisTaskCheckESDTracks::UserExec(Option_t *)
     }
 
     fHistTPCchi2PerClusPhiPtTPCsel->Fill(chi2clus,pttrack,phitrack);
+    fHistTPCsig1ptPerClusPhiPtTPCsel->Fill(curvrelerr,pttrack,phitrack);
     if(itsRefit){
       if(pidtr>=0 && pidtr<9) fHistdEdxVsPTPCselITSref[pidtr]->Fill(ptrackTPC,dedx);
       fHistTPCchi2PerClusPhiPtTPCselITSref->Fill(chi2clus,pttrack,phitrack);
+      fHistTPCsig1ptPerClusPhiPtTPCselITSref->Fill(curvrelerr,pttrack,phitrack);
       if(spdAny){ 
 	fHistTPCchi2PerClusPhiPtTPCselSPDany->Fill(chi2clus,pttrack,phitrack);
+	fHistTPCsig1ptPerClusPhiPtTPCselSPDany->Fill(curvrelerr,pttrack,phitrack);
       }
     }
 
@@ -969,13 +980,13 @@ void AliAnalysisTaskCheckESDTracks::UserExec(Option_t *)
       keepAntiLambda=kFALSE;
       Int_t labelPos=TMath::Abs(pTrack->GetLabel());
       Int_t labbelNeg =TMath::Abs(nTrack->GetLabel());
-      TParticle* partPos=stack->Particle(labelPos);
-      TParticle* partNeg=stack->Particle(labbelNeg);
+      TParticle* partPos=mcEvent->Particle(labelPos);
+      TParticle* partNeg=mcEvent->Particle(labbelNeg);
       if(partPos && partNeg){
         Int_t labelMotherPos=partPos->GetFirstMother() ;
         Int_t labelMotherNeg=partNeg->GetFirstMother();
 	if(labelMotherPos==labelMotherNeg && labelMotherPos>-1){
-	  TParticle* partV0=stack->Particle(labelMotherPos);
+	  TParticle* partV0=mcEvent->Particle(labelMotherPos);
 	  Int_t pdgV0=partV0->GetPdgCode();
 	  if(TMath::Abs(pdgV0)==310) keepK0s=kTRUE;
 	  if(pdgV0==3122) keepLambda=kTRUE;

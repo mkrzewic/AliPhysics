@@ -60,6 +60,7 @@ lObjectToUseForLS(""),
 fF1Mean(0x0),
 fF1Sigma(0x0),
 lVerbose(kFALSE),
+lUseGeant3FlukaCorrection(kFALSE),
 lDoOnlyData(kFALSE)
 {
     // Dummy Constructor - not to be used!
@@ -97,6 +98,7 @@ lObjectToUseForLS(""),
 fF1Mean(0x0),
 fF1Sigma(0x0),
 lVerbose(kFALSE),
+lUseGeant3FlukaCorrection(kFALSE),
 lDoOnlyData(kFALSE)
 {
     // Main constructor
@@ -138,12 +140,13 @@ void AliStrangenessModule::SetSigExtTech ( TString lRecSigExtTech ) {
     if( !lRecSigExtTech.Contains("bincounting") &&
        !lRecSigExtTech.Contains("linear") &&
        !lRecSigExtTech.Contains("quadratic") &&
+       !lRecSigExtTech.Contains("cubic") &&
        !lRecSigExtTech.Contains("MC") ){
-        AliWarning("!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!");
+        AliWarning("!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!");
         AliWarning(Form(" Sig. ext. mode \"%s\" not recognized!",lRecSigExtTech.Data() ) );
-        AliWarning("   Accepted modes: \"bincounting\", \"linear\" or \"quadratic\"");
-        AliWarning("               WARNING: Will set to linear! ");
-        AliWarning("!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!");
+        AliWarning("   Accepted modes: \"bincounting\", \"linear\", \"quadratic\" or \"cubic\"");
+        AliWarning("                     WARNING: Will set to linear! ");
+        AliWarning("!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!");
         lRecSigExtTech = "linear";
     }
     for(Int_t ibin = 0; ibin<100; ibin++){
@@ -158,11 +161,12 @@ void AliStrangenessModule::SetVariableSigExtTech ( Long_t lRecNPtBins, TString *
         if( !lRecSigExtTech[ibin].Contains("bincounting") &&
            !lRecSigExtTech[ibin].Contains("linear") &&
            !lRecSigExtTech[ibin].Contains("quadratic") &&
+           !lRecSigExtTech[ibin].Contains("cubic") &&
            !lRecSigExtTech[ibin].Contains("MC") ){
             AliWarning("!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!");
             AliWarning(Form(" Sig. ext. mode \"%s\" not recognized!",lRecSigExtTech[ibin].Data() ) );
-            AliWarning("   Accepted modes: \"bincounting\", \"linear\" or \"quadratic\"");
-            AliWarning("               WARNING: Will set to linear! ");
+            AliWarning("   Accepted modes: \"bincounting\", \"linear\", \"quadratic\" or \"cubic\"");
+            AliWarning("                     WARNING: Will set to linear! ");
             AliWarning("!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!");
             lRecSigExtTech[ibin] = "linear";
         }
@@ -279,11 +283,19 @@ TH1D* AliStrangenessModule::DoAnalysis( TString lConfiguration, TString lOutputF
     TString lDataName = lConfiguration.Data();
     lDataName.Append("_Data");
     AliVWeakResult *lDataResult = (AliVWeakResult*) lDataInput->FindObject(lConfiguration.Data())->Clone( lDataName.Data() );
+    
+    //============================================================================
+    //Do bookkeeping of base input 
+    fListData->Add(lDataResult);
+    //============================================================================
+    
     if(lVerbose) lDataResult->Print();
     
     //_________________________________________________
     // Process TH3Fs and expand into histograms of interest
     TH3F *f3dHistData = (TH3F*) lDataResult->GetHistogram()->Clone("f3dHistData");
+    f3dHistData->SetDirectory(0);
+    fListData->Add(f3dHistData);
     
     //Check if multiplicity interval requested is possible
     Bool_t lCheckMult = CheckCompatibleMultiplicity ( f3dHistData );
@@ -355,6 +367,8 @@ TH1D* AliStrangenessModule::DoAnalysis( TString lConfiguration, TString lOutputF
         //_________________________________________________
         // Process TH3Fs and expand into histograms of interest
         TH3F *f3dHistLSData = (TH3F*) lLSDataResult->GetHistogram()->Clone("f3dHistLSData");
+        f3dHistLSData->SetDirectory(0);
+        fListData->Add(f3dHistLSData);
         //Check if multiplicity interval requested is possible
         Bool_t lCheckMult = CheckCompatibleMultiplicity ( f3dHistLSData );
         if ( !lCheckMult ){
@@ -402,6 +416,7 @@ TH1D* AliStrangenessModule::DoAnalysis( TString lConfiguration, TString lOutputF
             
             if ( TMath::Abs(lIntegralLSData) > 1e-5 ) lLSScalingRatio = lIntegralData/lIntegralLSData;
             
+            //Beware error propagation!
             lHistoLSData[ibin] -> Scale( lLSScalingRatio );
             
             //_____________________________________________
@@ -469,18 +484,24 @@ TH1D* AliStrangenessModule::DoAnalysis( TString lConfiguration, TString lOutputF
     Double_t lSignalVsPt[100], lSignalErrVsPt[100];
     TH1D* fHistRawVsPt  = new TH1D("fHistRawVsPt", "",lNPtBins,lPtBins);
     fHistRawVsPt->SetDirectory(0);
+    TH1D* fHistBgVsPt  = new TH1D("fHistBgVsPt", "",lNPtBins,lPtBins);
+    fHistBgVsPt->SetDirectory(0);
     
     if(!lVerbose) cout<<"AliStrangenessModule -> Extracting signal (data): ["<<flush;
     lExtStatus = kTRUE;
+    Double_t lBackground = 0;
+    Double_t lBackgroundError = 0;
     for(Long_t ibin = 0; ibin<lNPtBins; ibin++){
         if( lVerbose) cout<<"Extracting yield for bin #"<<ibin<<Form("\t%.1f-%.1f",lPtBins[ibin],lPtBins[ibin+1])<<endl;
-        lExtStatus = PerformSignalExtraction( lHistoData[ibin], lSignalVsPt[ibin], lSignalErrVsPt[ibin], lMeanVsPt[ibin], lSigmaVsPt[ibin], fListData, lSigExtTech[ibin].Data() );
+        lExtStatus = PerformSignalExtraction( lHistoData[ibin], lSignalVsPt[ibin], lSignalErrVsPt[ibin], lBackground, lBackgroundError, lMeanVsPt[ibin], lSigmaVsPt[ibin], fListData, lSigExtTech[ibin].Data() );
         if( !lVerbose ){
             //Report errors with "!"
             if( lExtStatus ){ cout<<"="<<flush; } else { cout<<"!"<<flush; }
         }
         fHistRawVsPt->SetBinContent(ibin+1, lSignalVsPt[ibin] );
         fHistRawVsPt->SetBinError(ibin+1, lSignalErrVsPt[ibin] );
+        fHistBgVsPt->SetBinContent(ibin+1, lBackground );
+        fHistBgVsPt->SetBinError(ibin+1, lBackgroundError );
     }
     if( lVerbose){
         cout<<"---] Signal Extraction summary [----------------------------"<<endl;
@@ -494,6 +515,7 @@ TH1D* AliStrangenessModule::DoAnalysis( TString lConfiguration, TString lOutputF
     
     //Add raw spectra as main analysis output
     fListOutput->Add(fHistRawVsPt);
+    fListOutput->Add(fHistBgVsPt);
     
     if(lDoOnlyData){
         fFileOut->cd();
@@ -513,6 +535,12 @@ TH1D* AliStrangenessModule::DoAnalysis( TString lConfiguration, TString lOutputF
     TString lMCName = lConfiguration.Data();
     lMCName.Append("_MC");
     AliVWeakResult *lMCResult = (AliVWeakResult*) lMCInput->FindObject(lConfiguration.Data())->Clone( lMCName.Data() ) ;
+    
+    //============================================================================
+    //Do bookkeeping of base input
+    fListMC->Add(lMCResult);
+    //============================================================================
+    
     if(lVerbose) lMCResult->Print();
     
     //Compatibility check 1: check if generated with the same cuts
@@ -528,6 +556,8 @@ TH1D* AliStrangenessModule::DoAnalysis( TString lConfiguration, TString lOutputF
     //_________________________________________________
     // Process TH3Fs and expand into histograms of interest
     TH3F *f3dHistMC = (TH3F*) lMCResult->GetHistogram()->Clone("f3dHistMC");
+    f3dHistMC->SetDirectory(0);
+    fListMC->Add(f3dHistMC);
     
     //Check if multiplicity interval requested is possible
     Bool_t lCheckMultMC = CheckCompatibleMultiplicity ( f3dHistMC );
@@ -570,7 +600,9 @@ TH1D* AliStrangenessModule::DoAnalysis( TString lConfiguration, TString lOutputF
     lExtStatus = kTRUE;
     for(Long_t ibin = 0; ibin<lNPtBins; ibin++){
         if(lVerbose) AliWarning(Form("MC Signal extraction on: %s",lHistoData[ibin]->GetName()));
-        lExtStatus = PerformSignalExtraction( lHistoMC[ibin], lSignalVsPtMC[ibin], lSignalErrVsPtMC[ibin], lMeanVsPt[ibin], lSigmaVsPt[ibin], fListMC, "MC" );
+        Double_t lBackgroundMC = 0;
+        Double_t lBackgroundErrorMC = 0;
+        lExtStatus = PerformSignalExtraction( lHistoMC[ibin], lSignalVsPtMC[ibin], lSignalErrVsPtMC[ibin], lBackgroundMC, lBackgroundErrorMC, lMeanVsPt[ibin], lSigmaVsPt[ibin], fListMC, "MC" );
         if( !lVerbose ){
             //Report errors with "!"
             if( lExtStatus ){ cout<<"="<<flush; } else { cout<<"!"<<flush; }
@@ -588,37 +620,111 @@ TH1D* AliStrangenessModule::DoAnalysis( TString lConfiguration, TString lOutputF
     lGenObjName.Append( lDataResult->GetParticleName() ) ;
     TH3F *f3dHistGenMC = (TH3F*) lMCCountersInput->FindObject( lGenObjName.Data() )->Clone("f3dHistGenMC");
     f3dHistGenMC->Sumw2();
+    f3dHistGenMC->SetDirectory(0);
+    fListMC->Add(f3dHistGenMC);
     //Project this into a 1D histogram, please
     TH1D* fHistGeneratedOriginal = f3dHistGenMC -> ProjectionX( "fHistGeneratedOriginal",
-                                                       f3dHistGenMC->GetYaxis()->FindBin(-0.5+1e-5),
-                                                       f3dHistGenMC->GetYaxis()->FindBin(+0.5-1e-5),
+                                                       f3dHistGenMC->GetYaxis()->FindBin(lDataResult->GetCutMinRapidity()+1e-5),
+                                                       f3dHistGenMC->GetYaxis()->FindBin(lDataResult->GetCutMaxRapidity()-1e-5),
                                                        f3dHistGenMC->GetZaxis()->FindBin( lLoMult+1e-5 ),
                                                        f3dHistGenMC->GetZaxis()->FindBin( lHiMult-1e-5 )
                                                        );
     fHistGeneratedOriginal->SetDirectory(0);
-    
-    //Save this as a very relevant histogram
-    fListOutput->Add(fHistGeneratedOriginal);
     
     //Rebin
     TH1D* fHistGenerated = (TH1D*) fHistGeneratedOriginal->Rebin( lNPtBins, "fHistGenerated", lPtBins );
     fHistGenerated->SetDirectory(0);
     
     //Save this as a very relevant histogram
-    fListOutput->Add(fHistGeneratedOriginal);
-    fListOutput->Add(fHistGenerated);
+    fListMC->Add(fHistGeneratedOriginal);
+    fListMC->Add(fHistGenerated);
     
     //Generate Efficiency Histogram
     TH1D* fHistEfficiency = (TH1D*) fHistRawVsPtMC -> Clone ("fHistEfficiency") ;
     fHistEfficiency->SetDirectory(0);
     fHistEfficiency->Divide(fHistGenerated);
+    
+    //Check if g3/f correction enabled 
+    if( lUseGeant3FlukaCorrection ){
+        //=====================================================================================
+        //Step 1: check which correction function is needed
+        TF1 *lFuncG3FCorr = 0x0;
+        TString lPartName = lDataResult->GetParticleName();
+        if( lPartName.Contains("Lambda")||lPartName.Contains("XiMinus")||lPartName.Contains("OmegaMinus") ){
+            //Initialize correction function for protons...
+            lFuncG3FCorr = new TF1("lFuncG3FCorr", "1 - [0]*TMath::Exp([1]*x) + [2]",     0.25, 10.0);
+            lFuncG3FCorr->SetParameter(0, 4.11235e+03);
+            lFuncG3FCorr->SetParameter(1,-3.28947e+01);
+            lFuncG3FCorr->SetParameter(2,-9.38341e-03);
+        }
+        if( lPartName.Contains("AntiLambda")||lPartName.Contains("XiPlus")||lPartName.Contains("OmegaPlus") ){
+            //Initialize correction function for antiprotons...
+            lFuncG3FCorr = new TF1("lFuncG3FCorr", "1 - [0]*TMath::Exp([1]*x) + [2] + [3]*1/TMath::Power(x, 0.2)*TMath::Log(x)", 0.25, 10.0);
+            lFuncG3FCorr->SetParameter(0, 1.77339e+02);
+            lFuncG3FCorr->SetParameter(1,-2.20242e+01);
+            lFuncG3FCorr->SetParameter(2,-6.53769e-02);
+            lFuncG3FCorr->SetParameter(3, 4.43007e-02);
+        }
+        if( !lFuncG3FCorr ) {
+            AliWarning("Something went wrong with the determination of the G3/F correction!"); return 0x0;
+        }
+        
+        fListMC->Add(lFuncG3FCorr); //add function to output for completeness
+        //=====================================================================================
+        //the geant3/fluka logic:
+        // --- in geant3: excessive antiparticle yield due to underestimated efficiencies
+        // --- correction therefore has to increase efficiencies
+        //     -> divide eff by lFuncG3FCorr at appropriate pT
+        //=====================================================================================
+        
+        TH1D *fHistG3FCorrection = new TH1D("fHistG3FCorrection", "", lNPtBins, lPtBins);
+        TProfile * fProfProtonComplete = (TProfile*) lMCResult->GetProtonProfileToCopy()->Clone("fProfProtonComplete");
+        fProfProtonComplete->SetDirectory(0);
+        
+        //rebin to match
+        TProfile *fProfProton = (TProfile*) fProfProtonComplete->Rebin( lNPtBins, "fProfProton", lPtBins );
+        fProfProton->SetDirectory(0);
+        
+        fListMC -> Add(fProfProtonComplete);
+        fListMC -> Add(fProfProton);
+        
+        for(Long_t ibin = 0; ibin<lNPtBins; ibin++){
+            Double_t lProtonMomentum = 1.0;
+            
+            //use proton profile information from MC
+            lProtonMomentum = fProfProton->GetBinContent(ibin+1);
+            fHistG3FCorrection -> SetBinContent(ibin+1, lFuncG3FCorr->Eval(lProtonMomentum) );
+            
+            //Apply correction on a bin-by-bin basis
+            // ...if the bin content isn't zero. Otherwise, don't touch it or there'll be... trouble
+            if( fHistEfficiency->GetBinContent(ibin+1)>1e-6){
+                fHistEfficiency->SetBinContent(ibin+1, fHistEfficiency->GetBinContent(ibin+1) / lFuncG3FCorr->Eval(lProtonMomentum) );
+                fHistEfficiency->SetBinError  (ibin+1, fHistEfficiency->GetBinError(ibin+1)   / lFuncG3FCorr->Eval(lProtonMomentum) );
+            }
+        }
+        
+        //Store histogram with the correction
+        fListOutput->Add(fHistG3FCorrection);
+    }
+    
+    
+    
     fListOutput->Add(fHistEfficiency);
     
     //Generate Corrected Spectrum
     TH1D *fHistSpectra = (TH1D*) fHistRawVsPt->Clone("fHistSpectra");
     fHistSpectra->SetDirectory(0);
+    
+    //Efficiency correction
     fHistSpectra->Divide(fHistEfficiency);
+    
+    //Normalize by number of events
     fHistSpectra->Scale(1.0/lNEvents, "width");
+    
+    //Scale with rapidity window size (default: no scale)
+    fHistSpectra->Scale(1.0/(lDataResult->GetCutMaxRapidity()-lDataResult->GetCutMinRapidity()));
+    
+    //Add to output 
     fListOutput->Add(fHistSpectra);
     
     TH1D *fHistSpectraToReturn = (TH1D*) fHistSpectra->Clone("fHistSpectraToReturn");
@@ -722,7 +828,7 @@ Bool_t AliStrangenessModule::PerformInitialFit( TH1D *lHisto, Double_t &lMean, D
 }
 
 //________________________________________________________________
-Bool_t AliStrangenessModule::PerformSignalExtraction( TH1D *lHisto, Double_t &lSignal, Double_t &lSignalErr, Double_t lMean, Double_t lSigma, TList *lControlList, TString lOption ){
+Bool_t AliStrangenessModule::PerformSignalExtraction( TH1D *lHisto, Double_t &lSignal, Double_t &lSignalErr, Double_t &lBackground, Double_t &lBackgroundError, Double_t lMean, Double_t lSigma, TList *lControlList, TString lOption ){
     //Helper function to perform actual signal extraction
     
     Bool_t lReturnValue = kTRUE; //everything went alright -> kTRUE
@@ -749,12 +855,12 @@ Bool_t AliStrangenessModule::PerformSignalExtraction( TH1D *lHisto, Double_t &lS
     
     //Get very first guess for linear background
     Double_t lAverageBg = lHisto->Integral(lBinLeftBgLo,lBinLeftBgHi )+lHisto->Integral(lBinRightBgLo,lBinRightBgHi) ;
-    lAverageBg = lAverageBg / ( lValLeftBgHi-lValLeftBgLo + lValRightBgHi-lValRightBgLo);
+    lAverageBg = lAverageBg / ( lBinLeftBgHi - lBinLeftBgLo + lBinRightBgHi - lBinRightBgLo + 2);
     
-    Double_t lLeftY = lHisto->Integral(lBinLeftBgLo, lBinLeftBgHi  ) / (lValLeftBgHi -lValLeftBgLo );
+    Double_t lLeftY = lHisto->Integral(lBinLeftBgLo, lBinLeftBgHi  ) / (lBinLeftBgHi - lBinLeftBgLo + 1 );
     Double_t lLeftX = 0.5*(lValLeftBgHi+lValLeftBgLo );
     
-    Double_t lRightY = lHisto->Integral(lBinRightBgLo,lBinRightBgHi ) / (lValRightBgHi-lValRightBgLo);
+    Double_t lRightY = lHisto->Integral(lBinRightBgLo,lBinRightBgHi ) / (lBinRightBgHi - lBinRightBgLo + 1 );
     Double_t lRightX = 0.5*(lValRightBgHi+lValRightBgLo );
     
     Double_t lGuessedSlope = (lRightY-lLeftY)/(lRightX-lLeftX);
@@ -813,9 +919,8 @@ Bool_t AliStrangenessModule::PerformSignalExtraction( TH1D *lHisto, Double_t &lS
         fitToSubtract->SetParameter( 1, fit->GetParameter(3) );
         
         lBgEstimate      = fitToSubtract->Integral     ( lValPeakLo, lValPeakHi );
-        lBgEstimate      /= lHisto->GetBinWidth(lBinPeakLo); //Transform into counts!
-        //lBgEstimateError = TMath::Sqrt(lBgEstimate); //fit->IntegralError( lValPeakLo, lValPeakHi );
-        lBgEstimateError = fit->IntegralError( lValPeakLo, lValPeakHi );
+        lBgEstimate     /= lHisto->GetBinWidth(lBinPeakLo); //Transform into counts!
+        lBgEstimateError = TMath::Sqrt(lBgEstimate); //fit->IntegralError( lValPeakLo, lValPeakHi );
     }
     
     if ( lOption.Contains("quadratic") ){
@@ -845,9 +950,41 @@ Bool_t AliStrangenessModule::PerformSignalExtraction( TH1D *lHisto, Double_t &lS
         fitToSubtract->SetParameter( 2, fit->GetParameter(4) );
         
         lBgEstimate      = fitToSubtract->Integral     ( lValPeakLo, lValPeakHi );
-        lBgEstimate      /= lHisto->GetBinWidth(lBinPeakLo); //Transform into counts!
-        //lBgEstimateError = TMath::Sqrt(lBgEstimate); //fit->IntegralError( lValPeakLo, lValPeakHi );
-        lBgEstimateError = fit->IntegralError( lValPeakLo, lValPeakHi );
+        lBgEstimate     /= lHisto->GetBinWidth(lBinPeakLo); //Transform into counts!
+        lBgEstimateError = TMath::Sqrt(lBgEstimate); //fit->IntegralError( lValPeakLo, lValPeakHi );
+    }
+    
+    if ( lOption.Contains("cubic") ){
+        //Step 2: Perform Quadratic Fit to improve results
+        TString lNameCubic = lHisto->GetName();
+        lNameCubic.Append("_CubicFit");
+        fit = new TF1(lNameCubic, this, &AliStrangenessModule::BgPol3,
+                      lMean + lLoLeftBg*lSigma, lMean + lHiRightBg*lSigma, 6 , "AliStrangenessModule", "BgPol3");
+        
+        //Start with parameters from initial fit: probably a good initial guess
+        fit->FixParameter(0, lMean + lHiLeftBg*lSigma );
+        fit->FixParameter(1, lMean + lLoRightBg*lSigma);
+        fit->SetParameter(2, lBgConst );
+        fit->SetParameter(3, lBgSlope );
+        fit->SetParameter(4, 0.000 );
+        fit->SetParameter(5, 0.000 );
+        
+        //Perform fit - otherwise stick to initial (linear) guess
+        TFitResultPtr fitResultPtr = lHisto->Fit( lNameCubic.Data(), lFitOptions.Data());
+        if ( !fitResultPtr->IsValid() ) lReturnValue = kFALSE; //went bad
+        
+        TString lNameToSubtract = lHisto->GetName();
+        lNameToSubtract.Append("_FitToSubtract");
+        fitToSubtract = new TF1(lNameToSubtract.Data(), "[0]+[1]*x+[2]*x*x+[3]*x*x*x",
+                                lMean + lLoLeftBg*lSigma, lMean + lHiRightBg*lSigma);
+        fitToSubtract->SetParameter( 0, fit->GetParameter(2) );
+        fitToSubtract->SetParameter( 1, fit->GetParameter(3) );
+        fitToSubtract->SetParameter( 2, fit->GetParameter(4) );
+        fitToSubtract->SetParameter( 3, fit->GetParameter(5) );
+        
+        lBgEstimate      = fitToSubtract->Integral     ( lValPeakLo, lValPeakHi );
+        lBgEstimate     /= lHisto->GetBinWidth(lBinPeakLo); //Transform into counts!
+        lBgEstimateError = TMath::Sqrt(lBgEstimate); //fit->IntegralError( lValPeakLo, lValPeakHi );
     }
     
     if ( lOption.Contains("bincounting") || lOption.Contains("MC") ){
@@ -896,6 +1033,10 @@ Bool_t AliStrangenessModule::PerformSignalExtraction( TH1D *lHisto, Double_t &lS
     if ( fit           ) lControlList->Add(fit          );
     if ( fitToSubtract ) lControlList->Add(fitToSubtract);
     
+    //Provide background information to the outside scope
+    lBackground      = lBgEstimate;
+    lBackgroundError = lBgEstimateError;
+    
     Double_t lPeakPlusBg      = 0;
     Double_t lPeakPlusBgError = 0;
     lPeakPlusBg = lHisto->IntegralAndError(lBinPeakLo,lBinPeakHi,lPeakPlusBgError);
@@ -933,7 +1074,6 @@ Double_t AliStrangenessModule::BgPol1(const Double_t *x, const Double_t *par)
     return par[2] + par[3]*x[0];
 }
 
-
 //________________________________________________________________
 Double_t AliStrangenessModule::BgPol2(const Double_t *x, const Double_t *par)
 {
@@ -946,6 +1086,21 @@ Double_t AliStrangenessModule::BgPol2(const Double_t *x, const Double_t *par)
     }
     return par[2] + par[3]*x[0] + par[4]*x[0]*x[0];
 }
+
+//________________________________________________________________
+Double_t AliStrangenessModule::BgPol3(const Double_t *x, const Double_t *par)
+{
+    //Function for background fitting, rejects peak region
+    //Parameter [0] -> Hi LeftBg Boundary
+    //Parameter [1] -> Lo RightBg Boundary
+    if ( x[0] > par[0] && x[0] < par[1]) {
+        TF1::RejectPoint();
+        return 0;
+    }
+    return par[2] + par[3]*x[0] + par[4]*x[0]*x[0] + par[5]*x[0]*x[0]*x[0];
+}
+
+
 
 
 

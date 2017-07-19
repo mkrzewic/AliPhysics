@@ -5,8 +5,10 @@ AliAnalysisTask *AddTaskBeautyCal(
                                  Bool_t FillElec=kFALSE,
                                  Bool_t ispPb=kFALSE,
                                  Int_t MimCent = -1, Int_t MaxCent = -1, 
+                                 Double_t nSig = -1.0,
                                  Int_t EtaRange = 0,
                                  Int_t ITSchi2 = 26,
+                                 Double_t eopmim = 0.9,
                                  Bool_t pileup = kFALSE,
                                  Double_t mass = 0.1, Double_t ptAss = 0.2, 
                                  Int_t thEG1ADC=140, Int_t thEG2ADC=89,
@@ -105,6 +107,8 @@ AliAnalysisTask *AddTaskBeautyCal(
     hfecalqa7->SetInvMassCut1(ptAss);
     hfecalqa7->SetEtaRange(EtaRange);
     hfecalqa7->SetITSchi2(ITSchi2);
+    hfecalqa7->SetMinSig(nSig);
+    hfecalqa7->SetEopMim(eopmim);
     hfecalqa7->SetPileUpCut(pileup);
     
     TString containerName7 = mgr->GetCommonFileName();
@@ -222,6 +226,8 @@ AliAnalysisTask *AddTaskBeautyCal(
         hfecalqaTrig01->SetInvMassCut1(ptAss);
         hfecalqaTrig01->SetEtaRange(EtaRange);
         hfecalqaTrig01->SetITSchi2(ITSchi2);
+        hfecalqaTrig01->SetMinSig(nSig);
+        hfecalqaTrig01->SetEopMim(eopmim);
         hfecalqaTrig01->SetPileUpCut(pileup);
         
         TString containerName01 = mgr->GetCommonFileName();
@@ -252,6 +258,8 @@ AliAnalysisTask *AddTaskBeautyCal(
         hfecalqaTrig02->SetInvMassCut1(ptAss);
         hfecalqaTrig02->SetEtaRange(EtaRange);
         hfecalqaTrig02->SetITSchi2(ITSchi2);        
+        hfecalqaTrig02->SetMinSig(nSig);
+        hfecalqaTrig02->SetEopMim(eopmim);
         hfecalqaTrig02->SetPileUpCut(pileup);
 
         TString containerName02 = mgr->GetCommonFileName();
@@ -283,6 +291,8 @@ AliAnalysisTask *AddTaskBeautyCal(
         hfecalqaTrig0->SetInvMassCut1(ptAss);
         hfecalqaTrig0->SetEtaRange(EtaRange);
         hfecalqaTrig0->SetITSchi2(ITSchi2);        
+        hfecalqaTrig0->SetMinSig(nSig);
+        hfecalqaTrig0->SetEopMim(eopmim);
         hfecalqaTrig0->SetPileUpCut(pileup);
 
         TString containerName1 = mgr->GetCommonFileName();
@@ -313,6 +323,8 @@ AliAnalysisTask *AddTaskBeautyCal(
     hfecalqaMB->SetInvMassCut1(ptAss);
     hfecalqaMB->SetEtaRange(EtaRange);
     hfecalqaMB->SetITSchi2(ITSchi2);     
+    hfecalqaMB->SetMinSig(nSig);
+    hfecalqaMB->SetEopMim(eopmim);
     hfecalqaMB->SetPileUpCut(pileup);     
 
     TString containerName2 = mgr->GetCommonFileName();

@@ -5,6 +5,8 @@
 
 #include "AliEMCALRecParam.h"
 
+class TStopwatch;
+
 /**
  * @class AliEmcalCorrectionClusterizer
  * @ingroup EMCALCOREFW
@@ -31,19 +33,6 @@
 
 class AliEmcalCorrectionClusterizer : public AliEmcalCorrectionComponent {
  public:
-  /**
-   * @num EmbeddedCellEnergyType
-   * @brief Select which part of the embedded cell energy to use
-   */
-  enum EmbeddedCellEnergyType {
-    kNonEmbedded = 0,            //!<! Standard mode for all data where no cells are embedded
-    kEmbeddedDataMCOnly,         //!<! Use only MC energy in an embedded cells
-    kEmbeddedDataExcludeMC       //!<! Exclude MC energy in an embedded cells
-  };
-
-  /// Relates string to the embedded cell energy type enumeration for YAML configuration
-  static const std::map <std::string, AliEmcalCorrectionClusterizer::EmbeddedCellEnergyType> fgkEmbeddedCellEnergyTypeMap; //!<!
-
   /// Relates string to the clusterizer type enumeration for YAML configuration
   static const std::map <std::string, AliEMCALRecParam::AliEMCALClusterizerFlag> fgkClusterizerTypeMap; //!<!
 
@@ -68,6 +57,10 @@ protected:
   void           SetClustersMCLabelFromOriginalClusters();
   void           ClearEMCalClusters();
   
+  TH1F* fHistCPUTime;                                     //!<! CPU time for the Run() function (event loop)
+  TH1F* fHistRealTime;                                    //!<! Real time for the Run() function (event loop)
+  TStopwatch * fTimer;                                    //!<! Timer for the Run() function (event loop)
+
   TClonesArray          *fDigitsArr;                      //!<!digits array
   TObjArray             *fClusterArr;                     //!<!recpoints array
   AliEMCALRecParam      *fRecParam;                       ///< reconstruction parameters container
@@ -89,7 +82,6 @@ protected:
   Int_t                  fShiftPhi;                       ///< shift in phi (for FixedWindowsClusterizer)
   Int_t                  fShiftEta;                       ///< shift in eta (for FixedWindowsClusterizer)
   Bool_t                 fTRUShift;                       ///< shifting inside a TRU (true) or through the whole calorimeter (false) (for FixedWindowsClusterizer)
-  EmbeddedCellEnergyType fEmbeddedCellEnergyType;         ///< Which selection of energy to use when embedding cells
   Bool_t                 fTestPatternInput;               ///< Use test pattern as input instead of cells
   
   // MC labels
@@ -122,7 +114,7 @@ protected:
   static RegisterCorrectionComponent<AliEmcalCorrectionClusterizer> reg;
 
   /// \cond CLASSIMP
-  ClassDef(AliEmcalCorrectionClusterizer, 2); // EMCal correction clusterizer component
+  ClassDef(AliEmcalCorrectionClusterizer, 4); // EMCal correction clusterizer component
   /// \endcond
 };
 

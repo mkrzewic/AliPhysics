@@ -72,42 +72,42 @@ class AliAnalysisTaskUpcEtaC : public AliAnalysisTaskSE {
   Bool_t fIsPhysicsSelected;
 
   //PID for EtC->Pi+Pi-K+K- Channel  
-  Double_t fPIDTPCMuon[4];
-  Double_t fPIDTPCElectron[4];
-  Double_t fPIDTPCPion[4];
-  Double_t fPIDTPCKaon[4];
-  Double_t fPIDTPCProton[4];
+  Double_t fPIDTPCMuon[7];
+  Double_t fPIDTPCElectron[7];
+  Double_t fPIDTPCPion[7];
+  Double_t fPIDTPCKaon[7];
+  Double_t fPIDTPCProton[7];
   
-  Double_t fPIDTOFMuon[4];
-  Double_t fPIDTOFElectron[4];
-  Double_t fPIDTOFPion[4];
-  Double_t fPIDTOFKaon[4];
-  Double_t fPIDTOFProton[4];
+  Double_t fPIDTOFMuon[7];
+  Double_t fPIDTOFElectron[7];
+  Double_t fPIDTOFPion[7];
+  Double_t fPIDTOFKaon[7];
+  Double_t fPIDTOFProton[7];
 
   //PID for EtC->K0s K+- Pi-+ Channel
-  Double_t fPIDTPCMuonPos[4];
-  Double_t fPIDTPCElectronPos[4];
-  Double_t fPIDTPCPionPos[4];
-  Double_t fPIDTPCKaonPos[4];
-  Double_t fPIDTPCProtonPos[4];
+  Double_t fPIDTPCMuonPos[7];
+  Double_t fPIDTPCElectronPos[7];
+  Double_t fPIDTPCPionPos[7];
+  Double_t fPIDTPCKaonPos[7];
+  Double_t fPIDTPCProtonPos[7];
   
-  Double_t fPIDTOFMuonPos[4];
-  Double_t fPIDTOFElectronPos[4];
-  Double_t fPIDTOFPionPos[4];
-  Double_t fPIDTOFKaonPos[4];
-  Double_t fPIDTOFProtonPos[4];
+  Double_t fPIDTOFMuonPos[7];
+  Double_t fPIDTOFElectronPos[7];
+  Double_t fPIDTOFPionPos[7];
+  Double_t fPIDTOFKaonPos[7];
+  Double_t fPIDTOFProtonPos[7];
  
-  Double_t fPIDTPCMuonNeg[4];
-  Double_t fPIDTPCElectronNeg[4];
-  Double_t fPIDTPCPionNeg[4];
-  Double_t fPIDTPCKaonNeg[4];
-  Double_t fPIDTPCProtonNeg[4];
+  Double_t fPIDTPCMuonNeg[7];
+  Double_t fPIDTPCElectronNeg[7];
+  Double_t fPIDTPCPionNeg[7];
+  Double_t fPIDTPCKaonNeg[7];
+  Double_t fPIDTPCProtonNeg[7];
   
-  Double_t fPIDTOFMuonNeg[4];
-  Double_t fPIDTOFElectronNeg[4];
-  Double_t fPIDTOFPionNeg[4];
-  Double_t fPIDTOFKaonNeg[4];
-  Double_t fPIDTOFProtonNeg[4];
+  Double_t fPIDTOFMuonNeg[7];
+  Double_t fPIDTOFElectronNeg[7];
+  Double_t fPIDTOFPionNeg[7];
+  Double_t fPIDTOFKaonNeg[7];
+  Double_t fPIDTOFProtonNeg[7];
   
   Int_t fVtxContrib;
   Double_t fVtxPos[3];
@@ -118,7 +118,7 @@ class AliAnalysisTaskUpcEtaC : public AliAnalysisTaskSE {
   Int_t fSpdVtxContrib;
   Double_t fSpdVtxPos[3];
   
-  Bool_t fIsVtxContributor[4];
+  Bool_t fIsVtxContributor[7];
   
   UShort_t fBCrossNum, fNtracklets, fNLooseTracks;
   //vzero, zdc
@@ -176,14 +176,16 @@ class AliAnalysisTaskUpcEtaC : public AliAnalysisTaskSE {
   TH1D *f2KstarPtKMinus;
   TH2D *f2KstarTPCsignalPion; //dEdx correlation Pions
   TH2D *f2KstarTPCsignalKaon; //dEdx correlation Kaons
+  TH2D *f2KstarDedxVsPtPion;
+  TH2D *f2KstarDedxVsPtKaon;
   TH2D *f2KstarTPCsignalVsQPtPion; //dEdx Pions vs Q*Pt
   TH2D *f2KstarTPCsignalVsQPtKaon; //dEdx Kaons vs Q*Pt
-  TH1D *f2KstarPtFirstKstar; 
-  TH1D *f2KstarPtSecondKstar;
-  TH1D *f2KstarMinvFirstKstar;
-  TH1D *f2KstarMinvSecondKstar;
-  TH1D *f2KstarPtEtaC;
-  TH1D *f2KstarMinvEtaC;
+  TH2D *f2KstarPtVsMinvFirstKstar; 
+  TH2D *f2KstarPtVsMinvSecondKstar;
+  //    TH1D *f2KstarMinvFirstKstar;
+  //    TH1D *f2KstarMinvSecondKstar;
+  TH2D *f2KstarPtVsMinvEtaC;
+  //    TH1D *f2KstarMinvEtaC;
   //1 Kstar case
   TH1D *f1KstarPtPiPlus;
   TH1D *f1KstarPtPiMinus;
@@ -191,14 +193,16 @@ class AliAnalysisTaskUpcEtaC : public AliAnalysisTaskSE {
   TH1D *f1KstarPtKMinus;
   TH2D *f1KstarTPCsignalPion; //dEdx correlation Pions
   TH2D *f1KstarTPCsignalKaon; //dEdx correlation Kaons
+  TH2D *f1KstarDedxVsPtPion;
+  TH2D *f1KstarDedxVsPtKaon;
   TH2D *f1KstarTPCsignalVsQPtPion; //dEdx Pions vs Q*Pt
   TH2D *f1KstarTPCsignalVsQPtKaon; //dEdx Kaons vs Q*Pt
-  TH1D *f1KstarPtKstar;
-  TH1D *f1KstarPtOtherPiKcombo;
-  TH1D *f1KstarMinvKstar;
-  TH1D *f1KstarMinvOtherPiKcombo;
-  TH1D *f1KstarPtEtaC;
-  TH1D *f1KstarMinvEtaC;
+  TH2D *f1KstarPtVsMinvKstar;
+  TH2D *f1KstarPtVsMinvOtherPiKcombo;
+  //    TH1D *f1KstarMinvKstar;
+  //    TH1D *f1KstarMinvOtherPiKcombo;
+  TH2D *f1KstarPtVsMinvEtaC;
+  //    TH1D *f1KstarMinvEtaC;
   //0 Kstar case
   TH1D *f0KstarPtPiPlus;
   TH1D *f0KstarPtPiMinus;
@@ -206,14 +210,16 @@ class AliAnalysisTaskUpcEtaC : public AliAnalysisTaskSE {
   TH1D *f0KstarPtKMinus;
   TH2D *f0KstarTPCsignalPion; //dEdx correlation Pions
   TH2D *f0KstarTPCsignalKaon; //dEdx correlation Kaons
+  TH2D *f0KstarDedxVsPtPion;
+  TH2D *f0KstarDedxVsPtKaon;
   TH2D *f0KstarTPCsignalVsQPtPion; //dEdx Pions vs Q*Pt
   TH2D *f0KstarTPCsignalVsQPtKaon; //dEdx Kaons vs Q*Pt
-  TH1D *f0KstarPtFirstPiKcombo;
-  TH1D *f0KstarPtSecondPiKcombo;
-  TH1D *f0KstarMinvFirstPiKcombo;
-  TH1D *f0KstarMinvSecondPiKcombo;
-  TH1D *f0KstarPtEtaC;
-  TH1D *f0KstarMinvEtaC;
+  TH2D *f0KstarPtVsMinvFirstPiKcombo;
+  TH2D *f0KstarPtVsMinvSecondPiKcombo;
+  //    TH1D *f0KstarMinvFirstPiKcombo;
+  //    TH1D *f0KstarMinvSecondPiKcombo;
+  TH2D *f0KstarPtVsMinvEtaC;
+  //    TH1D *f0KstarMinvEtaC;
 
   //K0s Channel
   TH1D *fHistK0sCandidatesPerEvent; //Track number of K0s candidates per event
@@ -222,13 +228,13 @@ class AliAnalysisTaskUpcEtaC : public AliAnalysisTaskSE {
   TH2D *fK0sPosVsNegDaughterPt;
   TH1D *fPionK0sChannelPt;
   TH1D *fKaonK0sChannelPt;
-  TH1D *fK0sPt;
-  TH1D *fK0sMinv;
-  TH1D *fKPiPtK0sChannel;
-  TH1D *fKPiMinvK0sChannel;
+  TH2D *fK0sPtVsMinv;
+  //  TH1D *fK0sMinv;
+  TH2D *fKPiPtVsMinvK0sChannel;
+  //  TH1D *fKPiMinvK0sChannel;
   TH2D *fMK0sVsMKPiK0sChannel; //Dalitz Plot, Mass K0s vs Mass of PiK combo
-  TH1D *fEtaCPtK0sChannel;
-  TH1D *fEtaCMinvK0sChannel;
+  TH2D *fEtaCPtVsMinvK0sChannel;
+  //  TH1D *fEtaCMinvK0sChannel;
   TH1D *fK0sDecayLength;
 
 
@@ -243,6 +249,25 @@ class AliAnalysisTaskUpcEtaC : public AliAnalysisTaskSE {
   TH1D *fHistNkaon;
   TH1D *fHistPiMinusK;
 
+  //New diagnostic histos to investigate alternative PID approaches.
+  TH2D *fNSigmaPionTPCvsNSigmaPionTOFLowPt;
+  TH2D *fNSigmaPionTPCvsNSigmaPionTOFMidPt;
+  TH2D *fNSigmaPionTPCvsNSigmaPionTOFHighPt;
+  TH2D *fNSigmaKaonTPCvsNSigmaKaonTOFLowPt;
+  TH2D *fNSigmaKaonTPCvsNSigmaKaonTOFMidPt;
+  TH2D *fNSigmaKaonTPCvsNSigmaKaonTOFHighPt;
+  TH2D *fTPCdEdxVsTOFbetaAll;
+  TH2D *fTPCdEdxVsTOFbetaPionsWithPID;
+  TH2D *fTPCdEdxVsTOFbetaKaonsWithPID;
+  TH2D *fTOFTimeVsTPCdEdxAll;
+  TH2D *fTOFTimeVsTPCdEdxPionsWithPID;
+  TH2D *fTOFTimeVsTPCdEdxKaonsWithPID;
+  TH2D *fTOFbetaVsPtAll;
+  TH2D *fTOFbetaVsPtPionsWithPID;
+  TH2D *fTOFbetaVsPtKaonsWithPID;
+  TH1D *fNTracksWithTOFPIDPerEvent;
+  TH1D *fNTracksMissingDueToTOFPerEvent;
+
   TH1D *fV0DaughterDca;
   TH1D *fK0sDcaToPrimVertex;
   TH1D *fK0sDaughterDcaToPrimVertex;
@@ -250,6 +275,17 @@ class AliAnalysisTaskUpcEtaC : public AliAnalysisTaskSE {
   TH1D *fV0DecayLength;
   TH1D *fV0Eta;
   TH1D *fCosPointingAngle;
+
+  //RhoRho Channel histos.
+  TH1D *fHistNeventsEtaCRhoChannel;
+  TH2D *f2RhoPtVsMinvRho;
+  TH2D *f4PionPtVsMinvRho;
+  TH2D *f2RhoPtVsMinvEtaC;
+  TH2D *f4PionPtVsMinvEtaC;
+
+  //3PiPi Channel histos
+  TH1D *fHistNeventsEtaC3PiPiChannel;
+  TH2D *f3PiPiPtVsMinvEtaC;
     
   TH1D *fHistZDCCuts;
   

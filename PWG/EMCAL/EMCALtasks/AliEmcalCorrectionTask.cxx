@@ -17,6 +17,7 @@
 #include <TSystem.h>
 #include <TGrid.h>
 #include <TFile.h>
+#include <TUUID.h>
 
 #include "AliVEventHandler.h"
 #include "AliEMCALGeometry.h"
@@ -665,6 +666,7 @@ void AliEmcalCorrectionTask::CreateInputObjects(AliEmcalContainerUtils::InputObj
  *
  * @param[in] component The correction component to which the input objects will be added
  * @param[in] inputObjectType The type of input object to add to the component
+ * @param[in] checkObjectExists If true, check if the object exists before adding it to the component
  */
 void AliEmcalCorrectionTask::AddContainersToComponent(AliEmcalCorrectionComponent * component, AliEmcalContainerUtils::InputObject_t inputObjectType, bool checkObjectExists)
 {
@@ -721,7 +723,7 @@ void AliEmcalCorrectionTask::AddContainersToComponent(AliEmcalCorrectionComponen
       }
 
       if (checkObjectExists && !(cellCont->GetCells())) {
-        AliFatal(TString::Format("%s: Unable to retrieve input object \"%s\" because it is null. Please check your configuration!", GetName(), str.c_str()));
+        AliFatal(TString::Format("%s: Unable to retrieve cells \"%s\" in input object \"%s\" because the cells are null. Please check your configuration!", GetName(), cellCont->GetBranchName().c_str(), str.c_str()));
       }
 
       // Set the calo cells (may be null)
@@ -879,7 +881,7 @@ void AliEmcalCorrectionTask::SetupContainer(AliEmcalContainerUtils::InputObject_
     }
   }
   // Embedded
-  result = AliEmcalCorrectionComponent::GetProperty("IsEmbedded", tempBool, userNode, defaultNode, false, containerName);
+  result = AliEmcalCorrectionComponent::GetProperty("embedding", tempBool, userNode, defaultNode, false, containerName);
   if (result) {
     AliDebugStream(2) << cont->GetName() << ": Setting embedding to " << (tempBool ? "enabled" : "disabled") << std::endl;
     cont->SetIsEmbedding(tempBool);
@@ -1494,8 +1496,14 @@ void AliEmcalCorrectionTask::SetupConfigurationFilePath(std::string & filename, 
       std::string localFilename = gSystem->BaseName(filename.c_str());
       // Ensures that the default and user files do not conflict if both are taken from the grid and have the same filename
       if (userFile == true) {
-        localFilename = "user" + localFilename;
+        localFilename = "user." + localFilename;
       }
+      // Add UUID to ensure there are no conflicts if multiple correction tasks have the same configuration file name
+      TUUID tempUUID;
+      localFilename = "." + localFilename;
+      localFilename = tempUUID.AsString() + localFilename;
+
+      // Copy file
       TFile::Cp(filename.c_str(), localFilename.c_str());
 
       // yaml-cpp should only open the local file
@@ -1649,7 +1657,7 @@ void AliEmcalCorrectionTask::PrintRequestedContainersInformation(AliEmcalContain
     AliEmcalContainer * cont = 0;
     for (auto containerInfo : (inputObjectType == AliEmcalContainerUtils::kCluster ? fClusterCollArray : fParticleCollArray) ) {
       cont = static_cast<AliEmcalContainer *>(containerInfo);
-      stream << "\tName: " << cont->GetName() << "\tBranch: " << cont->GetArrayName() << "\tTitle: " << cont->GetTitle() << "\tIsEmbedding:" << std::boolalpha << cont->GetIsEmbedding() << std::endl;
+      stream << "\tName: " << cont->GetName() << "\tBranch: " << cont->GetArrayName() << "\tTitle: " << cont->GetTitle() << "\tIsEmbedding: " << std::boolalpha << cont->GetIsEmbedding() << std::endl;
     }
   }
   else {

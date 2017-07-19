@@ -333,9 +333,6 @@ void AliPerformancePtCalibMC::SetPtShift(const Double_t shiftVal ) {
 void AliPerformancePtCalibMC::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent, AliVfriendEvent *const /*vfriendEvent*/, const Bool_t /*bUseMC*/, const Bool_t /*bUseVfriend*/)
 {
    //exec: read MC and esd or tpc tracks
-   
-   AliStack* stack = NULL;
- 
   if (!vEvent) {
     Printf("ERROR: Event not available");
     return;
@@ -347,12 +344,6 @@ void AliPerformancePtCalibMC::Exec(AliMCEvent* const mcEvent, AliVEvent *const v
       Printf("ERROR: Could not retrieve MC event");
       return;
    }    
-   stack = mcEvent->Stack();
-   if (!stack) {
-      Printf("ERROR: Could not retrieve stack");
-      return;
-   }
-
    
    //vertex info for cut
    //const AliESDVertex *vtx = esdEvent->GetPrimaryVertex();
@@ -387,7 +378,7 @@ void AliPerformancePtCalibMC::Exec(AliMCEvent* const mcEvent, AliVEvent *const v
     // get MC info 
     Int_t label = vTrack->GetLabel();
     if(label<0) continue;	
-    TParticle *  partMC = stack->Particle(label);
+    TParticle *  partMC = ((AliMCParticle*)mcEvent->GetTrack(label))->Particle();
     if (!partMC) continue;
   
     // fill correlation histos MC Recon

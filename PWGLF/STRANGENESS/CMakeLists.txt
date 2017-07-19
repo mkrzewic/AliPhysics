@@ -27,6 +27,7 @@ include_directories(${ROOT_INCLUDE_DIRS}
                     ${AliPhysics_SOURCE_DIR}/OADB
                     ${AliPhysics_SOURCE_DIR}/OADB/COMMON/MULTIPLICITY
                     ${AliPhysics_SOURCE_DIR}/PWGCF/Correlations/Base
+		    ${AliPhysics_SOURCE_DIR}/PWGLF/FORWARD/analysis2
                     ${AliPhysics_SOURCE_DIR}/PWGLF/STRANGENESS/Cascades/lightvertexers
                     ${AliPhysics_SOURCE_DIR}/PWGLF/STRANGENESS/Cascades/Run2
                     ${AliPhysics_SOURCE_DIR}/PWGUD/base
@@ -60,6 +61,8 @@ set(SRCS
   Cascades/Run2/AliAnalysisTaskStrangenessVsMultiplicityRun2.cxx
   Cascades/Run2/AliAnalysisTaskStrangenessVsMultiplicityRsnLikeBgSub.cxx
   Cascades/Run2/AliAnalysisTaskStrangenessVsMultiplicityMCRun2.cxx
+  Cascades/Run2/AliAnalysisTaskStrangenessVsMultiplicityRun2pPb.cxx
+  Cascades/Run2/AliAnalysisTaskStrangenessVsMultiplicityMCRun2pPb.cxx
   Cascades/AliAnalysisTaskPPVsMultCrossCheckMC.cxx
   Cascades/AliAnalysisTaskpANormalizationCheckMC.cxx
   Correlations/AliAnalysisTaskLambdaOverK0sJets.cxx
@@ -74,6 +77,8 @@ set(SRCS
   Cascades/Run2/AliV0Result.cxx
   Cascades/Run2/AliCascadeResult.cxx
   Cascades/Run2/AliStrangenessModule.cxx
+  Cascades/Run2/AliAnalysisTaskWeakDecayVertexer.cxx
+  Cascades/Run2/AliAnalysisTaskStrEffStudy.cxx
   )
 
 # Headers from sources

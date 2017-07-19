@@ -54,7 +54,6 @@
 #include "AliMCEvent.h"
 #include "AliVTrack.h"
 #include "AliExternalTrackParam.h"
-#include "AliStack.h"
 #include "AliLog.h" 
 #include "AliMCInfoCuts.h" 
 #include "AliMathBase.h"
@@ -119,10 +118,13 @@ AliPerformanceDEdx::~AliPerformanceDEdx()
 {
   // destructor
   delete fDeDxHisto;
-  delete fAnalysisFolder;
 
-  if (fFolderObj) { fFolderObj->Delete(); }
+  if (fFolderObj && fAnalysisFolder && !fAnalysisFolder->IsOwner()) {
+    fFolderObj->Delete();
+  } //delete the registered non-sparse histograms
+
   delete fFolderObj;
+  delete fAnalysisFolder;
 }
 
 //_____________________________________________________________________________
@@ -219,14 +221,14 @@ void AliPerformanceDEdx::Init()
 }
 
 //_____________________________________________________________________________
-void AliPerformanceDEdx::ProcessTPC(AliStack* const /*stack*/, AliVTrack *const /*vTrack*/)
+void AliPerformanceDEdx::ProcessTPC(AliMCEvent* const /*mcev*/, AliVTrack *const /*vTrack*/)
 {
   // Fill dE/dx  comparison information
   AliDebug(AliLog::kWarning, "Warning: Not implemented");
 }
 
 //_____________________________________________________________________________
-void AliPerformanceDEdx::ProcessInnerTPC(AliStack* const stack, AliVTrack *const vTrack, AliVEvent* const vEvent)
+void AliPerformanceDEdx::ProcessInnerTPC(AliMCEvent* const mcev, AliVTrack *const vTrack, AliVEvent* const vEvent)
 {
  //
  // Fill TPC track information at inner TPC wall
@@ -302,14 +304,13 @@ void AliPerformanceDEdx::ProcessInnerTPC(AliStack* const stack, AliVTrack *const
 
   //Double_t vDeDxHisto[10] = {dedx,phi,y,z,snp,tgl,ncls,p,TPCSignalN,nCrossedRows};
   Double_t vDeDxHisto[10] = {dedx,phi,y,z,snp,tgl,Double_t(ncls),p,Double_t(TPCSignalN),nClsF};
-  if(fUseSparse) fDeDxHisto->Fill(vDeDxHisto);
-  else FilldEdxHisotgram(vDeDxHisto);
-    
-  if(!stack) return;
+  fDeDxHisto->Fill(vDeDxHisto); 
+
+  if(!mcev) return;
 }
 
 //_____________________________________________________________________________
-void AliPerformanceDEdx::ProcessTPCITS(AliStack* const /*stack*/, AliVTrack *const /*vTrack*/)
+void AliPerformanceDEdx::ProcessTPCITS(AliMCEvent* const /*mcev*/, AliVTrack *const /*vTrack*/)
 {
   // Fill dE/dx  comparison information
   
@@ -317,7 +318,7 @@ void AliPerformanceDEdx::ProcessTPCITS(AliStack* const /*stack*/, AliVTrack *con
 }
 
 //_____________________________________________________________________________
-void AliPerformanceDEdx::ProcessConstrained(AliStack* const /*stack*/, AliVTrack *const /*vTrack*/)
+void AliPerformanceDEdx::ProcessConstrained(AliMCEvent* const /*mcev*/, AliVTrack *const /*vTrack*/)
 {
   // Fill dE/dx  comparison information
   
@@ -379,7 +380,6 @@ void AliPerformanceDEdx::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent
   }
   AliHeader* header = 0;
   AliGenEventHeader* genHeader = 0;
-  AliStack* stack = 0;
   TArrayF vtxMC(3);
   
   if(bUseMC)
@@ -393,12 +393,6 @@ void AliPerformanceDEdx::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent
     header = mcEvent->Header();
     if (!header) {
       AliDebug(AliLog::kError, "Header not available");
-      return;
-    }
-    // MC particle stack
-    stack = mcEvent->Stack();
-    if (!stack) {
-      AliDebug(AliLog::kError, "Stack not available");
       return;
     }
 
@@ -421,7 +415,7 @@ void AliPerformanceDEdx::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent
   }
 
   // trigger
-  if(!bUseMC && !GetTriggerClass().IsNull()) {
+  if(!bUseMC && GetTriggerClass()) {
     Bool_t isEventTriggered = vEvent->IsTriggerClassFired(GetTriggerClass());
     if(!isEventTriggered) return; 
   }
@@ -450,10 +444,10 @@ void AliPerformanceDEdx::Exec(AliMCEvent* const mcEvent, AliVEvent *const vEvent
     AliVTrack *track = dynamic_cast<AliVTrack*>(particle);
     if(!track) continue;
 
-    if(GetAnalysisMode() == 0) ProcessTPC(stack,track);
-    else if(GetAnalysisMode() == 1) ProcessTPCITS(stack,track);
-    else if(GetAnalysisMode() == 2) ProcessConstrained(stack,track);
-    else if(GetAnalysisMode() == 3) ProcessInnerTPC(stack,track,vEvent);
+    if(GetAnalysisMode() == 0) ProcessTPC(mcEvent,track);
+    else if(GetAnalysisMode() == 1) ProcessTPCITS(mcEvent,track);
+    else if(GetAnalysisMode() == 2) ProcessConstrained(mcEvent,track);
+    else if(GetAnalysisMode() == 3) ProcessInnerTPC(mcEvent,track,vEvent);
     else {
       printf("ERROR: AnalysisMode %d \n",fAnalysisMode);
       return;
@@ -712,3 +706,13 @@ void AliPerformanceDEdx::ResetOutputData(){
     }
     
 }
+
+//_____________________________________________________________________________
+TCollection* AliPerformanceDEdx::GetListOfDrawableObjects()
+{
+  TObjArray* tmp = fFolderObj;
+  fFolderObj = NULL;
+  if (fAnalysisFolder) { fAnalysisFolder->SetOwner(kFALSE); }
+  return tmp;
+}
+

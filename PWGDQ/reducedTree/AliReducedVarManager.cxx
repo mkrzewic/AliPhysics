@@ -128,8 +128,8 @@ TH1I* AliReducedVarManager::fgRunTimeStart = 0x0;
 TH1I* AliReducedVarManager::fgRunTimeEnd = 0x0;
 std::vector<Int_t>  AliReducedVarManager::fgRunNumbers;
 Int_t AliReducedVarManager::fgRunID = -1;
-TProfile* AliReducedVarManager::fgAvgSpdTrackletsVertex = 0x0;
-Double_t AliReducedVarManager::fgRefMult = 0.;
+TH1* AliReducedVarManager::fgAvgMultVsVertex[3] = {0x0, 0x0, 0x0};
+Double_t AliReducedVarManager::fgRefMult[3] = {0., 0., 0.};
 TString AliReducedVarManager::fgVZEROCalibrationPath = "";
 TProfile2D* AliReducedVarManager::fgAvgVZEROChannelMult[64] = {0x0};
 TProfile2D* AliReducedVarManager::fgVZEROqVecRecentering[4] = {0x0};
@@ -392,6 +392,7 @@ void AliReducedVarManager::FillEventInfo(BASEEVENT* baseEvent, Float_t* values, 
   values[kHighMultV0Triggered]  = event->TriggerMask() & kHighMultV0 ?1:0;
   values[kIsPhysicsSelection]   = (event->IsPhysicsSelection() ? 1.0 : 0.0);
   values[kIsSPDPileup]          = event->IsSPDPileup();
+  values[kIsSPDPileup5]         = event->EventTag(11);
   values[kIsSPDPileupMultBins]  = event->IsSPDPileupMultBins();
   values[kNSPDpileups]          = event->NpileupSPD();
   values[kNTrackPileups]        = event->NpileupTracks();
@@ -447,16 +448,16 @@ void AliReducedVarManager::FillEventInfo(BASEEVENT* baseEvent, Float_t* values, 
      fgUsedVars[kNTracksTOFoutVsTRDout] = kFALSE;
   
   values[kSPDntracklets]   = event->SPDntracklets();
-  if( fgUsedVars[kSPDntrackletsCorr] ){
-    if( fgAvgSpdTrackletsVertex && TMath::Abs(baseEvent->Vertex(2)) < 10. ){
-      if( !fgRefMult ) fgRefMult = fgAvgSpdTrackletsVertex->GetMaximum();
-      Double_t localAvg = fgAvgSpdTrackletsVertex->GetBinContent( fgAvgSpdTrackletsVertex->FindBin(baseEvent->Vertex(2)) );
-      Double_t deltaM = values[kSPDntracklets] * (fgRefMult/localAvg - 1);
-      values[kSPDntrackletsCorr] = values[kSPDntracklets] + (deltaM>0 ? 1 : -1) * gRandom->Poisson(TMath::Abs(deltaM));
-    }
-    else{
+  if( fgUsedVars[kSPDntrackletsCorr] || fgUsedVars[kSPDntrackletsCorrSmear] ){
       values[kSPDntrackletsCorr] = values[kSPDntracklets];
-    }
+      values[kSPDntrackletsCorrSmear] = values[kSPDntracklets];
+      if( fgAvgMultVsVertex[0] && TMath::Abs(baseEvent->Vertex(2)) < 10. ){
+        if( !fgRefMult[0] ) fgRefMult[0] = fgAvgMultVsVertex[0]->GetMaximum();
+        Double_t localAvg = fgAvgMultVsVertex[0]->GetBinContent( fgAvgMultVsVertex[0]->FindBin(baseEvent->Vertex(2)) );
+        Double_t deltaM = values[kSPDntracklets] * (fgRefMult[0]/localAvg - 1);
+        values[kSPDntrackletsCorrSmear] += (deltaM>0 ? 1. : -1.) * gRandom->Poisson(TMath::Abs(deltaM));
+        values[kSPDntrackletsCorr]      *= fgRefMult[0]/localAvg;
+      }
   }
   fgUsedVars[kNTracksITSoutVsSPDtracklets] = kTRUE;  
   fgUsedVars[kNTracksTPCoutVsSPDtracklets] = kTRUE;
@@ -479,11 +480,26 @@ void AliReducedVarManager::FillEventInfo(BASEEVENT* baseEvent, Float_t* values, 
   values[kNTPCclusters]    = event->NTPCClusters();
   values[kSPDntracklets08] = 0.;
   values[kSPDntracklets16] = 0.;
+  values[kSPDntrackletsOuter] = 0.;
   for(Int_t ieta=0;ieta<32;++ieta) {
     values[kSPDntrackletsEta+ieta] = event->SPDntracklets(ieta);
     values[kSPDntracklets16] += event->SPDntracklets(ieta);
-    if(ieta >7 && ieta <25 ) values[kSPDntracklets08] += event->SPDntracklets(ieta);
+    if(ieta >7 && ieta <24 ) values[kSPDntracklets08] += event->SPDntracklets(ieta);
+    if( ieta <7 || ieta > 24 ) values[kSPDntrackletsOuter] += event->SPDntracklets(ieta);
   }
+  if( fgUsedVars[kSPDntrackletsOuterCorr] || fgUsedVars[kSPDntrackletsOuterCorrSmear] ){
+      values[kSPDntrackletsOuterCorr] = values[kSPDntrackletsOuter];
+      values[kSPDntrackletsOuterCorrSmear] = values[kSPDntrackletsOuter];
+      if( fgAvgMultVsVertex[1] && TMath::Abs(baseEvent->Vertex(2)) < 10. ){
+        if( !fgRefMult[1] ) fgRefMult[1] = fgAvgMultVsVertex[1]->GetMaximum();
+        Double_t localAvg = fgAvgMultVsVertex[1]->GetBinContent( fgAvgMultVsVertex[1]->FindBin(baseEvent->Vertex(2)) );
+        Double_t deltaM = values[kSPDntrackletsOuter] * (fgRefMult[1]/localAvg - 1);
+        values[kSPDntrackletsOuterCorrSmear] += (deltaM>0 ? 1. : -1.) * gRandom->Poisson(TMath::Abs(deltaM));
+        values[kSPDntrackletsOuterCorr]      *= fgRefMult[1]/localAvg;
+      }
+  }
+  
+  
   for(Int_t i=0;i<2;++i) values[kSPDFiredChips+i] = event->SPDFiredChips(i+1);
   for(Int_t i=0;i<6;++i) values[kITSnClusters+i] = event->ITSClusters(i+1);
   values[kSPDnSingleClusters] = event->SPDnSingleClusters();
@@ -492,6 +508,18 @@ void AliReducedVarManager::FillEventInfo(BASEEVENT* baseEvent, Float_t* values, 
   values[kVZEROATotalMult] = event->MultVZEROA();
   values[kVZEROCTotalMult] = event->MultVZEROC();
   values[kVZEROTotalMult]  = event->MultVZERO();
+  
+    if( fgUsedVars[kVZEROTotalMultCorr] || fgUsedVars[kVZEROTotalMultCorrSmear] ){
+      values[kVZEROTotalMultCorr] = values[kVZEROTotalMult];
+      values[kVZEROTotalMultCorrSmear] = values[kVZEROTotalMult];
+      if( fgAvgMultVsVertex[1] && TMath::Abs(baseEvent->Vertex(2)) < 10. ){
+        if( !fgRefMult[2] ) fgRefMult[2] = fgAvgMultVsVertex[2]->GetMaximum();
+        Double_t localAvg = fgAvgMultVsVertex[2]->GetBinContent( fgAvgMultVsVertex[2]->FindBin(baseEvent->Vertex(2)) );
+        Double_t deltaM = values[kVZEROTotalMult] * (fgRefMult[2]/localAvg - 1);
+        values[kVZEROTotalMultCorrSmear] += (deltaM>0 ? 1. : -1.) * gRandom->Poisson(TMath::Abs(deltaM));
+        values[kVZEROTotalMultCorr]      *= fgRefMult[2]/localAvg;
+      }
+  }
   fgUsedVars[kNTracksTPCoutVsVZEROTotalMult] = kTRUE;
   if(values[kVZEROTotalMult]>1.0e-5) 
      values[kNTracksTPCoutVsVZEROTotalMult] = values[kNTracksPerTrackingStatus+kTPCout] / values[kVZEROTotalMult];
@@ -893,6 +921,50 @@ void AliReducedVarManager::FillMCTruthInfo(TRACK* p, Float_t* values, TRACK* leg
       if(TMath::Abs(p->MCPdg(0))==443)
          values[kRapMC] = p->RapidityMC(3.1);   // TODO: use correct PDG mass
    }
+   
+   // compute MC truth variables from decay legs, e.g. from the 2 electrons of a J/psi decay
+   // NOTE: this may be different from the kinematics of the mother, if not all decay legs are considered / tracked
+   Bool_t requestMCfromLegs = kFALSE;
+   if(fgUsedVars[kPtMCfromLegs] || fgUsedVars[kPMCfromLegs] || 
+      fgUsedVars[kPxMCfromLegs] || fgUsedVars[kPyMCfromLegs] || fgUsedVars[kPzMCfromLegs] ||
+      fgUsedVars[kThetaMCfromLegs] || fgUsedVars[kEtaMCfromLegs] || fgUsedVars[kPhiMCfromLegs] ||
+      fgUsedVars[kMassMCfromLegs] || fgUsedVars[kRapMCfromLegs]) 
+      requestMCfromLegs = kTRUE;
+   if(leg1 && leg2 && requestMCfromLegs) {
+      values[kPxMCfromLegs] = leg1->MCmom(0) + leg2->MCmom(0);
+      values[kPyMCfromLegs] = leg1->MCmom(1) + leg2->MCmom(1);
+      values[kPzMCfromLegs] = leg1->MCmom(2) + leg2->MCmom(2);
+      values[kPtMCfromLegs] = TMath::Sqrt(values[kPxMCfromLegs]*values[kPxMCfromLegs]+values[kPyMCfromLegs]*values[kPyMCfromLegs]);
+      values[kPMCfromLegs] = TMath::Sqrt(values[kPtMCfromLegs]*values[kPtMCfromLegs]+values[kPzMCfromLegs]*values[kPzMCfromLegs]);
+      values[kThetaMCfromLegs] = (values[kPMCfromLegs]>=1.0e-6 ? TMath::ACos(values[kPzMCfromLegs]/values[kPMCfromLegs]) : 0.0);
+      values[kEtaMCfromLegs] = TMath::Tan(0.5*values[kThetaMCfromLegs]);
+      values[kEtaMCfromLegs] = (values[kEtaMCfromLegs]>1.0e-6 ? -1.0*TMath::Log(values[kEtaMCfromLegs]) : 0.0);
+      values[kPhiMCfromLegs] = TMath::ATan2(values[kPyMCfromLegs],values[kPxMCfromLegs]);
+      values[kPhiMCfromLegs] = (values[kPhiMCfromLegs]<0.0 ? (TMath::TwoPi()+values[kPhiMCfromLegs]) : values[kPhiMCfromLegs]);
+      if(TMath::Abs(p->MCPdg(0))==443) {
+         Float_t m1 = fgkParticleMass[kElectron];
+         Float_t m2 = fgkParticleMass[kElectron];
+         values[kMassMCfromLegs] = m1*m1+m2*m2 + 
+         2.0*(TMath::Sqrt(m1*m1+leg1->P()*leg1->P())*TMath::Sqrt(m2*m2+leg2->P()*leg2->P()) - 
+         leg1->Px()*leg2->Px() - leg1->Py()*leg2->Py() - leg1->Pz()*leg2->Pz());
+         if(values[kMassMCfromLegs]<0.0) {
+            cout << "FillMCTruthInfo(mother, values, track1, track2): Warning: Very small squared mass found. "
+            << "   Could be negative due to resolution of Float_t so it will be set to a small positive value." << endl; 
+            cout << "   mass^2: " << values[kMassMCfromLegs] << endl;
+            cout << "p1(p,x,y,z): " << leg1->P() << ", " << leg1->Px() << ", " << leg1->Py() << ", " << leg1->Pz() << endl;
+            cout << "p2(p,x,y,z): " << leg2->P() << ", " << leg2->Px() << ", " << leg2->Py() << ", " << leg2->Pz() << endl;
+            values[kMassMCfromLegs] = 0.0;
+         }
+         else
+            values[kMassMCfromLegs] = TMath::Sqrt(values[kMassMCfromLegs]);
+         
+         Float_t e = TMath::Sqrt(values[kPMCfromLegs]*values[kPMCfromLegs] + values[kMassMCfromLegs] * values[kMassMCfromLegs]);
+         Float_t factor = e - values[kPzMCfromLegs];
+         values[kRapMCfromLegs] = (TMath::Abs(factor)>1.0e-6 ? (e+values[kPzMCfromLegs])/factor : 0.0);
+         values[kRapMCfromLegs] = (values[kRapMCfromLegs]>1.0e-6 ? 0.5*TMath::Log(values[kRapMCfromLegs]) : 0.0);
+      }
+   }
+   
    values[kPdgMC] = p->MCPdg(0);
    values[kPdgMC+1] = p->MCPdg(1);
    values[kPdgMC+2] = p->MCPdg(2);
@@ -1752,6 +1824,7 @@ void AliReducedVarManager::SetDefaultVarNames() {
   fgVariableNames[kOnlineTriggerFired2]  = "Online trigger fired2";           fgVariableUnits[kOnlineTriggerFired2]  = "";
   fgVariableNames[kIsPhysicsSelection]   = "Physics selection ON";            fgVariableUnits[kIsPhysicsSelection]   = "";
   fgVariableNames[kIsSPDPileup]          = "SPD pileup ON";                   fgVariableUnits[kIsSPDPileup]          = "";
+  fgVariableNames[kIsSPDPileup5]          = "SPD pileup (5 contributors) ON";                   fgVariableUnits[kIsSPDPileup5]          = "";
   fgVariableNames[kIsSPDPileupMultBins]  = "SPD pileup multiplicity bins ON"; fgVariableUnits[kIsSPDPileupMultBins]  = "";
   fgVariableNames[kNSPDpileups]          = "Number of SPD pileup events";     fgVariableUnits[kNSPDpileups]          = "";
   fgVariableNames[kNTrackPileups]        = "Number of track pileup events";   fgVariableUnits[kNTrackPileups]        = "";
@@ -1835,6 +1908,9 @@ void AliReducedVarManager::SetDefaultVarNames() {
   fgVariableNames[kSPDntracklets08]             = "No.SPD tracklets in |#eta| < 0.8";                fgVariableUnits[kSPDntracklets08]        = "";
   fgVariableNames[kSPDntracklets16]             = "No.SPD tracklets in |#eta| < 1.6";                fgVariableUnits[kSPDntracklets16]        = "";
   fgVariableNames[kSPDntrackletsCorr]           = "Corrected no. SPD tracklets in |#eta| < 1.0";     fgVariableUnits[kSPDntrackletsCorr]      = "";
+  fgVariableNames[kSPDntrackletsCorrSmear]      = "Corrected no. SPD tracklets in |#eta| < 1.0, Poisson smeared";    
+  fgVariableNames[kSPDntrackletsOuterCorr]      = "Corrected no. SPD tracklets in outer eta region";   fgVariableUnits[kSPDntrackletsOuterCorr]     = "";
+  fgVariableNames[kSPDntrackletsOuterCorrSmear]          = "Corrected no.SPD tracklets in outer eta region, Poisson smeared";                fgVariableUnits[kSPDntrackletsOuterCorrSmear]     = ""; fgVariableUnits[kSPDntrackletsCorrSmear]      = "";
   for(Int_t ieta=0;ieta<32;++ieta) {
     fgVariableNames[kSPDntrackletsEta+ieta] = Form("No.SPD tracklets in %.1f<#eta<%.1f", -1.6+0.1*ieta, -1.6+0.1*(ieta+1));
     fgVariableUnits[kSPDntrackletsEta+ieta] = "";
@@ -1852,6 +1928,8 @@ void AliReducedVarManager::SetDefaultVarNames() {
   fgVariableNames[kVZEROATotalMult]     = "Multiplicity VZERO-A";   fgVariableUnits[kVZEROATotalMult]     = "";
   fgVariableNames[kVZEROCTotalMult]     = "Multiplicity VZERO-C";   fgVariableUnits[kVZEROCTotalMult]     = "";
   fgVariableNames[kVZEROTotalMult]      = "Multiplicity VZERO";     fgVariableUnits[kVZEROTotalMult]      = "";
+  fgVariableNames[kVZEROTotalMultCorr]      = "Corrected Multiplicity VZERO";     fgVariableUnits[kVZEROTotalMult]      = "";
+  fgVariableNames[kVZEROTotalMultCorrSmear]      = "Corrected Multiplicity VZERO, Poisson smeared";     fgVariableUnits[kVZEROTotalMult]      = "";
   fgVariableNames[kVZEROAemptyChannels] = "VZERO-A empty channels"; fgVariableUnits[kVZEROAemptyChannels] = "";
   fgVariableNames[kVZEROCemptyChannels] = "VZERO-C empty channels"; fgVariableUnits[kVZEROCemptyChannels] = "";
   for(Int_t ich=0;ich<64;++ich) {
@@ -2047,20 +2125,28 @@ void AliReducedVarManager::SetDefaultVarNames() {
   
   fgVariableNames[kPt]    = "p_{T}";   fgVariableUnits[kPt]    = "GeV/c";
   fgVariableNames[kPtMC]    = "p^{MC}_{T}";   fgVariableUnits[kPtMC]    = "GeV/c";
+  fgVariableNames[kPtMCfromLegs]    = "p^{MC-legs}_{T}";   fgVariableUnits[kPtMCfromLegs]    = "GeV/c";
   fgVariableNames[kP]     = "p";       fgVariableUnits[kP]     = "GeV/c";
   fgVariableNames[kPMC]     = "p^{MC}";       fgVariableUnits[kPMC]     = "GeV/c";
+  fgVariableNames[kPMCfromLegs]     = "p^{MC-legs}";       fgVariableUnits[kPMCfromLegs]     = "GeV/c";
   fgVariableNames[kPx]    = "p_{x}";   fgVariableUnits[kPx]    = "GeV/c";
   fgVariableNames[kPxMC]    = "p^{MC}_{x}";   fgVariableUnits[kPxMC]    = "GeV/c";
+  fgVariableNames[kPxMCfromLegs]    = "p^{MC-legs}_{x}";   fgVariableUnits[kPxMCfromLegs]    = "GeV/c";
   fgVariableNames[kPy]    = "p_{y}";   fgVariableUnits[kPy]    = "GeV/c";
   fgVariableNames[kPyMC]    = "p^{MC}_{y}";   fgVariableUnits[kPyMC]    = "GeV/c";
+  fgVariableNames[kPyMCfromLegs]    = "p^{MC-legs}_{y}";   fgVariableUnits[kPyMCfromLegs]    = "GeV/c";
   fgVariableNames[kPz]    = "p_{z}";   fgVariableUnits[kPz]    = "GeV/c";
   fgVariableNames[kPzMC]    = "p^{MC}_{z}";   fgVariableUnits[kPzMC]    = "GeV/c";
+  fgVariableNames[kPzMCfromLegs]    = "p^{MC-legs}_{z}";   fgVariableUnits[kPzMCfromLegs]    = "GeV/c";
   fgVariableNames[kTheta] = "#theta";  fgVariableUnits[kTheta] = "rad.";
   fgVariableNames[kThetaMC] = "#theta^{MC}";  fgVariableUnits[kThetaMC] = "rad.";
+  fgVariableNames[kThetaMCfromLegs] = "#theta^{MC-legs}";  fgVariableUnits[kThetaMCfromLegs] = "rad.";
   fgVariableNames[kEta]   = "#eta";    fgVariableUnits[kEta]   = "";
   fgVariableNames[kEtaMC]   = "#eta^{MC}";    fgVariableUnits[kEtaMC]   = "";
+  fgVariableNames[kEtaMCfromLegs]   = "#eta^{MC-legs}";    fgVariableUnits[kEtaMCfromLegs]   = "";
   fgVariableNames[kPhi]   = "#varphi"; fgVariableUnits[kPhi]   = "rad.";
   fgVariableNames[kPhiMC]   = "#varphi^{MC}"; fgVariableUnits[kPhiMC]   = "rad.";
+  fgVariableNames[kPhiMCfromLegs]   = "#varphi^{MC-legs}"; fgVariableUnits[kPhiMCfromLegs]   = "rad.";
   for(Int_t iHarmonic=0;iHarmonic<6;++iHarmonic) {
     fgVariableNames[kCosNPhi+iHarmonic] = Form("cos(%d#varphi)",iHarmonic+1); fgVariableUnits[kCosNPhi+iHarmonic] = "";
     fgVariableNames[kSinNPhi+iHarmonic] = Form("sin(%d#varphi)",iHarmonic+1); fgVariableUnits[kSinNPhi+iHarmonic] = "";
@@ -2069,8 +2155,10 @@ void AliReducedVarManager::SetDefaultVarNames() {
   fgVariableNames[kOneOverSqrtPt] = "1/sqrt(p_{T})"; fgVariableUnits[kOneOverSqrtPt] = "GeV^{-1/2}";
   fgVariableNames[kMass]      = "m";         fgVariableUnits[kMass]        = "GeV/c^{2}";
   fgVariableNames[kMassMC]      = "m^{MC}";         fgVariableUnits[kMassMC]        = "GeV/c^{2}";
+  fgVariableNames[kMassMCfromLegs]      = "m^{MC-legs}";         fgVariableUnits[kMassMCfromLegs]        = "GeV/c^{2}";
   fgVariableNames[kRap]       = "y";         fgVariableUnits[kRap]         = "";  
   fgVariableNames[kRapMC]       = "y^{MC}";         fgVariableUnits[kRapMC]         = "";  
+  fgVariableNames[kRapMCfromLegs]       = "y^{MC-legs}";         fgVariableUnits[kRapMCfromLegs]         = "";  
   fgVariableNames[kPdgMC]       = "PDG code";          fgVariableUnits[kPdgMC]         = "";
   fgVariableNames[kPdgMC+1]  = "mother's PDG code";     fgVariableUnits[kPdgMC+1]         = "";
   fgVariableNames[kPdgMC+2]  = "grand-mother's PDG code";     fgVariableUnits[kPdgMC+2]         = "";
@@ -2320,13 +2408,16 @@ void AliReducedVarManager::SetRunNumbers( TString runNumbers ){
 }
 
 //____________________________________________________________________________________
-void AliReducedVarManager::SetTrackletsProfile(TProfile* profileTracklets) {
+void AliReducedVarManager::SetMultiplicityProfile(TH1* profile, Int_t estimator) {
    //
    // initialize the profile for the z-vertex equalization of the multiplicity estimator
    //
-   if(profileTracklets) {
-     fgAvgSpdTrackletsVertex = (TProfile*)profileTracklets->Clone(Form("AliReducedVarManager_AverageSPDtrackletsVsVertex"));
-     fgAvgSpdTrackletsVertex->SetDirectory(0x0);
+   if(profile) {
+     fgAvgMultVsVertex[estimator] = (TH1*)profile->Clone(Form("AliReducedVarManager_AverageMultiplicityVsVertex"));
+     fgAvgMultVsVertex[estimator]->SetDirectory(0x0);
+   }
+   else{
+     cout <<"AliReducedVarManager::SetMultiplicityProfile : Profile empty. " << estimator << endl;
    }
 }
 

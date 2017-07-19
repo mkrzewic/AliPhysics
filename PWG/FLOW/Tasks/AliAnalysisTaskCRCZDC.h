@@ -58,6 +58,7 @@ public:
     k2011,
     k2015,
     k2015v6,
+    k2015pidfix,
     kAny
   };
   
@@ -68,6 +69,15 @@ public:
     kTRK
   };
   
+  enum AnalysisType {
+    kMCkine,
+    kMCAOD,
+    kAUTOMATIC,
+    kMCESD,
+    kTrackQA,
+    kTracklets
+  };
+  
   virtual void InitializeRunArrays();
   
   // Implementation of interface methods
@@ -75,8 +85,7 @@ public:
   virtual void UserExec(Option_t *option);
   virtual void Terminate(Option_t *option);
   
-  void    SetAnalysisType(TString type) { this->fAnalysisType = type; }
-  TString GetAnalysisType() const       { return this->fAnalysisType; }
+  void    SetAnalysisType(AnalysisType type) { this->fAnalysisType = type; }
   
   void    SetRPType(TString rptype) { this->fRPType = rptype; }
   TString GetRPType() const         { return this->fRPType; }
@@ -111,6 +120,7 @@ public:
   TList*        GetQAList()      const      {return fQAList; }
   void          SetQAOn(Bool_t kt)        {fQAon = kt; }
   Bool_t        GetQAOn()   const         {return fQAon; }
+  Bool_t        SelectPileup(AliAODEvent* aod);
   
   void          SetShuffleTracks(Bool_t b)  {fShuffleTracks=b;}
   
@@ -153,6 +163,8 @@ public:
   void SetUseMCCen( Bool_t kB ) { fUseMCCen = kB; }
   void SetRejectPileUp( Bool_t kB ) { fRejectPileUp = kB; }
   void SetRejectPileUpTight( Bool_t kB ) { fRejectPileUpTight = kB; }
+  void SetResetNegativeZDC( Bool_t kB ) { fResetNegativeZDC = kB; }
+  void SetCorrectPhiTracklets( Bool_t kB ) { fCorrectPhiTracklets = kB; }
   void SetCentralityRange(Float_t centrlow=0., Float_t centrup=100.) {fCentrLowLim=centrlow;
     fCentrUpLim=centrup;}
   void SetCentralityEstimator(CentrEstimator centrest) {fCentrEstimator=centrest;}
@@ -168,16 +180,18 @@ public:
   TList* GetVZEROQVecRecList() const {return this->fVZEROQVecRecList;};
   void SetZDCSpectraCorrList(TList* const kList) {this->fZDCSpectraCorrList = (TList*)kList->Clone(); fUseZDCSpectraCorr=kTRUE;};
   TList* GetZDCSpectraCorrList() const {return this->fZDCSpectraCorrList;};
+  
   virtual Int_t GetCenBin(Double_t Centrality);
   Double_t GetWDist(const AliVVertex* v0, const AliVVertex* v1);
   Bool_t plpMV(const AliAODEvent* aod);
   Double_t GetBadTowerResp(Double_t Et, TH2D* BadTowerCalibHist);
+  void SetWhichVZERORings(int minVZC, int maxVZC, int minVZA, int maxVZA) {fMinRingVZC = minVZC; fMaxRingVZC = maxVZC; fMinRingVZA = minVZA; fMaxRingVZA = maxVZA;}
   
 private:
   AliAnalysisTaskCRCZDC(const AliAnalysisTaskCRCZDC& dud);
   AliAnalysisTaskCRCZDC& operator=(const AliAnalysisTaskCRCZDC& dud);
   
-  TString       fAnalysisType;      // can be MC, ESD or AOD
+  AnalysisType  fAnalysisType;      // can be MC, ESD or AOD
   TString       fRPType;            // can be Global or Tracklet or FMD
   AliCFManager* fCFManager1;        // correction framework manager
   AliCFManager* fCFManager2;        // correction framework manager
@@ -261,6 +275,7 @@ private:
   CentrEstimator  fCentrEstimator;     // string for the centrality estimator
   Bool_t   fRejectPileUp;
   Bool_t   fRejectPileUpTight;
+  Bool_t   fResetNegativeZDC;
   //
   TList       *fOutput;	   	//! list send on output slot 0
   //
@@ -352,8 +367,24 @@ private:
   const static Int_t fkVZEROnQAplots = 8;
   TProfile2D *fVZEROQVectorRecFinal[fkVZEROnHar][fkVZEROnQAplots]; //!
   Int_t fCachedRunNum;   //
+  Int_t fMinRingVZC; //
+  Int_t fMaxRingVZC; //
+  Int_t fMinRingVZA; //
+  Int_t fMaxRingVZA; //
+  Bool_t fCorrectPhiTracklets; //
   
-  ClassDef(AliAnalysisTaskCRCZDC,8);
+  // TrackQA
+  TList *fTrackQAList; //!
+  const static Int_t fKNFBs = 4;
+  TH3D* fTrackQADCAxy[fKNFBs][4]; //!
+  TH3D* fTrackQADCAz[fKNFBs][4]; //!
+  TH2D* fTrackQApT[fKNFBs][4]; //!
+  TProfile2D* fTrackQADphi[fKNFBs][4]; //!
+  TH2D* fEbEQRe[fKNFBs][4]; //!
+  TH2D* fEbEQIm[fKNFBs][4]; //!
+  TH2D* fEbEQMu[fKNFBs][4]; //!
+  
+  ClassDef(AliAnalysisTaskCRCZDC,10);
   
 };
 

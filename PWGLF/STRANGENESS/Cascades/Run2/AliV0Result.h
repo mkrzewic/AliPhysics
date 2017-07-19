@@ -3,6 +3,7 @@
 #include <TNamed.h>
 #include <TList.h>
 #include <TH3F.h>
+#include <TProfile.h>
 #include "AliVWeakResult.h"
 
 //+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -42,6 +43,10 @@ public:
     
     Long64_t Merge(TCollection *hlist);
     
+    //Acceptance
+    void SetCutMinRapidity      ( Double_t lCut ) { fCutMinRapidity       = lCut; }
+    void SetCutMaxRapidity      ( Double_t lCut ) { fCutMaxRapidity       = lCut; }
+    
     void SetCutV0Radius       ( Double_t lCut ) { fCutV0Radius         = lCut; }
     void SetCutDCANegToPV     ( Double_t lCut ) { fCutDCANegToPV       = lCut; }
     void SetCutDCAPosToPV     ( Double_t lCut ) { fCutDCAPosToPV       = lCut; }
@@ -51,6 +56,7 @@ public:
     
     void SetCutCompetingV0Rejection ( Double_t lCut ) { fCutCompetingV0Rejection   = lCut; }
     void SetCutArmenteros           ( Bool_t lCut   ) { fCutArmenteros        = lCut; }
+    void SetCutArmenterosParameter  ( Double_t lCut ) { fCutArmenterosParameter        = lCut; }
     void SetCutTPCdEdx              ( Double_t lCut ) { fCutTPCdEdx           = lCut; }
     void SetCutMinBaryonMomentum    ( Double_t lCut ) { fCutMinBaryonMomentum = lCut; }
     
@@ -85,6 +91,9 @@ public:
         fCutVarV0CosPA_Const     = l5;
     }
     
+    //Use OTF V0s
+    void SetUseOnTheFly ( Bool_t lCut ) { fUseOnTheFly = lCut; } 
+    
     //Feeddown matrix initializer
     void InitializeFeeddownMatrix(Long_t lNLambdaPtBins, Double_t *lLambdaPtBins,
                                   Long_t lNXiPtPins, Double_t *lXiPtPins,
@@ -92,7 +101,11 @@ public:
     
     AliV0Result::EMassHypo GetMassHypothesis () const { return fMassHypo; }
     Double_t GetMass() const;
-    TString GetParticleName() const; 
+    TString GetParticleName() const;
+    
+    //Getters for V0 Cuts
+    Double_t GetCutMinRapidity     () const { return fCutMinRapidity; }
+    Double_t GetCutMaxRapidity     () const { return fCutMaxRapidity; }
     
     Double_t GetCutV0Radius       () const { return fCutV0Radius; }
     Double_t GetCutDCANegToPV     () const { return fCutDCANegToPV; }
@@ -103,6 +116,7 @@ public:
 
     Double_t GetCutCompetingV0Rejection () const { return fCutCompetingV0Rejection; }
     Bool_t   GetCutArmenteros           () const { return fCutArmenteros; }
+    Double_t GetCutArmenterosParameter  () const { return fCutArmenterosParameter; }
     Double_t GetCutTPCdEdx              () const { return fCutTPCdEdx; }
     Double_t GetCutMinBaryonMomentum    () const { return fCutMinBaryonMomentum; }
     
@@ -128,8 +142,15 @@ public:
     Double_t GetCutVarV0CosPAExp1Slope() const { return fCutVarV0CosPA_Exp1Slope; }
     Double_t GetCutVarV0CosPAConst    () const { return fCutVarV0CosPA_Const;     }
     
+    //Use OTF V0s
+    Bool_t GetUseOnTheFly() const { return fUseOnTheFly; }
+    
     TH3F* GetHistogram       ()       { return fHisto; }
     TH3F* GetHistogramToCopy () const { return fHisto; }
+    
+    //Proton Profile - not implemented for V0s so far
+    TProfile* GetProtonProfile       ()       { return 0x0; }
+    TProfile* GetProtonProfileToCopy () const { return 0x0; }
 
     TH3F* GetHistogramFeeddown       ()       { return fHistoFeeddown; }
     TH3F* GetHistogramFeeddownToCopy () const { return fHistoFeeddown; }
@@ -141,6 +162,10 @@ private:
     //V0 Selection Criteria
     AliV0Result::EMassHypo fMassHypo; //For determining invariant mass
 
+    //Basic acceptance criteria
+    Double_t fCutMinRapidity; //min rapidity
+    Double_t fCutMaxRapidity; //max rapidity
+    
     Double_t fCutV0Radius;
     Double_t fCutDCANegToPV;
     Double_t fCutDCAPosToPV;
@@ -149,6 +174,7 @@ private:
     Double_t fCutProperLifetime;
     Double_t fCutCompetingV0Rejection;
     Bool_t fCutArmenteros;
+    Double_t fCutArmenterosParameter;
     Double_t fCutTPCdEdx;
     Double_t fCutMinBaryonMomentum;
     
@@ -175,10 +201,13 @@ private:
     Double_t fCutVarV0CosPA_Exp1Slope;
     Double_t fCutVarV0CosPA_Const;
     
+    //Master switch to use on-the-fly candidates
+    Bool_t fUseOnTheFly; //if zero -> offline, if kTRUE -> go on-the-fly
+    
     TH3F *fHisto; //Histogram for storing output with these configurations
     TH3F *fHistoFeeddown; //Feeddown matrix (optional)
     
-    ClassDef(AliV0Result, 13)
+    ClassDef(AliV0Result, 16)
     // 1 - original implementation
     // 2 - first implementation of MC association (to be adjusted)
     // 3 - Variable binning constructor + re-order variables in main output for convenience
@@ -192,5 +221,8 @@ private:
     //11 - Addition of variable CosPA, ITSrefit requirement
     //12 - Addition of eta window selection
     //13 - Max chi2/clusters, min track length for checking
+    //14 - added possibility to select on-the-fly V0 candidates
+    //15 - added proton profile (dummy as of now)
+    //16 - added configurable AP cut
 };
 #endif

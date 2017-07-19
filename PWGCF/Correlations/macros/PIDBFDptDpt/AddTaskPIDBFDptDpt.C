@@ -1,21 +1,29 @@
 //  Macro designed for use with the AliAnalysisTaskPIDBFDptDpt task.
 //  Author: Jinjin(Au-Au) Pan, Claude Pruneau & Prabhat Pujahari, Wayne State University
 //
-//   PbPb         10:     centralityMethod = 4 (V0),        trigger = kFALSE (AliVEvent::kMB).
-//   pPb          13:     centralityMethod = 7 (V0A),       trigger = kTRUE (AliVEvent::kINT7).     
-//   pp           10:     centralityMethod = 3 (nTracks),   trigger = kFALSE (AliVEvent::kMB).
-//   pp_V0A_kMB   10:     centralityMethod = 7 (V0A),       trigger = kFALSE (AliVEvent::kMB).
-//   pp_V0A_kINT7 10:     centralityMethod = 7 (V0A),       trigger = kTRUE (AliVEvent::kINT7).
-//   pp_V0_kMB    10:     centralityMethod = 4 (V0),        trigger = kFALSE (AliVEvent::kMB).
+//   PbPb               10:     centralityMethod = 4 (V0),        trigger = kFALSE (AliVEvent::kMB).
+//   PbPb_2015_kTRUE    15:     centralityMethod = 4 (V0),        trigger = kTRUE (AliVEvent::kINT7).
+//   PbPb_2015_kFALSE   15:     centralityMethod = 4 (V0),        trigger = kTRUE (AliVEvent::kINT7).
+//   pPb                13:     centralityMethod = 7 (V0A),       trigger = kTRUE (AliVEvent::kINT7).     
+//   pp                 10:     centralityMethod = 3 (nTracks),   trigger = kFALSE (AliVEvent::kMB).
+//   pp_V0A_kMB_kTRUE   10:     centralityMethod = 7 (V0A),       trigger = kFALSE (AliVEvent::kMB).
+//   pp_V0A_kMB_kFALSE  10:     centralityMethod = 7 (V0A),       trigger = kFALSE (AliVEvent::kMB).
+//   pp_V0_kMB_kTRUE    10:     centralityMethod = 4 (V0),        trigger = kFALSE (AliVEvent::kMB).
+//   pp_V0_kMB_kFALSE   10:     centralityMethod = 4 (V0),        trigger = kFALSE (AliVEvent::kMB).
+//   pp_V0C_kMB_kTRUE   10:     centralityMethod = 8 (V0C),       trigger = kFALSE (AliVEvent::kMB).
+//   pp_V0C_kMB_kFALSE  10:     centralityMethod = 8 (V0C),       trigger = kFALSE (AliVEvent::kMB).
+//   pp_V0A_kMB_Utils   10:     centralityMethod = 7 (V0A),       trigger = kFALSE (AliVEvent::kMB).
+//   pp_V0C_kMB_Utils   10:     centralityMethod = 8 (V0C),       trigger = kFALSE (AliVEvent::kMB).
+//   pp_V0_kMB_Utils    10:     centralityMethod = 4 (V0),        trigger = kFALSE (AliVEvent::kMB).
 /////////////////////////////////////////////////////////////////////////////////
 
 AliAnalysisTaskPIDBFDptDpt * AddTaskPIDBFDptDpt
 (
  TString AnalysisDataType       = "RealData", // "RealData"; "MCAOD" for MC AOD truth; "MCAODreco"
- TString System                 = "pp_V0A_kMB",      // "PbPb", "pPb", "pp", "pp_V0A_kMB", "pp_V0A_kINT7", "pp_V0_kMB"
+ TString System                 = "PbPb_2015_kTRUE",
  bool    pidparticle            =  1,   // 0: All Charged Particles;       1: PID particles
  int    useRapidity             =  1,   // 0: pseudo-rapadity      1: rapidity
- int    CentralityGroup         =  9,  // Diff Cent Groups dealing w/ memory limit & weight file 100M Alien limit
+ int    CentralityGroup         =  9,   // Diff Cent Groups dealing w/ memory limit & weight file 100M Alien limit
  int    singlesOnly             =  1,   // 0: full correlations    1: singles only
  int    useWeights              =  0,   // 0: no                   1: yes  
  int    chargeSet               =  1,   // 0: ++    1: +-    2: -+    3: --
@@ -60,13 +68,21 @@ AliAnalysisTaskPIDBFDptDpt * AddTaskPIDBFDptDpt
   Bool_t remove_Tracks_T0       = 1;
   bool   PurePIDinMC            = 0;   // 0: Contamination in MCAODreco;       1: No Contamination in MCAODreco
    
-  
-  if      ( System == "PbPb" )          { centralityMethod = 4; trigger = kFALSE; }
-  else if ( System == "pPb" )           { centralityMethod = 7; trigger = kTRUE;  }
-  else if ( System == "pp" )            { centralityMethod = 3; trigger = kFALSE; }
-  else if ( System == "pp_V0A_kMB" )    { centralityMethod = 7; trigger = kFALSE; }
-  else if ( System == "pp_V0A_kINT7" )  { centralityMethod = 7; trigger = kTRUE;  }
-  else if ( System == "pp_V0_kMB" )     { centralityMethod = 4; trigger = kFALSE; }
+
+  if      ( System == "PbPb" )                { centralityMethod = 4; trigger = kFALSE; }
+  else if ( System == "PbPb_2015_kTRUE" )     { centralityMethod = 4; trigger = kTRUE;  }
+  else if ( System == "PbPb_2015_kFALSE" )    { centralityMethod = 4; trigger = kTRUE;  }
+  else if ( System == "pPb" )                 { centralityMethod = 7; trigger = kTRUE;  }
+  else if ( System == "pp" )                  { centralityMethod = 3; trigger = kFALSE; }
+  else if ( System == "pp_V0A_kMB_kTRUE" )    { centralityMethod = 7; trigger = kFALSE; }
+  else if ( System == "pp_V0A_kMB_kFALSE" )   { centralityMethod = 7; trigger = kFALSE; }
+  else if ( System == "pp_V0C_kMB_kTRUE" )    { centralityMethod = 8; trigger = kFALSE; }
+  else if ( System == "pp_V0C_kMB_kFALSE" )   { centralityMethod = 8; trigger = kFALSE; }
+  else if ( System == "pp_V0_kMB_kTRUE" )     { centralityMethod = 4; trigger = kFALSE; }
+  else if ( System == "pp_V0_kMB_kFALSE" )    { centralityMethod = 4; trigger = kFALSE; }
+  else if ( System == "pp_V0A_kMB_Utils" )    { centralityMethod = 7; trigger = kFALSE; }
+  else if ( System == "pp_V0C_kMB_Utils" )    { centralityMethod = 8; trigger = kFALSE; }
+  else if ( System == "pp_V0_kMB_Utils" )     { centralityMethod = 4; trigger = kFALSE; }
   else    return 0;
 
   
@@ -360,7 +376,7 @@ AliAnalysisTaskPIDBFDptDpt * AddTaskPIDBFDptDpt
       task->SetElectronNSigmaVetoCut( ElectronVetoCut );
       task->SetfRemoveTracksT0Fill( remove_Tracks_T0 );
   
-      if(trigger) task -> SelectCollisionCandidates(AliVEvent::kINT7); //pPb
+      if(trigger) task -> SelectCollisionCandidates(AliVEvent::kINT7); //pPb, PbPb_2015
       else task -> SelectCollisionCandidates(AliVEvent::kMB); // PbPb & pp
         
       cout << "Creating task output container" << endl;
