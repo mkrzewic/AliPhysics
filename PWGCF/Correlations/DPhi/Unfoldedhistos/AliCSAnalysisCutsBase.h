@@ -177,12 +177,18 @@ public:
     kLHC16h2b,        ///< anchored LHC15o pass1 - jet-jet 10-50%
     kLHC16h2c,        ///< anchored LHC15o pass1 - jet-jet 50-90%
     kLHC16i3a,        ///< anchored LHC15o HIJING + HF injected with electron decays in central events
+    kLHC17i2,         ///< anchored LHC15o AMPT via AliGenerators
     ///@}
     /// \name 2016
     /// \brief 2016 periods
     ///@{
     kLHC16k,          ///< pp 13 TeV
     kLHC16l,          ///< pp 13 TeV
+    ///@}
+    /// \name 2017
+    /// \brief 2017 periods
+    ///@{
+    kLHC17n,          ///< XeXe 5.44 TeV
     ///@}
   };
 
@@ -200,6 +206,7 @@ public:
     kpPb8TeV      = 8,  ///< pPb 8 TeV
     kPbPb2760GeV  = 9,  ///< PbPb 2.76TeV
     kPbPb5TeV     = 10, ///< PbPb 5 TeV
+    kXeXe5440GeV  = 11, ///< XeXe 5.44 TeV
   };
 
                                 AliCSAnalysisCutsBase();

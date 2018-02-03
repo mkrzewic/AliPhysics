@@ -191,6 +191,11 @@ ClassImp(AliAnalysisTaskBeautyCal)
   fHistDCAdeEnhance_D(0),
   fHistDCAdeEnhance_Ds(0),
   fHistDCAdeEnhance_Lc(0),
+  fHistDCAdeEnhance_D0_w(0),
+  fHistDCAdeEnhance_D_w(0),
+  fHistDCAdeEnhance_Ds_w(0),
+  fHistDCAdeEnhance_Lc_w(0),
+  fHistDCAdeEnhance_Lc_w2(0),
   fHistDCAdePureMC(0),
   fHistDCAbePureMC(0),
   fHistDCAdeInc(0),
@@ -215,6 +220,10 @@ ClassImp(AliAnalysisTaskBeautyCal)
   fTPCcls(0),
   fdPhiEP0(0),
   fdPhiEP1(0),
+  fHistMcD0(0),
+  fHistMcD(0),
+  fHistMcDs(0),
+  fHistMcLc(0),
   Eop010Corr(0),
   fhfeCuts(0) 
 {
@@ -345,6 +354,11 @@ AliAnalysisTaskBeautyCal::AliAnalysisTaskBeautyCal()
   fHistDCAdeEnhance_D(0),
   fHistDCAdeEnhance_Ds(0),
   fHistDCAdeEnhance_Lc(0),
+  fHistDCAdeEnhance_D0_w(0),
+  fHistDCAdeEnhance_D_w(0),
+  fHistDCAdeEnhance_Ds_w(0),
+  fHistDCAdeEnhance_Lc_w(0),
+  fHistDCAdeEnhance_Lc_w2(0),
   fHistDCAdePureMC(0),
   fHistDCAbePureMC(0),
   fHistDCAdeInc(0),
@@ -369,6 +383,10 @@ AliAnalysisTaskBeautyCal::AliAnalysisTaskBeautyCal()
   fTPCcls(0),
   fdPhiEP0(0),
   fdPhiEP1(0),
+  fHistMcD0(0),
+  fHistMcD(0),
+  fHistMcDs(0),
+  fHistMcLc(0),
   Eop010Corr(0),
   fhfeCuts(0) 
 {
@@ -739,7 +757,22 @@ void AliAnalysisTaskBeautyCal::UserCreateOutputObjects()
 
   fHistDCAdeEnhance_Lc = new TH2D("fHistDCAdeEnhance_Lc", "DCA of Lc-> e; p_{T}(GeV/c);DCAxchargexMag.", 40,0,40,2000,-0.2,0.2);
   fOutputList->Add(fHistDCAdeEnhance_Lc);
+//
+  fHistDCAdeEnhance_D0_w = new TH2D("fHistDCAdeEnhance_D0_w", "DCA of D0-> e; p_{T}(GeV/c);DCAxchargexMag.", 40,0,40,2000,-0.2,0.2);
+  fOutputList->Add(fHistDCAdeEnhance_D0_w);
 
+  fHistDCAdeEnhance_D_w = new TH2D("fHistDCAdeEnhance_D_w", "DCA of Dp-> e; p_{T}(GeV/c);DCAxchargexMag.", 40,0,40,2000,-0.2,0.2);
+  fOutputList->Add(fHistDCAdeEnhance_D_w);
+
+  fHistDCAdeEnhance_Ds_w = new TH2D("fHistDCAdeEnhance_Ds_w", "DCA of Ds-> e; p_{T}(GeV/c);DCAxchargexMag.", 40,0,40,2000,-0.2,0.2);
+  fOutputList->Add(fHistDCAdeEnhance_Ds_w);
+
+  fHistDCAdeEnhance_Lc_w = new TH2D("fHistDCAdeEnhance_Lc_w", "DCA of Lc-> e; p_{T}(GeV/c);DCAxchargexMag.", 40,0,40,2000,-0.2,0.2);
+  fOutputList->Add(fHistDCAdeEnhance_Lc_w);
+
+  fHistDCAdeEnhance_Lc_w2 = new TH2D("fHistDCAdeEnhance_Lc_w2", "DCA of Lc-> e; p_{T}(GeV/c);DCAxchargexMag.", 40,0,40,2000,-0.2,0.2);
+  fOutputList->Add(fHistDCAdeEnhance_Lc_w2);
+//
   fHistDCAdePureMC = new TH2D("fHistDCAdePureMC", "DCA of D-> e; p_{T}(GeV/c);DCAxchargexMag.", 40,0,40,2000,-0.2,0.2);
   fOutputList->Add(fHistDCAdePureMC);
  
@@ -814,6 +847,18 @@ void AliAnalysisTaskBeautyCal::UserCreateOutputObjects()
 
   fdPhiEP1 = new TH1F("fdPhiEP1","tr phi w.r.t. EP",628,-6.28,6.28);
   fOutputList->Add(fdPhiEP1);
+
+  fHistMcD0 = new TH2D("fHistMcD0","D0 pT in MC",2,-0.5,1.5,40,0,40);
+  fOutputList->Add(fHistMcD0);
+
+  fHistMcD = new TH2D("fHistMcD","D pT in MC",2,-0.5,1.5,40,0,40);
+  fOutputList->Add(fHistMcD);
+
+  fHistMcDs = new TH2D("fHistMcDs","Ds pT in MC",2,-0.5,1.5,40,0,40);
+  fOutputList->Add(fHistMcDs);
+
+  fHistMcLc = new TH2D("fHistMcLc","Lc pT in MC",2,-0.5,1.5,40,0,40);
+  fOutputList->Add(fHistMcLc);
 
   PostData(1,fOutputList);
 
@@ -1423,7 +1468,7 @@ void AliAnalysisTaskBeautyCal::UserExec(Option_t *)
       {
        Double_t dphi_ep_tmp = track->Phi() - evPlane;
        Double_t dphi_ep = atan2(sin(dphi_ep_tmp),cos(dphi_ep_tmp));
-       cout << "dphi_ep = " << dphi_ep << endl;
+       //cout << "dphi_ep = " << dphi_ep << endl;
        fdPhiEP0->Fill(dphi_ep); 
    
        Double_t cosdphi = TMath::Cos(dphi_ep);
@@ -1641,6 +1686,12 @@ void AliAnalysisTaskBeautyCal::UserExec(Option_t *)
                   if(abs(pidM)==411)fHistDCAdeEnhance_D->Fill(track->Pt(),DCAxy);
                   if(abs(pidM)==431)fHistDCAdeEnhance_Ds->Fill(track->Pt(),DCAxy);
                   if(abs(pidM)==4122)fHistDCAdeEnhance_Lc->Fill(track->Pt(),DCAxy);
+                  //-------
+                  if(abs(pidM)==421)fHistDCAdeEnhance_D0_w->Fill(track->Pt(),DCAxy,1.0);
+                  if(abs(pidM)==411)fHistDCAdeEnhance_D_w->Fill(track->Pt(),DCAxy,0.793);  // 0.5/0.63 = 0.793
+                  if(abs(pidM)==431)fHistDCAdeEnhance_Ds_w->Fill(track->Pt(),DCAxy,1.9); // 0.4/0.21 = 1.9
+                  if(abs(pidM)==4122)fHistDCAdeEnhance_Lc_w->Fill(track->Pt(),DCAxy,6.6);  // 0.5/0.076 = 6.6
+                  if(abs(pidM)==4122)fHistDCAdeEnhance_Lc_w2->Fill(track->Pt(),DCAxy,14.5);  // 1.1/0.076 = 6.6
                  } 
                }
           if(pid_eleB)
@@ -2116,7 +2167,7 @@ Bool_t AliAnalysisTaskBeautyCal::IsPdecay(int mpid)
 void AliAnalysisTaskBeautyCal::CheckMCgen(AliAODMCHeader* fMCheader)
 {
  TList *lh=fMCheader->GetCocktailHeaders();
- Int_t NpureMC = 0;
+ Int_t NpureMC = 0; // base PYTHIA or HIJING
  NpureMCproc = 0;
  NembMCpi0 = 0;
  NembMCeta = 0;
@@ -2148,7 +2199,7 @@ void AliAnalysisTaskBeautyCal::CheckMCgen(AliAODMCHeader* fMCheader)
             if(MCgen.Contains(embeta))NembMCeta = NpureMCproc;
             if(MCgen.Contains(embBe))NembMCbe++;
 
-            NpureMCproc += gh->NProduced();  // generate by PYTHIA or HIJING
+            NpureMCproc += gh->NProduced();  //  enhanced MC sample + PYTHIA or HIJING (base)
            }
         }
     }
@@ -2167,7 +2218,6 @@ void AliAnalysisTaskBeautyCal::CheckMCgen(AliAODMCHeader* fMCheader)
       //cout << "imc = " << imc << endl;
       Bool_t iEnhance = kFALSE;
       if(imc>=NpureMC)iEnhance = kTRUE;
-      Int_t iHijing = 1;  // select particles from Hijing or PYTHIA
 
       if(imc==NpureMC)cout << "========================" << endl;  
 
@@ -2192,11 +2242,28 @@ void AliAnalysisTaskBeautyCal::CheckMCgen(AliAODMCHeader* fMCheader)
 
       fCheckEtaMC->Fill(pdgEta);
 
+      if(imc<NpureMC)
+        {
+          if(pdgGen==421)fHistMcD0->Fill(0.0,pTtrue);
+          if(pdgGen==411)fHistMcD->Fill(0.0,pTtrue);
+          if(pdgGen==431)fHistMcDs->Fill(0.0,pTtrue);
+          if(pdgGen==4122)fHistMcLc->Fill(0.0,pTtrue);
+        }
+      else
+        {
+          if(pdgGen==421)fHistMcD0->Fill(1.0,pTtrue);
+          if(pdgGen==411)fHistMcD->Fill(1.0,pTtrue);
+          if(pdgGen==431)fHistMcDs->Fill(1.0,pTtrue);
+          if(pdgGen==4122)fHistMcLc->Fill(1.0,pTtrue);
+        }
+
       Int_t pdgMom = -99;
       Int_t labelMom = -1;
       Double_t pTmom = -1.0;
       //cout << "check Mother" << endl;
       FindMother(fMCparticle,labelMom,pdgMom,pTmom);
+
+      Int_t iHijing = 1;  // select particles from Hijing or PYTHIA
       if(pdgMom==-99 && iEnhance)iHijing = 0;  // particles from enhance
       if(pdgMom>0 && iEnhance)iHijing = -1;  // particles from enhance but feeddown
       //if(pdgGen==111)cout << "pdg = " << pdgGen << " ; enhance = " << iEnhance << " ; HIJIJG = " << iHijing << " ; mother = " << pdgMom  << endl;
@@ -2209,7 +2276,6 @@ void AliAnalysisTaskBeautyCal::CheckMCgen(AliAODMCHeader* fMCheader)
 
       if(TMath::Abs(pdgGen)!=11)continue;
       if(pTtrue<2.0)continue;
-
 
       //if(iHijing ==0)
       if(pdgMom>0)

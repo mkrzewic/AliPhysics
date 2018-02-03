@@ -135,7 +135,9 @@ AliAnalysisTaskPHOSPi0EtaToGammaGamma::AliAnalysisTaskPHOSPi0EtaToGammaGamma(con
   fPHOSTriggerHelperL1L(0x0),
   fForceActiveTRU(kFALSE),
   fPIDResponse(0x0),
-  fIsNonLinStudy(kFALSE)
+  fIsNonLinStudy(kFALSE),
+  fGlobalEScale(1.0),
+  fEminForEta(0.4)
 {
   // Constructor
 
@@ -337,10 +339,10 @@ void AliAnalysisTaskPHOSPi0EtaToGammaGamma::UserCreateOutputObjects()
   fOutputContainer->Add(new TH2F(Form("hCentrality%svsPHOSClusterMultiplicity"   ,fEstimator.Data()),Form("Centrality %s vs. Cluster Multiplicity;centrality (%%);Ncluster"                  ,fEstimator.Data()),100,0,100,201,-0.5,200.5));
   fOutputContainer->Add(new TH2F(Form("hCentrality%svsPHOSClusterMultiplicityTOF",fEstimator.Data()),Form("Centrality %s vs. Cluster Multiplicity with TOF cut;centrality (%%);Ncluster"     ,fEstimator.Data()),100,0,100,201,-0.5,200.5));
 
-  fOutputContainer->Add(new TH2F(Form("hCentrality%svsSPDTracklet",fEstimator.Data()),Form("Centrality %s vs. SPD tracklet",fEstimator.Data()),100,0,100,5000,0,5000));
-  fOutputContainer->Add(new TH2F(Form("hCentrality%svsTrackMultiplicity",fEstimator.Data()),Form("Centrality %s vs. track Multiplicity",fEstimator.Data()),100,0,100,5000,0,5000));
-  fOutputContainer->Add(new TH2F("hPHOSClusterMultiplicityvsTrackMultiplicity"   ,"cluster multiplicity vs. track multiplicity"         ,500,0,5000,201,-0.5,200.5));
-  fOutputContainer->Add(new TH2F("hPHOSClusterMultiplicityTOFvsTrackMultiplicity","cluster multiplicity with TOF vs. track multiplicity",500,0,5000,201,-0.5,200.5));
+  fOutputContainer->Add(new TH2F(Form("hCentrality%svsSPDTracklet",fEstimator.Data()),Form("Centrality %s vs. SPD tracklet;centrality (%%);SPD tracklets",fEstimator.Data()),100,0,100,5000,0,5000));
+  fOutputContainer->Add(new TH2F(Form("hCentrality%svsTrackMultiplicity",fEstimator.Data()),Form("Centrality %s vs. track Multiplicity;centrality (%%);track multiplicity",fEstimator.Data()),100,0,100,5000,0,5000));
+  fOutputContainer->Add(new TH2F("hPHOSClusterMultiplicityvsTrackMultiplicity"   ,"cluster multiplicity vs. track multiplicity;Ncluster;track multiplicity"         ,500,0,5000,201,-0.5,200.5));
+  fOutputContainer->Add(new TH2F("hPHOSClusterMultiplicityTOFvsTrackMultiplicity","cluster multiplicity with TOF vs. track multiplicity;Ncluster;track multiplicity",500,0,5000,201,-0.5,200.5));
 
   //track QA histograms
   const Int_t Ntype=3;
@@ -410,8 +412,6 @@ void AliAnalysisTaskPHOSPi0EtaToGammaGamma::UserCreateOutputObjects()
 
   fOutputContainer->Add(new TH2F("hClusterEtaPhi","Cluster eta vs. phi;#phi;#eta",60,0,TwoPi,200,-1,1));
   fOutputContainer->Add(new TH2F("hEnergyvsDistanceToBadChannel","distance to closest bad channel;E (GeV);distance in cell",100,0,50,10,0,5));
-  //fOutputContainer->Add(new TH2F("hAsymvsMgg","asymmetry vs. M_{#gamma#gamma};asymmetry;M_{#gamma#gamma} (GeV/c^{2})",10,0,1,240,0,0.96));
-  //fOutputContainer->Add(new TH2F("hAsymvsPt" ,"asymmetry vs. p_{T}^{#gamma#gamma};asymmetry;p_{T} (GeV/c)",10,0,1,100,0,50));
 
   fOutputContainer->Add(new TH3F("hMggvsPtvsDeltaRgg","Mgg vs. p_{T} vs. #DeltaR_{#gamma#gamma};M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);#DeltaR_{#gamma#gamma}",180,0,0.72,100,0,50,50,0,0.5));
 
@@ -457,37 +457,51 @@ void AliAnalysisTaskPHOSPi0EtaToGammaGamma::UserCreateOutputObjects()
   hs_Photon_TOF->Sumw2();
   fOutputContainer->Add(hs_Photon_TOF);
 
-  const TString Asym[] = {"","_asym08"};
-  const Int_t Nasym = sizeof(Asym)/sizeof(Asym[0]);
 
   const Int_t Ndim = 4;
-  const Int_t Nbin[Ndim]    = { 240, 500, 10, NbinQ};
-  const Double_t xmin[Ndim] = {   0,   0,  0,  Qmin};
-  const Double_t xmax[Ndim] = {0.96,  50,  1,  Qmax};
+  const Int_t Nbin_pi0[Ndim]    = { 120, 500, 10, NbinQ};
+  const Double_t xmin_pi0[Ndim] = {   0,   0,  0,  Qmin};
+  const Double_t xmax_pi0[Ndim] = {0.48,  50,  1,  Qmax};
 
-  const Int_t Ndim_mix = 4;//it is meaningless to compute SP mixed event;
-  const Int_t Nbin_mix[Ndim_mix]    = { 240, 500, 10, NbinQ};
-  const Double_t xmin_mix[Ndim_mix] = {   0,   0,  0,  Qmin};
-  const Double_t xmax_mix[Ndim_mix] = {0.96,  50,  1,  Qmax};
+  const Int_t Nbin_eta[Ndim]    = { 120, 500, 10, NbinQ};
+  const Double_t xmin_eta[Ndim] = {0.32,   0,  0,  Qmin};
+  const Double_t xmax_eta[Ndim] = {0.80,  50,  1,  Qmax};
 
-  //same event
-  THnSparseF *hs_Mgg = new THnSparseF("hSparseMgg",Form("M_{#gamma#gamma};M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);asymmetry;%s;",axistitle.Data()),Ndim,Nbin,xmin,xmax);
-  hs_Mgg->Sumw2();
-  fOutputContainer->Add(hs_Mgg);
+  //same event for pi0 region
+  THnSparseF *hs_Mgg_pi0 = new THnSparseF("hSparseMgg_Pi0",Form("M_{#gamma#gamma};M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);asymmetry;%s;",axistitle.Data()),Ndim,Nbin_pi0,xmin_pi0,xmax_pi0);
+  hs_Mgg_pi0->Sumw2();
+  fOutputContainer->Add(hs_Mgg_pi0);
 
-  THnSparseF *hs_Mgg_TOF = new THnSparseF("hSparseMgg_TOF",Form("M_{#gamma#gamma} with TOF;M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);asymmetry;%s;",axistitle.Data()),Ndim,Nbin,xmin,xmax);
-  hs_Mgg_TOF->Sumw2();
-  fOutputContainer->Add(hs_Mgg_TOF);
+  THnSparseF *hs_Mgg_pi0_TOF = new THnSparseF("hSparseMgg_Pi0_TOF",Form("M_{#gamma#gamma} with TOF;M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);asymmetry;%s;",axistitle.Data()),Ndim,Nbin_pi0,xmin_pi0,xmax_pi0);
+  hs_Mgg_pi0_TOF->Sumw2();
+  fOutputContainer->Add(hs_Mgg_pi0_TOF);
 
-  //mixed event
-  THnSparseF *hs_MixMgg = new THnSparseF("hSparseMixMgg",Form("M_{#gamma#gamma}^{mix};M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);asymmetry;%s;",axistitle.Data()),Ndim_mix,Nbin_mix,xmin_mix,xmax_mix);
-  hs_MixMgg->Sumw2();
-  fOutputContainer->Add(hs_MixMgg);
+  //mixed event for pi0 region
+  THnSparseF *hs_MixMgg_pi0 = new THnSparseF("hSparseMixMgg_Pi0",Form("M_{#gamma#gamma}^{mix};M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);asymmetry;%s;",axistitle.Data()),Ndim,Nbin_pi0,xmin_pi0,xmax_pi0);
+  hs_MixMgg_pi0->Sumw2();
+  fOutputContainer->Add(hs_MixMgg_pi0);
 
-  THnSparseF *hs_MixMgg_TOF = new THnSparseF("hSparseMixMgg_TOF",Form("M_{#gamma#gamma}^{mix} with TOF;M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);asymmetry;%s;",axistitle.Data()),Ndim_mix,Nbin_mix,xmin_mix,xmax_mix);
-  hs_MixMgg_TOF->Sumw2();
-  fOutputContainer->Add(hs_MixMgg_TOF);
+  THnSparseF *hs_MixMgg_pi0_TOF = new THnSparseF("hSparseMixMgg_Pi0_TOF",Form("M_{#gamma#gamma}^{mix} with TOF;M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);asymmetry;%s;",axistitle.Data()),Ndim,Nbin_pi0,xmin_pi0,xmax_pi0);
+  hs_MixMgg_pi0_TOF->Sumw2();
+  fOutputContainer->Add(hs_MixMgg_pi0_TOF);
 
+  //same event for eta region
+  THnSparseF *hs_Mgg_eta = new THnSparseF("hSparseMgg_Eta",Form("M_{#gamma#gamma};M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);asymmetry;%s;",axistitle.Data()),Ndim,Nbin_eta,xmin_eta,xmax_eta);
+  hs_Mgg_eta->Sumw2();
+  fOutputContainer->Add(hs_Mgg_eta);
+
+  THnSparseF *hs_Mgg_eta_TOF = new THnSparseF("hSparseMgg_Eta_TOF",Form("M_{#gamma#gamma} with TOF;M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);asymmetry;%s;",axistitle.Data()),Ndim,Nbin_eta,xmin_eta,xmax_eta);
+  hs_Mgg_eta_TOF->Sumw2();
+  fOutputContainer->Add(hs_Mgg_eta_TOF);
+
+  //mixed event for eta region
+  THnSparseF *hs_MixMgg_eta = new THnSparseF("hSparseMixMgg_Eta",Form("M_{#gamma#gamma}^{mix};M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);asymmetry;%s;",axistitle.Data()),Ndim,Nbin_eta,xmin_eta,xmax_eta);
+  hs_MixMgg_eta->Sumw2();
+  fOutputContainer->Add(hs_MixMgg_eta);
+
+  THnSparseF *hs_MixMgg_eta_TOF = new THnSparseF("hSparseMixMgg_Eta_TOF",Form("M_{#gamma#gamma}^{mix} with TOF;M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);asymmetry;%s;",axistitle.Data()),Ndim,Nbin_eta,xmin_eta,xmax_eta);
+  hs_MixMgg_eta_TOF->Sumw2();
+  fOutputContainer->Add(hs_MixMgg_eta_TOF);
   //<- histograms for physics analysis
 
   for(Int_t imod1=1;imod1<Nmod;imod1++){
@@ -685,15 +699,17 @@ void AliAnalysisTaskPHOSPi0EtaToGammaGamma::UserCreateOutputObjects()
     h1TrueGamma->Sumw2();
     fOutputContainer->Add(h1TrueGamma);
 
+    const TString Asym[] = {"","_asym08"};
+    const Int_t Nasym = sizeof(Asym)/sizeof(Asym[0]);
+
     for(Int_t iasym=0;iasym<Nasym;iasym++){
-      TH2F *h2 = new TH2F(Form("hMggFromK0S%s",Asym[iasym].Data()),"M_{#gamma#gamma} from K_{S}^{0};M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c)",240,0,0.96,NpTgg-1,pTgg);
+      TH2F *h2 = new TH2F(Form("hMggFromK0S%s",Asym[iasym].Data()),"M_{#gamma#gamma} from K_{S}^{0};M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c)",120,0,0.48,NpTgg-1,pTgg);
       h2->Sumw2();
       fOutputContainer->Add(h2);
-
     }//end of asym loop
 
     for(Int_t iasym=0;iasym<Nasym;iasym++){
-      TH2F *h2 = new TH2F(Form("hMggFromLambda0%s",Asym[iasym].Data()),"M_{#gamma#gamma} from K_{S}^{0};M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);",240,0,0.96,NpTgg-1,pTgg);
+      TH2F *h2 = new TH2F(Form("hMggFromLambda0%s",Asym[iasym].Data()),"M_{#gamma#gamma} from K_{S}^{0};M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c);",120,0,0.48,NpTgg-1,pTgg);
       h2->Sumw2();
       fOutputContainer->Add(h2);
 
@@ -709,11 +725,12 @@ void AliAnalysisTaskPHOSPi0EtaToGammaGamma::UserCreateOutputObjects()
           Double_t a = -0.09 + 0.01*ia;
           Double_t b =  0.4  + 0.1 *ib;
 
-          fNonLin[ia][ib] = new TF1(Form("fNonLin_a%d_b%d",ia,ib),"1.0*(1. + [0] / (1. + TMath::Power(x/[1],2)))",0,100);
+          fNonLin[ia][ib] = new TF1(Form("fNonLin_a%d_b%d",ia,ib),"[2]*(1. + [0] / (1. + TMath::Power(x/[1],2)))",0,100);
           fNonLin[ia][ib]->SetParNames("a","b (GeV)");
           fNonLin[ia][ib]->FixParameter(0,a);
           fNonLin[ia][ib]->FixParameter(1,b);
-
+          fNonLin[ia][ib]->FixParameter(2,fGlobalEScale);
+  
           fOutputContainer->Add(new TH2F(Form("hMgg_a%d_b%d",ia,ib)   ,Form("M_{#gamma#gamma} vs. p_{T} a = %3.2f , b = %3.2f;M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c)",a,b)      ,240,0,0.96,NpTgg-1,pTgg));
           fOutputContainer->Add(new TH2F(Form("hMixMgg_a%d_b%d",ia,ib),Form("M_{#gamma#gamma}^{mix} vs. p_{T} a = %3.2f , b = %3.2f;M_{#gamma#gamma} (GeV/c^{2});p_{T} (GeV/c)",a,b),240,0,0.96,NpTgg-1,pTgg));
         }//end of ib
@@ -791,13 +808,11 @@ void AliAnalysisTaskPHOSPi0EtaToGammaGamma::UserExec(Option_t *option)
     return;
   }
 
-  FillHistogramTH1(fOutputContainer,"hEventSummary",1);//all
 
   const AliVVertex *vVertex = fEvent->GetPrimaryVertex();
   fVertex[0] = vVertex->GetX();
   fVertex[1] = vVertex->GetY();
   fVertex[2] = vVertex->GetZ();
-  FillHistogramTH1(fOutputContainer,"hVertexZ" ,fVertex[2]);
   fZvtx = (Int_t)((fVertex[2]+10.)/2.);//it should be 0-9.
   if(fZvtx < 0) fZvtx = 0;//protection to avoid fZvtx = -1.
   if(fZvtx > 9) fZvtx = 9;//protection to avoid fZvtx = 10.
@@ -918,6 +933,8 @@ void AliAnalysisTaskPHOSPi0EtaToGammaGamma::UserExec(Option_t *option)
     return;
   }
 
+  FillHistogramTH1(fOutputContainer,"hEventSummary",1);//all
+  FillHistogramTH1(fOutputContainer,"hVertexZ" ,fVertex[2]);
   FillHistogramTH2(fOutputContainer,Form("hCentrality%svsNContributor",fEstimator.Data()),fCentralityMain,Ncontributor);
 
   fPHOSClusterArray = (TClonesArray*)fEvent->FindListObject("PHOSClusterArray");
@@ -1751,13 +1768,15 @@ void AliAnalysisTaskPHOSPi0EtaToGammaGamma::FillMgg()
       value[1] = pt12;
       value[2] = asym;
 
-      if(m12 > 0.96) continue;//reduce entry in THnSparse
+      if(m12 > 0.8) continue;//reduce entry in THnSparse
 
       if(TMath::Abs(ph1->Module()-ph2->Module()) < 2) FillHistogramTH2(fOutputContainer,Form("hMgg_M%d%d",TMath::Min(ph1->Module(),ph2->Module()), TMath::Max(ph1->Module(),ph2->Module())),m12,pt12,weight * 1/trgeff12);
-      FillSparse(fOutputContainer,"hSparseMgg",value,weight * 1/trgeff12);
+      FillSparse(fOutputContainer,"hSparseMgg_Pi0",value,weight * 1/trgeff12);
+      if(e1 > fEminForEta && e2 > fEminForEta) FillSparse(fOutputContainer,"hSparseMgg_Eta",value,weight * 1/trgeff12);//to increase S/B
 
       if(ph1->IsTOFOK() && ph2->IsTOFOK()){
-        FillSparse(fOutputContainer,"hSparseMgg_TOF",value,1/eff12 * weight * 1/trgeff12);
+        FillSparse(fOutputContainer,"hSparseMgg_Pi0_TOF",value,1/eff12 * weight * 1/trgeff12);
+        if(e1 > fEminForEta && e2 > fEminForEta)  FillSparse(fOutputContainer,"hSparseMgg_Eta_TOF",value,1/eff12 * weight * 1/trgeff12);//to increase S/B
 
         if(TMath::Abs(ph1->Module()-ph2->Module()) < 2) FillHistogramTH2(fOutputContainer,Form("hMgg_M%d%d_TOF",TMath::Min(ph1->Module(),ph2->Module()), TMath::Max(ph1->Module(),ph2->Module())),m12,pt12,1/eff12 * weight * 1/trgeff12);
 
@@ -1870,13 +1889,16 @@ void AliAnalysisTaskPHOSPi0EtaToGammaGamma::FillMixMgg()
         value[1] = pt12;
         value[2] = asym;
 
-        if(m12 > 0.96) continue;//reduce entry in THnSparse
+        if(m12 > 0.8) continue;//reduce entry in THnSparse
 
-        FillSparse(fOutputContainer,"hSparseMixMgg",value,weight * 1/trgeff12);
+        FillSparse(fOutputContainer,"hSparseMixMgg_Pi0",value,weight * 1/trgeff12);
+        if(e1 > fEminForEta && e2 > fEminForEta) FillSparse(fOutputContainer,"hSparseMixMgg_Eta",value,weight * 1/trgeff12);//to increase S/B
+
         if(TMath::Abs(ph1->Module()-ph2->Module()) < 2) FillHistogramTH2(fOutputContainer,Form("hMixMgg_M%d%d",TMath::Min(ph1->Module(),ph2->Module()), TMath::Max(ph1->Module(),ph2->Module())),m12,pt12, weight * 1/trgeff12);
 
         if(ph1->IsTOFOK() && ph2->IsTOFOK()){
-          FillSparse(fOutputContainer,"hSparseMixMgg_TOF",value,1/eff12 * weight * 1/trgeff12);
+          FillSparse(fOutputContainer,"hSparseMixMgg_Pi0_TOF",value,1/eff12 * weight * 1/trgeff12);
+          if(e1 > fEminForEta && e2 > fEminForEta) FillSparse(fOutputContainer,"hSparseMixMgg_Eta_TOF",value,1/eff12 * weight * 1/trgeff12);//to increase S/B
 
           if(TMath::Abs(ph1->Module()-ph2->Module()) < 2) FillHistogramTH2(fOutputContainer,Form("hMixMgg_M%d%d_TOF",TMath::Min(ph1->Module(),ph2->Module()), TMath::Max(ph1->Module(),ph2->Module())),m12,pt12,1/eff12 * weight * 1/trgeff12);
 
@@ -3172,6 +3194,10 @@ void AliAnalysisTaskPHOSPi0EtaToGammaGamma::DoNonLinearityStudy()
   TLorentzVector p12, p12core;
   Double_t m12=0,pt12=0;
   Double_t e1=0,e2=0;
+  Double_t weight = 1., w1 = 1., w2 = 1.;
+  Int_t primary1 = -1;
+  Int_t primary2 = -1;
+  Int_t commonID = -1;
 
   for(Int_t ia=0;ia<7;ia++){
     for(Int_t ib=0;ib<7;ib++){
@@ -3200,7 +3226,21 @@ void AliAnalysisTaskPHOSPi0EtaToGammaGamma::DoNonLinearityStudy()
             pt12 = p12core.Pt();
           }
 
-          FillHistogramTH2(fOutputContainer,Form("hMgg_a%d_b%d",ia,ib),m12,pt12);
+          weight = 1.;
+          if(fIsMC){
+            w1= ph1->GetWeight();
+            primary1 = ph1->GetPrimary();
+
+            w2 = ph2->GetWeight();
+            primary2 = ph2->GetPrimary();
+
+            commonID = FindCommonParent(primary1,primary2);
+            if(commonID > -1) weight = w1;
+            else weight = w1*w2;
+
+          }//end of if fIsMC
+
+          FillHistogramTH2(fOutputContainer,Form("hMgg_a%d_b%d",ia,ib),m12,pt12,weight);
 
         }//end of ph2
       }//end of ph1
